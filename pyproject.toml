@@ -1,0 +1,18 @@
+[project]
+name = "dpx3300-plotter"
+version = "0.2.0"
+description = "Convert SVG artwork to HP-GL for a Roland DPX-3300 and transmit it over RS-232."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "vpype>=1.14",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+chiplotle = [
+    "Chiplotle3",
+]
+
+[tool.uv]
+package = false

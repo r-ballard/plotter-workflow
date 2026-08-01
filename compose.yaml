@@ -1,0 +1,36 @@
+services:
+  converter:
+    build:
+      context: .
+    image: dpx3300-plotter:local
+    working_dir: /app
+    volumes:
+      - ./input:/app/input:ro
+      - ./output:/app/output
+    command:
+      - dpx3300_convert.py
+      - --input-dir
+      - /app/input
+      - --output-dir
+      - /app/output
+      - --page-size
+      - a3
+      - --landscape
+
+  # Linux-only example. Compose cannot expand a configurable device path
+  # portably, so change both paths to the host's actual /dev/ttyUSB* device.
+  sender:
+    profiles: ["serial-linux"]
+    build:
+      context: .
+    image: dpx3300-plotter:local
+    working_dir: /app
+    volumes:
+      - ./output:/app/output:ro
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    command:
+      - send_hpgl.py
+      - --port
+      - /dev/ttyUSB0
+      - /app/output/test.hpgl

@@ -1,0 +1,66 @@
+# Custom vpype HP-GL profile for the Roland DPX-3300.
+#
+# The machine was verified to treat (0, 0) as the center of the drawing area.
+# vpype's built-in Roland DXY profile assumes a lower-left origin and therefore
+# places positive-only jobs in the upper-right quadrant on this plotter.
+#
+# These paper ranges use the complete physical page dimensions at 40 plotter
+# units per millimetre. Use the converter's --margin option to keep geometry
+# safely away from paper edges and clamps.
+
+[device.dpx3300]
+name = "Roland DPX-3300"
+plotter_unit_length = "0.025mm"
+pen_count = 8
+info = """
+DPX-3300 centered-origin profile. Load the selected paper centered on the
+machine origin and verify the placement with a small test before a full job.
+"""
+
+[[device.dpx3300.paper]]
+name = "letter"
+aka_names = ["ansi_a", "a"]
+info = "US Letter paper (8.5 x 11 in) loaded landscape. Use an explicit margin."
+paper_size = ["11in", "8.5in"]
+x_range = [-5588, 5588]
+y_range = [-4318, 4318]
+y_axis_up = true
+origin_location = ["5.5in", "4.25in"]
+origin_location_reference = "topleft"
+final_pu_params = "0,0"
+
+[[device.dpx3300.paper]]
+name = "a4"
+aka_names = ["A4"]
+info = "A4 paper loaded landscape. Use an explicit margin."
+paper_size = ["297mm", "210mm"]
+x_range = [-5940, 5940]
+y_range = [-4200, 4200]
+y_axis_up = true
+origin_location = ["148.5mm", "105mm"]
+origin_location_reference = "topleft"
+final_pu_params = "0,0"
+
+[[device.dpx3300.paper]]
+name = "a3"
+aka_names = ["A3"]
+info = "A3 paper loaded landscape. Use an explicit margin."
+paper_size = ["420mm", "297mm"]
+x_range = [-8400, 8400]
+y_range = [-5940, 5940]
+y_axis_up = true
+origin_location = ["210mm", "148.5mm"]
+origin_location_reference = "topleft"
+final_pu_params = "0,0"
+
+[[device.dpx3300.paper]]
+name = "tabloid"
+aka_names = ["ansi_b", "b"]
+info = "US Tabloid paper (11 x 17 in) loaded landscape. Use an explicit margin."
+paper_size = ["17in", "11in"]
+x_range = [-8636, 8636]
+y_range = [-5588, 5588]
+y_axis_up = true
+origin_location = ["8.5in", "5.5in"]
+origin_location_reference = "topleft"
+final_pu_params = "0,0"

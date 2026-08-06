@@ -18,8 +18,9 @@ on. Always turn the plotter off before changing a switch, then power it back on.
 - Inspect the HP-GL before transmitting it.
 - Keep a hand near the plotter's pause control.
 - Be prepared to power the plotter off if it moves outside the expected area.
-- Do not assume that the generic vpype `dxy` profile exactly matches every
-  DPX-3300 paper boundary or P1/P2 configuration.
+- The repository's `vpype.toml` defines a centered-origin `dpx3300` profile.
+  Continue to verify paper placement, P1/P2 configuration, and margins with a
+  small test before a full job.
 
 ---
 
@@ -626,6 +627,28 @@ Avoid `--privileged`. Pass only the serial device required by the job.
 ---
 
 # Common plotting notes
+
+## DPX-3300 coordinate profile
+
+The plotter has been physically verified with a one-inch square spanning
+negative and positive coordinates around `(0, 0)`. The square was drawn in the
+middle of the drawing surface, confirming that this DPX-3300 uses a centered
+machine origin for the tested configuration.
+
+The converter now loads `vpype.toml` automatically and uses the `dpx3300`
+device profile by default. The profile defines centered coordinate ranges for
+Letter, A4, A3, and Tabloid paper. For example, Letter landscape uses:
+
+```text
+Full page: X=-5588..5588, Y=-4318..4318
+0.5-inch margin: approximately X=-5080..5080, Y=-3810..3810
+```
+
+For the first converted job, use `--absolute` and inspect the HP-GL before
+sending it. A correctly centered two-dimensional drawing should normally
+contain both negative and positive coordinate values. The final `SP0;` command
+returns the tool to the pen stock; the carriage moving to the lower-left after a
+successful job is expected behavior.
 
 ## Multicolor jobs
 

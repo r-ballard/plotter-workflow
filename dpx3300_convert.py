@@ -18,9 +18,11 @@ Important DPX-3300 assumptions
 ------------------------------
 * The DPX-3300 uses Roland RD-GL II, which is closely related to HP-GL.
 * The plotter coordinate resolution is 0.025 mm (40 plotter units/mm).
-* vpype does not currently include a DPX-3300 profile. This script uses
-  vpype's built-in Roland ``dxy`` profile as a practical starting point.
-  Always make a small pen-up or sacrificial-paper test before plotting.
+* vpype does not currently include a built-in DPX-3300 profile. This
+  project supplies ``vpype.toml`` with a centered-origin ``dpx3300`` device
+  profile. The profile maps the physical center of the selected page to
+  plotter coordinate ``(0, 0)``, matching the behavior verified on the
+  machine. Always make a small pen-up or sacrificial-paper test before plotting.
 * The plotter and computer serial settings must match. The factory serial
   settings documented by Roland are 9600 baud, no parity, 8 data bits,
   and 1 stop bit.
@@ -33,14 +35,16 @@ Convert every SVG in ./input to ./output:
         --input-dir ./input \
         --output-dir ./output
 
-Convert one file with A3 landscape layout:
+Convert one file for US Letter paper loaded landscape:
 
     python3 dpx3300_convert.py \
         --input-dir ./input \
         --output-dir ./output \
         --file drawing.svg \
-        --page-size a3 \
-        --landscape
+        --page-size letter \
+        --landscape \
+        --margin 0.5in \
+        --absolute
 
 Convert and immediately send each result with Chiplotle3:
 
@@ -63,6 +67,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 LOG = logging.getLogger("dpx3300")
+DEFAULT_VPYPE_CONFIG = Path(__file__).resolve().with_name("vpype.toml")
 
 
 class ConversionError(RuntimeError):
@@ -83,6 +88,14 @@ def positive_float(value: str) -> float:
     if number <= 0:
         raise argparse.ArgumentTypeError("Value must be greater than zero.")
     return number
+
+
+def existing_file(value: str) -> Path:
+    """Return *value* as a resolved file path or raise an argparse error."""
+    path = Path(value).expanduser().resolve()
+    if not path.is_file():
+        raise argparse.ArgumentTypeError(f"File does not exist: {path}")
+    return path
 
 
 def discover_svg_files(input_dir: Path, filename: str | None) -> list[Path]:
@@ -124,6 +137,7 @@ def build_vpype_command(
     source: Path,
     destination: Path,
     *,
+    config_path: Path,
     device: str,
     page_size: str,
     landscape: bool,
@@ -153,6 +167,8 @@ def build_vpype_command(
     """
     command = [
         "vpype",
+        "--config",
+        str(config_path),
         "read",
         str(source),
         "linemerge",
@@ -264,6 +280,7 @@ def convert_files(
     sources: Iterable[Path],
     output_dir: Path,
     *,
+    config_path: Path,
     device: str,
     page_size: str,
     landscape: bool,
@@ -289,6 +306,7 @@ def convert_files(
         command = build_vpype_command(
             source,
             destination,
+            config_path=config_path,
             device=device,
             page_size=page_size,
             landscape=landscape,
@@ -334,11 +352,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Convert only this SVG filename inside --input-dir.",
     )
     parser.add_argument(
-        "--device",
-        default="dxy",
+        "--vpype-config",
+        type=existing_file,
+        default=DEFAULT_VPYPE_CONFIG,
         help=(
-            "vpype HP-GL device profile. Default: dxy, a Roland profile and "
-            "the closest built-in starting point for the DPX-3300."
+            "vpype TOML configuration file. Default: the repository's "
+            "vpype.toml next to this script."
+        ),
+    )
+    parser.add_argument(
+        "--device",
+        default="dpx3300",
+        help=(
+            "vpype HP-GL device profile. Default: dpx3300, the project's "
+            "center-origin profile for this machine."
         ),
     )
     parser.add_argument(
@@ -412,6 +439,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         outputs = convert_files(
             sources,
             output_dir,
+            config_path=args.vpype_config,
             device=args.device,
             page_size=args.page_size,
             landscape=args.landscape,

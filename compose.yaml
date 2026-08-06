@@ -14,8 +14,11 @@ services:
       - --output-dir
       - /app/output
       - --page-size
-      - a3
+      - letter
       - --landscape
+      - --margin
+      - 0.5in
+      - --absolute
 
   # Linux-only example. Compose cannot expand a configurable device path
   # portably, so change both paths to the host's actual /dev/ttyUSB* device.

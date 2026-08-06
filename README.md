@@ -15,13 +15,43 @@ uv sync
 
 ## Convert
 
+The repository includes `vpype.toml`, a DPX-3300-specific device profile that
+maps the center of the selected page to plotter coordinate `(0, 0)`. This avoids
+the upper-right placement produced by vpype's built-in positive-coordinate
+Roland DXY profile.
+
+For US Letter paper loaded landscape:
+
 ```bash
 uv run python dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file drawing.svg \
-  --page-size a3 \
-  --landscape
+  --page-size letter \
+  --landscape \
+  --margin 0.5in \
+  --absolute \
+  --overwrite
+```
+
+`--absolute` is recommended for the first few jobs because it makes the HP-GL
+coordinates easy to inspect. After the coordinate profile is verified, it may
+be omitted to produce more compact relative-coordinate HP-GL.
+
+Inspect the result before sending:
+
+```bash
+head -c 1000 output/drawing.hpgl
+```
+
+A centered Letter-landscape job with a 0.5-inch margin should normally contain
+both negative and positive absolute coordinates, approximately within
+`X=-5080..5080` and `Y=-3810..3810`.
+
+Run the centered-origin regression tests with:
+
+```bash
+uv run python -m unittest discover -s tests -v
 ```
 
 ## Find the serial port
@@ -45,6 +75,7 @@ uv run python send_hpgl.py --port COM3 output/drawing.hpgl
 ## Project files
 
 - `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
+- `vpype.toml` — centered-origin DPX-3300 paper and coordinate profiles.
 - `send_hpgl.py` — explicit pySerial sender using 9600 8N1 and XON/XOFF.
 - `playbook.md` — selected hardware, switch settings, operating procedure, and troubleshooting.
 - `pyproject.toml` — uv project metadata and dependencies.
@@ -78,8 +109,10 @@ docker compose run --rm converter \
   --input-dir /app/input \
   --output-dir /app/output \
   --file drawing.svg \
-  --page-size a3 \
+  --page-size letter \
   --landscape \
+  --margin 0.5in \
+  --absolute \
   --overwrite
 ```
 

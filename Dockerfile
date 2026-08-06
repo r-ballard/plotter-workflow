@@ -16,7 +16,7 @@ COPY pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
 
-COPY dpx3300_convert.py send_hpgl.py README.md playbook.md ./
+COPY dpx3300_convert.py send_hpgl.py vpype.toml README.md playbook.md ./
 RUN mkdir -p /app/input /app/output
 
 # The default container behavior is conversion. Override the command to run

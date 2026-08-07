@@ -1,66 +1,153 @@
 # Custom vpype HP-GL profile for the Roland DPX-3300.
 #
-# The machine was verified to treat (0, 0) as the center of the drawing area.
-# vpype's built-in Roland DXY profile assumes a lower-left origin and therefore
-# places positive-only jobs in the upper-right quadrant on this plotter.
+# The DPX-3300 has a machine coordinate origin near the center of its maximum
+# plotting area. This file defines two physical placement strategies:
 #
-# These paper ranges use the complete physical page dimensions at 40 plotter
-# units per millimetre. Use the converter's --margin option to keep geometry
-# safely away from paper edges and clamps.
+#   1. Standard paper names (letter, a4, a3, tabloid): sheet centered around
+#      machine coordinate (0, 0). This is the known-good placement verified
+#      with a centered test square.
+#
+#   2. *_lower_left paper names: sheet placed with its lower-left corner at the
+#      lower-left limit of the DPX-3300 maximum plotting area.
+#
+# Manual maximum plotting areas:
+#
+#   ANSI-D (SW-1 switch 7 ON):
+#       X = -17750 .. 16790
+#       Y = -11180 .. 11180
+#
+#   ISO-A1 (SW-1 switch 7 OFF):
+#       X = -17300 .. 16340
+#       Y = -11880 .. 11880
+#
+# The plotter uses 0.025 mm units (40 units/mm).
+#
+# The lower-left profiles intentionally crop to the selected physical sheet,
+# not to the entire machine bed. This keeps generated coordinates inside the
+# expected paper rectangle when the sheet is aligned with the bed's lower-left
+# plotting-area corner.
 
 [device.dpx3300]
 name = "Roland DPX-3300"
 plotter_unit_length = "0.025mm"
 pen_count = 8
 info = """
-DPX-3300 centered-origin profile. Load the selected paper centered on the
-machine origin and verify the placement with a small test before a full job.
+Roland DPX-3300 custom coordinate profile. Verify paper placement and run a
+small test before committing a full drawing.
 """
+
+# ---------------------------------------------------------------------------
+# CENTERED PAPER PROFILES
+# ---------------------------------------------------------------------------
 
 [[device.dpx3300.paper]]
 name = "letter"
 aka_names = ["ansi_a", "a"]
-info = "US Letter paper (8.5 x 11 in) loaded landscape. Use an explicit margin."
+info = "US Letter (11 x 8.5 in), landscape, centered on machine origin."
 paper_size = ["11in", "8.5in"]
 x_range = [-5588, 5588]
 y_range = [-4318, 4318]
 y_axis_up = true
 origin_location = ["5.5in", "4.25in"]
 origin_location_reference = "topleft"
-final_pu_params = "0,0"
 
 [[device.dpx3300.paper]]
 name = "a4"
 aka_names = ["A4"]
-info = "A4 paper loaded landscape. Use an explicit margin."
+info = "A4 (297 x 210 mm), landscape, centered on machine origin."
 paper_size = ["297mm", "210mm"]
 x_range = [-5940, 5940]
 y_range = [-4200, 4200]
 y_axis_up = true
 origin_location = ["148.5mm", "105mm"]
 origin_location_reference = "topleft"
-final_pu_params = "0,0"
 
 [[device.dpx3300.paper]]
 name = "a3"
 aka_names = ["A3"]
-info = "A3 paper loaded landscape. Use an explicit margin."
+info = "A3 (420 x 297 mm), landscape, centered on machine origin."
 paper_size = ["420mm", "297mm"]
 x_range = [-8400, 8400]
 y_range = [-5940, 5940]
 y_axis_up = true
 origin_location = ["210mm", "148.5mm"]
 origin_location_reference = "topleft"
-final_pu_params = "0,0"
 
 [[device.dpx3300.paper]]
 name = "tabloid"
 aka_names = ["ansi_b", "b"]
-info = "US Tabloid paper (11 x 17 in) loaded landscape. Use an explicit margin."
+info = "US Tabloid (17 x 11 in), landscape, centered on machine origin."
 paper_size = ["17in", "11in"]
 x_range = [-8636, 8636]
 y_range = [-5588, 5588]
 y_axis_up = true
 origin_location = ["8.5in", "5.5in"]
 origin_location_reference = "topleft"
-final_pu_params = "0,0"
+
+# ---------------------------------------------------------------------------
+# LOWER-LEFT PAPER PROFILES
+#
+# origin_location_reference = "botleft" makes these easier to audit:
+# origin_location is the machine's (0,0) location measured from the physical
+# lower-left corner of the selected sheet.
+#
+# ANSI-D machine origin measured from lower-left hard limit:
+#     X = 17750 units = 443.75 mm
+#     Y = 11180 units = 279.50 mm
+#
+# ISO-A1 machine origin measured from lower-left hard limit:
+#     X = 17300 units = 432.50 mm
+#     Y = 11880 units = 297.00 mm
+# ---------------------------------------------------------------------------
+
+[[device.dpx3300.paper]]
+name = "letter_lower_left"
+info = """
+US Letter (11 x 8.5 in), landscape. Place the sheet's lower-left corner at the
+DPX-3300 ANSI-D lower-left plotting-area limit. Requires SW-1 switch 7 ON.
+"""
+paper_size = ["11in", "8.5in"]
+x_range = [-17750, -6574]
+y_range = [-11180, -2544]
+y_axis_up = true
+origin_location = ["443.75mm", "279.50mm"]
+origin_location_reference = "botleft"
+
+[[device.dpx3300.paper]]
+name = "tabloid_lower_left"
+info = """
+US Tabloid (17 x 11 in), landscape. Place the sheet's lower-left corner at the
+DPX-3300 ANSI-D lower-left plotting-area limit. Requires SW-1 switch 7 ON.
+"""
+paper_size = ["17in", "11in"]
+x_range = [-17750, -478]
+y_range = [-11180, -4]
+y_axis_up = true
+origin_location = ["443.75mm", "279.50mm"]
+origin_location_reference = "botleft"
+
+[[device.dpx3300.paper]]
+name = "a4_lower_left"
+info = """
+A4 (297 x 210 mm), landscape. Place the sheet's lower-left corner at the
+DPX-3300 ISO-A1 lower-left plotting-area limit. Requires SW-1 switch 7 OFF.
+"""
+paper_size = ["297mm", "210mm"]
+x_range = [-17300, -5420]
+y_range = [-11880, -3480]
+y_axis_up = true
+origin_location = ["432.50mm", "297.00mm"]
+origin_location_reference = "botleft"
+
+[[device.dpx3300.paper]]
+name = "a3_lower_left"
+info = """
+A3 (420 x 297 mm), landscape. Place the sheet's lower-left corner at the
+DPX-3300 ISO-A1 lower-left plotting-area limit. Requires SW-1 switch 7 OFF.
+"""
+paper_size = ["420mm", "297mm"]
+x_range = [-17300, -500]
+y_range = [-11880, 0]
+y_axis_up = true
+origin_location = ["432.50mm", "297.00mm"]
+origin_location_reference = "botleft"

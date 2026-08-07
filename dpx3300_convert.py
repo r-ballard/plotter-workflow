@@ -19,10 +19,13 @@ Important DPX-3300 assumptions
 * The DPX-3300 uses Roland RD-GL II, which is closely related to HP-GL.
 * The plotter coordinate resolution is 0.025 mm (40 plotter units/mm).
 * vpype does not currently include a built-in DPX-3300 profile. This
-  project supplies ``vpype.toml`` with a centered-origin ``dpx3300`` device
-  profile. The profile maps the physical center of the selected page to
-  plotter coordinate ``(0, 0)``, matching the behavior verified on the
-  machine. Always make a small pen-up or sacrificial-paper test before plotting.
+  project supplies ``vpype.toml`` with a DPX-3300 device profile supporting
+  both centered paper placement and lower-left paper placement.
+* The machine's native coordinate origin remains near the center of the bed.
+  ``--paper-position lower-left`` does not redefine the machine origin; it
+  maps the selected paper size into the lower-left portion of the DPX-3300
+  maximum plotting area.
+* Always make a small pen-up or sacrificial-paper test before plotting.
 * The plotter and computer serial settings must match. The factory serial
   settings documented by Roland are 9600 baud, no parity, 8 data bits,
   and 1 stop bit.
@@ -35,7 +38,7 @@ Convert every SVG in ./input to ./output:
         --input-dir ./input \
         --output-dir ./output
 
-Convert one file for US Letter paper loaded landscape:
+Convert one file for US Letter paper placed at the lower-left of the bed:
 
     python3 dpx3300_convert.py \
         --input-dir ./input \
@@ -43,8 +46,12 @@ Convert one file for US Letter paper loaded landscape:
         --file drawing.svg \
         --page-size letter \
         --landscape \
+        --paper-position lower-left \
         --margin 0.5in \
         --absolute
+
+Use ``--paper-position center`` to retain the previously verified centered
+paper placement.
 
 Convert and immediately send each result with Chiplotle3:
 
@@ -68,6 +75,23 @@ from typing import Iterable, Sequence
 
 LOG = logging.getLogger("dpx3300")
 DEFAULT_VPYPE_CONFIG = Path(__file__).resolve().with_name("vpype.toml")
+
+PAPER_POSITION_CENTER = "center"
+PAPER_POSITION_LOWER_LEFT = "lower-left"
+
+# Lower-left profiles are intentionally explicit. Their coordinate limits come
+# from the DPX-3300 manual's maximum plotting-area table:
+#   ANSI-D: X=-17750..16790, Y=-11180..11180
+#   ISO-A1: X=-17300..16340, Y=-11880..11880
+#
+# The first release of lower-left placement supports the landscape paper sizes
+# we have defined and reviewed in vpype.toml.
+LOWER_LEFT_DEVICE_PAPERS = {
+    "letter": "letter_lower_left",
+    "tabloid": "tabloid_lower_left",
+    "a4": "a4_lower_left",
+    "a3": "a3_lower_left",
+}
 
 
 class ConversionError(RuntimeError):
@@ -96,6 +120,45 @@ def existing_file(value: str) -> Path:
     if not path.is_file():
         raise argparse.ArgumentTypeError(f"File does not exist: {path}")
     return path
+
+
+def resolve_device_page_size(
+    page_size: str,
+    paper_position: str,
+    landscape: bool,
+) -> str:
+    """
+    Resolve the vpype HP-GL paper profile for a physical bed position.
+
+    ``layout`` still uses the ordinary page size (for example ``letter``), so
+    artwork is fitted and centered *within the sheet*. The HP-GL writer then
+    uses a DPX-3300-specific paper profile describing where that physical sheet
+    sits on the plotter bed.
+
+    Lower-left placement is currently limited to landscape profiles because
+    those are the orientations whose hard-clip mapping has been explicitly
+    reviewed against the DPX-3300 manual.
+    """
+    if paper_position == PAPER_POSITION_CENTER:
+        return page_size
+
+    if paper_position != PAPER_POSITION_LOWER_LEFT:
+        raise ValueError(f"Unsupported paper position: {paper_position}")
+
+    if not landscape:
+        raise ValueError(
+            "--paper-position lower-left currently requires --landscape. "
+            "Use --paper-position center for portrait jobs."
+        )
+
+    try:
+        return LOWER_LEFT_DEVICE_PAPERS[page_size.lower()]
+    except KeyError as exc:
+        supported = ", ".join(sorted(LOWER_LEFT_DEVICE_PAPERS))
+        raise ValueError(
+            "Lower-left paper placement is currently defined for: "
+            f"{supported}. Received: {page_size!r}"
+        ) from exc
 
 
 def discover_svg_files(input_dir: Path, filename: str | None) -> list[Path]:
@@ -144,6 +207,7 @@ def build_vpype_command(
     margin: str,
     velocity: float | None,
     absolute: bool,
+    device_page_size: str | None = None,
 ) -> list[str]:
     """
     Construct the vpype command used for conversion.
@@ -161,10 +225,14 @@ def build_vpype_command(
     linesort
         Reorders paths to reduce pen-up travel.
     layout
-        Fits and centers the drawing on the selected page.
+        Fits and centers the drawing within the selected physical sheet.
     write
-        Serializes the result as HP-GL using a plotter device profile.
+        Serializes the result as HP-GL using a DPX-3300 paper profile that
+        determines where the physical sheet sits on the machine bed.
     """
+    if device_page_size is None:
+        device_page_size = page_size
+
     command = [
         "vpype",
         "--config",
@@ -190,7 +258,7 @@ def build_vpype_command(
             "--device",
             device,
             "--page-size",
-            page_size,
+            device_page_size,
             "--center",
         ]
     )
@@ -290,10 +358,23 @@ def convert_files(
     overwrite: bool,
     send: bool,
     dry_run: bool,
+    paper_position: str = PAPER_POSITION_CENTER,
 ) -> list[Path]:
     """Convert all *sources* and optionally transmit each result."""
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
+
+    device_page_size = resolve_device_page_size(
+        page_size=page_size,
+        paper_position=paper_position,
+        landscape=landscape,
+    )
+    LOG.info(
+        "Paper placement: %s (layout=%s, device-profile=%s)",
+        paper_position,
+        page_size,
+        device_page_size,
+    )
 
     for source in sources:
         destination = output_dir / f"{source.stem}.hpgl"
@@ -309,6 +390,7 @@ def convert_files(
             config_path=config_path,
             device=device,
             page_size=page_size,
+            device_page_size=device_page_size,
             landscape=landscape,
             margin=margin,
             velocity=velocity,
@@ -365,13 +447,23 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="dpx3300",
         help=(
             "vpype HP-GL device profile. Default: dpx3300, the project's "
-            "center-origin profile for this machine."
+            "DPX-3300 profile with selectable paper placement."
         ),
     )
     parser.add_argument(
         "--page-size",
         default="a3",
         help="vpype page size, such as a4, a3, letter, or tabloid. Default: a3.",
+    )
+    parser.add_argument(
+        "--paper-position",
+        choices=(PAPER_POSITION_CENTER, PAPER_POSITION_LOWER_LEFT),
+        default=PAPER_POSITION_CENTER,
+        help=(
+            "Physical location of the selected sheet on the DPX-3300 bed. "
+            "Default: center. Use lower-left to place supported landscape "
+            "paper sizes against the lower-left maximum plotting-area corner."
+        ),
     )
     parser.add_argument(
         "--landscape",
@@ -442,6 +534,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             config_path=args.vpype_config,
             device=args.device,
             page_size=args.page_size,
+            paper_position=args.paper_position,
             landscape=args.landscape,
             margin=args.margin,
             velocity=args.velocity,

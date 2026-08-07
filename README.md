@@ -15,12 +15,17 @@ uv sync
 
 ## Convert
 
-The repository includes `vpype.toml`, a DPX-3300-specific device profile that
-maps the center of the selected page to plotter coordinate `(0, 0)`. This avoids
-the upper-right placement produced by vpype's built-in positive-coordinate
-Roland DXY profile.
+The repository includes `vpype.toml`, a DPX-3300-specific device profile with
+two physical paper-placement modes:
 
-For US Letter paper loaded landscape:
+- `--paper-position center` keeps the sheet centered around machine `(0, 0)`.
+- `--paper-position lower-left` maps a supported landscape sheet to the
+  lower-left corner of the DPX-3300 maximum plotting area.
+
+The artwork is still fitted and centered *within the selected sheet*. The
+placement option changes where that sheet sits on the machine bed.
+
+For US Letter paper placed at the lower-left of the ANSI-D plotting area:
 
 ```bash
 uv run python dpx3300_convert.py \
@@ -29,6 +34,25 @@ uv run python dpx3300_convert.py \
   --file drawing.svg \
   --page-size letter \
   --landscape \
+  --paper-position lower-left \
+  --margin 0.5in \
+  --absolute \
+  --overwrite
+```
+
+For Letter/Tabloid lower-left placement, set **SW-1 switch 7 ON** for ANSI-D.
+For A4/A3 lower-left placement, set **SW-1 switch 7 OFF** for ISO-A1.
+
+To return to the previously verified centered placement:
+
+```bash
+uv run python dpx3300_convert.py \
+  --input-dir ./input \
+  --output-dir ./output \
+  --file drawing.svg \
+  --page-size letter \
+  --landscape \
+  --paper-position center \
   --margin 0.5in \
   --absolute \
   --overwrite
@@ -45,8 +69,12 @@ head -c 1000 output/drawing.hpgl
 ```
 
 A centered Letter-landscape job with a 0.5-inch margin should normally contain
-both negative and positive absolute coordinates, approximately within
-`X=-5080..5080` and `Y=-3810..3810`.
+both negative and positive coordinates.
+
+A lower-left Letter-landscape job should remain within the ANSI-D Letter paper
+window `X=-17750..-6574`, `Y=-11180..-2544`. With a 0.5-inch margin, actual
+drawing coordinates should remain approximately 508 plotter units inside those
+edges.
 
 Run the centered-origin regression tests with:
 
@@ -75,7 +103,7 @@ uv run python send_hpgl.py --port COM3 output/drawing.hpgl
 ## Project files
 
 - `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
-- `vpype.toml` — centered-origin DPX-3300 paper and coordinate profiles.
+- `vpype.toml` — centered and lower-left DPX-3300 paper/coordinate profiles.
 - `send_hpgl.py` — explicit pySerial sender using 9600 8N1 and XON/XOFF.
 - `playbook.md` — selected hardware, switch settings, operating procedure, and troubleshooting.
 - `pyproject.toml` — uv project metadata and dependencies.

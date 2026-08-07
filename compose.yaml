@@ -16,6 +16,8 @@ services:
       - --page-size
       - letter
       - --landscape
+      - --paper-position
+      - lower-left
       - --margin
       - 0.5in
       - --absolute

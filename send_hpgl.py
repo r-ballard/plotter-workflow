@@ -17,6 +17,13 @@ from pathlib import Path
 
 import serial
 from serial.tools import list_ports
+from pen_plan import (
+    PenPlanError,
+    format_pen_plan,
+    physical_pens_in_hpgl,
+    plan_has_documented_tools,
+    validate_resolved_pen_plan_for_hpgl,
+)
 
 LOG = logging.getLogger("dpx3300.sender")
 
@@ -103,6 +110,27 @@ def parse_args() -> argparse.Namespace:
         default=0.0,
         help="Optional delay in seconds between chunks. Default: 0.",
     )
+    parser.add_argument(
+        "--pen-plan",
+        type=Path,
+        help=(
+            "Resolved .penplan.json sidecar. By default the sender looks beside "
+            "the HP-GL file for <stem>.penplan.json."
+        ),
+    )
+    parser.add_argument(
+        "--confirm-pen-plan",
+        action="store_true",
+        help="Confirm that the printed multi-pen carriage loading plan was checked.",
+    )
+    parser.add_argument(
+        "--allow-unplanned-multipen",
+        action="store_true",
+        help=(
+            "Allow sending multi-pen HP-GL without a resolved sidecar. This bypasses "
+            "the carriage-plan safety check and should be used only for legacy jobs."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable detailed logging.")
     return parser.parse_args()
 
@@ -129,6 +157,35 @@ def main() -> int:
         return 2
 
     try:
+        physical_pens = physical_pens_in_hpgl(args.hpgl)
+        sidecar = (
+            args.pen_plan.expanduser().resolve()
+            if args.pen_plan is not None
+            else args.hpgl.with_suffix(".penplan.json")
+        )
+        resolved_plan = None
+        if sidecar.is_file():
+            resolved_plan = validate_resolved_pen_plan_for_hpgl(args.hpgl, sidecar)
+            for line in format_pen_plan(resolved_plan).splitlines():
+                LOG.info("%s", line)
+        elif len(physical_pens) > 1 and not args.allow_unplanned_multipen:
+            raise PenPlanError(
+                f"Multi-pen HP-GL uses {physical_pens} but no resolved pen-plan "
+                f"sidecar exists at {sidecar}. Use --allow-unplanned-multipen only "
+                "for a deliberately reviewed legacy job."
+            )
+
+        if len(physical_pens) > 1 and resolved_plan is not None:
+            if not plan_has_documented_tools(resolved_plan):
+                raise PenPlanError(
+                    "Multi-pen send requires a tool or label for every used physical slot."
+                )
+            if not args.confirm_pen_plan:
+                raise PenPlanError(
+                    "Multi-pen send requires --confirm-pen-plan after verifying the "
+                    "printed carriage loading plan."
+                )
+
         send_file(
             args.port,
             args.hpgl,

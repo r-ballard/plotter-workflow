@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "policy": "compact",
+  "slots": [
+    {"slot": 1, "label": "black fine", "tool": "technical pen", "color": "black"},
+    {"slot": 2, "label": "red fine", "tool": "technical pen", "color": "red"},
+    {"slot": 3, "label": "blue fine", "tool": "technical pen", "color": "blue"},
+    {"slot": 4, "label": "green fine", "tool": "technical pen", "color": "green"},
+    {"slot": 5, "label": "violet fine", "tool": "technical pen", "color": "violet"}
+  ],
+  "notes": "Example only: replace tool and color descriptions with the actual carriage loadout."
+}

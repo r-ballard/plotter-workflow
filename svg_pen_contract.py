@@ -1,8 +1,9 @@
 """Validate the multi-pen SVG contract consumed by ``plotter-workflow``.
 
-The contract is structural: a top-level SVG group named ``pen-N`` maps to
-vpype layer ``N`` and therefore to DPX-3300 physical pen ``SPN``. Stroke color
-is retained for preview/documentation but is not used to select a physical pen.
+The contract is structural: a top-level SVG group named ``pen-N`` declares
+logical/default layer ``N``. The default preserve policy maps that layer to
+physical ``SPN``; plotter-side pen plans may compact or explicitly remap active
+layers. Stroke color remains preview/documentation metadata.
 """
 
 from __future__ import annotations
@@ -31,9 +32,15 @@ class PenLayerContractError(ValueError):
 
 @dataclass(frozen=True)
 class PenLayerContract:
-    """Validated physical pen IDs present in an SVG."""
+    """Validated pen-layer metadata from an SVG.
+
+    ``declared_pens`` preserves every explicit ``pen-N`` group for provenance.
+    ``pens`` contains only layers with drawable geometry and therefore only the
+    physical pens that must appear as ``SPN`` selections in generated HP-GL.
+    """
 
     pens: tuple[int, ...]
+    declared_pens: tuple[int, ...]
 
 
 def inspect_pen_layer_contract(path: Path) -> PenLayerContract | None:
@@ -62,6 +69,7 @@ def inspect_pen_layer_contract(path: Path) -> PenLayerContract | None:
         return None
 
     pens: list[int] = []
+    declared_pens: list[int] = []
     seen: set[int] = set()
 
     for group, pen in matched:
@@ -115,7 +123,9 @@ def inspect_pen_layer_contract(path: Path) -> PenLayerContract | None:
                 f"{path}: pen-{pen} data-generations does not match nested generation groups"
             )
 
-        pens.append(pen)
+        declared_pens.append(pen)
+        if _contains_drawable(group):
+            pens.append(pen)
 
     matched_groups = {id(group) for group, _ in matched}
     for group in top_groups:
@@ -124,7 +134,10 @@ def inspect_pen_layer_contract(path: Path) -> PenLayerContract | None:
                 f"{path}: drawable top-level groups must use id=\"pen-N\""
             )
 
-    return PenLayerContract(pens=tuple(sorted(pens)))
+    return PenLayerContract(
+        pens=tuple(sorted(pens)),
+        declared_pens=tuple(sorted(declared_pens)),
+    )
 
 
 def _parse_generation_list(raw: str, *, path: Path, pen: int) -> tuple[int, ...]:

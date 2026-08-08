@@ -175,3 +175,15 @@ recommended workflow is therefore to run conversion in Docker and run
 `send_hpgl.py` on the host with `uv`. Docker Desktop has a USB/IP mechanism,
 but it is substantially more complex and requires privileged setup; it is not
 the baseline workflow for this project.
+
+## Multi-pen assignment and carriage plans
+
+Multi-pen contract SVGs may preserve producer layer numbers, compact active
+layers into the lowest DPX carriage slots, or explicitly assign logical layers
+to physical slots. A user-authored `<stem>.penplan.json` next to the SVG is
+discovered automatically. The converter writes a resolved sidecar next to the
+HP-GL output and prints the carriage loading plan before conversion.
+
+See [`PEN_PLAN.md`](PEN_PLAN.md) and [`penplan.schema.json`](penplan.schema.json)
+for the full user-authored format, examples, and preflight rules.
+

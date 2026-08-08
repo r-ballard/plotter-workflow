@@ -5,7 +5,7 @@ stricter multi-pen SVG contract used by `viz-virtualserver` L-system exports.
 
 ## Authoritative mapping
 
-Each physical pen is represented by one **top-level** SVG group:
+Each logical/default pen layer is represented by one **top-level** SVG group:
 
 ```xml
 <g id="pen-3"
@@ -61,6 +61,9 @@ contract SVG and all of the following are required:
 - `data-generations` agrees with nested generation groups; and
 - no other top-level group contains drawable geometry.
 
-After conversion, `plotter-workflow` verifies that every expected pen occurs as
-an `SPN;` selection in the generated HP-GL. SVGs without `pen-N` groups bypass
-these contract-specific checks and retain the existing generic SVG workflow.
+After conversion, `plotter-workflow` verifies active logical pen selections,
+applies the resolved physical pen plan, and verifies the resulting physical
+`SPN;` selections again. Declared layers with no drawable geometry are retained
+as provenance but do not consume a physical slot. SVGs without `pen-N` groups
+bypass these contract-specific checks and retain the existing generic SVG
+workflow. See `PEN_PLAN.md` for physical assignment and carriage preflight.

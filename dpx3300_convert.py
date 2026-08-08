@@ -74,6 +74,15 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from svg_pen_contract import inspect_pen_layer_contract
+from pen_plan import (
+    PEN_POLICIES,
+    PenPlanError,
+    format_pen_plan,
+    plan_has_documented_tools,
+    remap_hpgl_pen_selections,
+    resolve_pen_plan,
+    write_resolved_pen_plan,
+)
 
 LOG = logging.getLogger("dpx3300")
 DEFAULT_VPYPE_CONFIG = Path(__file__).resolve().with_name("vpype.toml")
@@ -372,8 +381,15 @@ def convert_files(
     send: bool,
     dry_run: bool,
     paper_position: str = PAPER_POSITION_CENTER,
+    pen_plan_path: Path | None = None,
+    pen_policy: str | None = None,
+    pen_map: str | None = None,
+    confirm_pen_plan: bool = False,
 ) -> list[Path]:
     """Convert all *sources* and optionally transmit each result."""
+    sources = list(sources)
+    if pen_plan_path is not None and len(sources) != 1:
+        raise ValueError("--pen-plan may only be used when converting one SVG")
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
 
@@ -391,11 +407,27 @@ def convert_files(
 
     for source in sources:
         pen_contract = inspect_pen_layer_contract(source)
-        expected_pens = pen_contract.pens if pen_contract is not None else None
-        if expected_pens:
+        resolved_pen_plan = None
+        expected_logical_pens = None
+        if pen_contract is not None:
+            resolved_pen_plan = resolve_pen_plan(
+                source,
+                plan_path=pen_plan_path,
+                cli_policy=pen_policy,
+                cli_pen_map=pen_map,
+            )
+            expected_logical_pens = resolved_pen_plan.logical_pens
             LOG.info(
-                "Detected explicit SVG pen layers: %s",
-                ", ".join(f"pen-{pen}" for pen in expected_pens),
+                "Detected logical SVG pen layers: %s",
+                ", ".join(
+                    f"pen-{pen}" for pen in resolved_pen_plan.declared_logical_pens
+                ),
+            )
+            for line in format_pen_plan(resolved_pen_plan).splitlines():
+                LOG.info("%s", line)
+        elif pen_plan_path is not None or pen_policy is not None or pen_map is not None:
+            raise PenPlanError(
+                "Pen assignment options require a contract SVG with top-level pen-N layers"
             )
 
         destination = output_dir / f"{source.stem}.hpgl"
@@ -421,7 +453,26 @@ def convert_files(
         run_command(command, dry_run=dry_run)
 
         if not dry_run:
-            validate_hpgl(destination, expected_pens=expected_pens)
+            validate_hpgl(destination, expected_pens=expected_logical_pens)
+            if resolved_pen_plan is not None:
+                remap_hpgl_pen_selections(destination, resolved_pen_plan)
+                validate_hpgl(
+                    destination, expected_pens=resolved_pen_plan.physical_pens
+                )
+                sidecar = destination.with_suffix(".penplan.json")
+                write_resolved_pen_plan(sidecar, resolved_pen_plan)
+                LOG.info("Created resolved pen plan: %s", sidecar)
+                if send and len(resolved_pen_plan.physical_pens) > 1:
+                    if not plan_has_documented_tools(resolved_pen_plan):
+                        raise ConversionError(
+                            "Multi-pen --send requires a pen-plan JSON with a tool "
+                            "or label for every used physical slot."
+                        )
+                    if not confirm_pen_plan:
+                        raise ConversionError(
+                            "Multi-pen --send requires --confirm-pen-plan after "
+                            "verifying the printed carriage loading plan."
+                        )
             LOG.info(
                 "Created %s (%d bytes)", destination, destination.stat().st_size
             )
@@ -507,6 +558,37 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Generate absolute rather than compact relative HP-GL coordinates.",
     )
     parser.add_argument(
+        "--pen-plan",
+        type=existing_file,
+        help=(
+            "User-authored .penplan.json file. If omitted, an adjacent "
+            "<svg-stem>.penplan.json is discovered automatically."
+        ),
+    )
+    parser.add_argument(
+        "--pen-policy",
+        choices=PEN_POLICIES,
+        help=(
+            "Physical pen assignment policy for contract SVGs when no JSON "
+            "pen plan is present: preserve, compact, or explicit."
+        ),
+    )
+    parser.add_argument(
+        "--pen-map",
+        help=(
+            "Explicit logical:physical mapping, for example 2:1,3:2,4:5. "
+            "Requires --pen-policy explicit and cannot be combined with a JSON plan."
+        ),
+    )
+    parser.add_argument(
+        "--confirm-pen-plan",
+        action="store_true",
+        help=(
+            "Confirm that the printed multi-pen carriage loading plan has been "
+            "checked. Required for multi-pen --send."
+        ),
+    )
+    parser.add_argument(
         "--send",
         action="store_true",
         help="After conversion, send each HP-GL file using Chiplotle3.",
@@ -556,6 +638,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             device=args.device,
             page_size=args.page_size,
             paper_position=args.paper_position,
+            pen_plan_path=args.pen_plan,
+            pen_policy=args.pen_policy,
+            pen_map=args.pen_map,
+            confirm_pen_plan=args.confirm_pen_plan,
             landscape=args.landscape,
             margin=args.margin,
             velocity=args.velocity,

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "policy": "explicit",
+  "assignments": [
+    {"logical_layer": 2, "physical_slot": 8},
+    {"logical_layer": 3, "physical_slot": 6},
+    {"logical_layer": 4, "physical_slot": 4},
+    {"logical_layer": 5, "physical_slot": 2},
+    {"logical_layer": 6, "physical_slot": 1}
+  ],
+  "slots": [
+    {"slot": 8, "label": "tool A", "tool": "technical pen", "color": "black"},
+    {"slot": 6, "label": "tool B", "tool": "technical pen", "color": "red"},
+    {"slot": 4, "label": "tool C", "tool": "technical pen", "color": "blue"},
+    {"slot": 2, "label": "tool D", "tool": "technical pen", "color": "green"},
+    {"slot": 1, "label": "tool E", "tool": "technical pen", "color": "violet"}
+  ],
+  "notes": "Example only: explicit mappings are useful when preferred tools are already loaded in specific slots."
+}

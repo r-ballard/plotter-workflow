@@ -16,6 +16,9 @@ on. Always turn the plotter off before changing a switch, then power it back on.
 - Use inexpensive paper and a sacrificial pen for the first test.
 - Start with a small drawing near the center of the page.
 - Inspect the HP-GL before transmitting it.
+- Run the unified job preflight and resolve every failure before transmission.
+- For a multi-pen job, physically verify the loaded carriage before using
+  `--confirm-pen-plan`.
 - Keep a hand near the plotter's pause control.
 - Be prepared to power the plotter off if it moves outside the expected area.
 - The repository's `vpype.toml` defines a centered-origin `dpx3300` profile.
@@ -252,12 +255,15 @@ The `/b` option is required. It prevents text-mode translation of the file.
 2. Confirm that SW-1 switch 5 is OFF.
 3. Confirm that the interface indicator is red.
 4. Confirm that the computer recognizes a printer device or `/dev/usb/lp0`.
-5. Generate a very small centered test job.
+5. Generate a very small test job using the intended paper placement.
 6. Inspect the HP-GL for `IN;`, `SP`, `PU`, and `PD`.
-7. Send the file through a raw queue or direct printer device.
-8. Remain ready to pause or power off the plotter.
-9. Confirm scale, orientation, origin, and pen selection.
-10. Only then proceed to larger jobs.
+7. Physically verify the carriage against the resolved pen plan.
+8. Run `job_preflight.py --confirm-pen-plan --write-report`.
+9. Confirm that preflight reports `READY TO SEND`.
+10. Send the same HP-GL bytes through a raw queue or direct printer device.
+11. Remain ready to pause or power off the plotter.
+12. Confirm scale, orientation, origin, and pen selection.
+13. Only then proceed to larger jobs.
 
 ## 8. Parallel troubleshooting
 
@@ -487,7 +493,14 @@ head -c 500 output/test.hpgl
 ```
 
 Confirm that it contains expected commands such as `IN;`, `SP`, `PU`, and `PD`
-before sending it to the plotter.
+before sending it to the plotter. Then review unified preflight:
+
+```bash
+uv run python job_preflight.py output/test.hpgl
+```
+
+For a multi-pen job, physically verify the carriage against the printed plan
+before using `--confirm-pen-plan`.
 
 ## 7. Find the serial port
 
@@ -531,6 +544,7 @@ uv run python send_hpgl.py --list-ports
 ```bash
 uv run python send_hpgl.py \
   --port /dev/cu.usbserial-XXXXXXXX \
+  --confirm-pen-plan \
   output/test.hpgl
 ```
 
@@ -539,6 +553,7 @@ uv run python send_hpgl.py \
 ```bash
 uv run python send_hpgl.py \
   --port /dev/ttyUSB0 \
+  --confirm-pen-plan \
   output/test.hpgl
 ```
 
@@ -547,6 +562,7 @@ uv run python send_hpgl.py \
 ```powershell
 uv run python send_hpgl.py `
   --port COM3 `
+  --confirm-pen-plan `
   output/test.hpgl
 ```
 
@@ -562,10 +578,13 @@ Replace the example device name with the actual port detected on the computer.
 6. Power-cycle the plotter after setting the switches.
 7. Confirm that the interface indicator is green.
 8. Confirm that the operating system sees the serial adapter.
-9. Generate and inspect a very small centered test job.
-10. Send the file while ready to pause or power off the plotter.
-11. Confirm scale, orientation, origin, and pen selection.
-12. Only then proceed to larger jobs.
+9. Generate and inspect a very small test job using the intended paper placement.
+10. Run standalone preflight and physically verify the carriage plan.
+11. Send with `--confirm-pen-plan`; the sender re-runs preflight before opening
+    the serial connection.
+12. Remain ready to pause or power off the plotter.
+13. Confirm scale, orientation, origin, and pen selection.
+14. Only then proceed to larger jobs.
 
 ## 10. Serial troubleshooting
 
@@ -619,6 +638,7 @@ docker run --rm \
   dpx3300-plotter:local \
   send_hpgl.py \
   --port /dev/ttyUSB0 \
+  --confirm-pen-plan \
   /app/output/test.hpgl
 ```
 
@@ -662,10 +682,14 @@ SP2;
 SP0;
 ```
 
-For deterministic multicolor plotting, prepare one SVG or vpype layer per
-physical tool slot and map layers 1 through 8 to `SP1` through `SP8`.
+For deterministic multicolor plotting, keep logical SVG layers distinct from
+physical DPX-3300 carriage slots. The pen-plan policy resolves logical layers
+to `SP1` through `SP8` using `preserve`, `compact`, or `explicit` assignment.
+Do not invent extra layers merely to occupy unused carriage slots.
 
-Record the actual tool loaded in each slot:
+Record the actual tool loaded in every physical slot used by the job. The
+resolved pen-plan sidecar and unified preflight are the authoritative software
+record; the operator must still verify the physical carriage before sending:
 
 | Slot | Tool or color | Verified |
 |---:|---|:---:|

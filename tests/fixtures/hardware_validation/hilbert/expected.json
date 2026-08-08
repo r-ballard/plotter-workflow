@@ -1,0 +1,11 @@
+{
+  "fixture_schema_version": 1,
+  "hardware": "Roland DPX-3300",
+  "commissioning_date": "2026-08-08",
+  "transport": "serial",
+  "result": "pass",
+  "assignment_policy": "compact",
+  "expected_active_pen_count": 3,
+  "expected_physical_pen_order": [1, 2, 3],
+  "expected_terminal_pen": 0
+}

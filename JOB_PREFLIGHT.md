@@ -45,7 +45,7 @@ The report includes a SHA-256 digest of the exact HP-GL bytes reviewed.
 
 ## Sender integration
 
-After running `scripts/integrate_job_preflight.py`, `send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission requires `--confirm-pen-plan`.
+`send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission requires `--confirm-pen-plan`. No separate integration step is required in a normal checkout.
 
 ```bash
 uv run python send_hpgl.py \
@@ -64,6 +64,30 @@ output/plant_test_drawing.placement.json
 `--pen-plan`, `--placement-report`, and `--vpype-config` may override those paths.
 
 `--allow-unvalidated-job` is an explicit legacy escape hatch. It skips the unified placement/sidecar preflight; the existing sender sanity checks and any existing pen-plan checks still apply. It should not be used for normal DPX-3300 jobs.
+
+## Raw parallel transmission
+
+Raw parallel paths such as `/dev/usb/lp0`, `lp -o raw`, or Windows `copy /b`
+bypass `send_hpgl.py`. They therefore **must** be preceded by the standalone
+preflight after the operator physically verifies the carriage:
+
+```bash
+uv run python job_preflight.py \
+  output/drawing.hpgl \
+  --confirm-pen-plan \
+  --write-report
+```
+
+Confirm that the command reports `READY TO SEND` before transmitting those
+exact HP-GL bytes through the raw parallel path. If the HP-GL is regenerated or
+modified afterward, run preflight again.
+
+## Golden hardware validation
+
+The repository keeps semantic commissioning invariants under
+`tests/fixtures/hardware_validation/`. The fixture records stable behavior such
+as pen order and assignment policy rather than machine-specific absolute paths
+or a permanent HP-GL SHA-256. See `docs/HARDWARE_VALIDATION.md`.
 
 ## What must agree
 

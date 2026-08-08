@@ -76,11 +76,34 @@ window `X=-17750..-6574`, `Y=-11180..-2544`. With a 0.5-inch margin, actual
 drawing coordinates should remain approximately 508 plotter units inside those
 edges.
 
-Run the centered-origin regression tests with:
+Run the regression tests with:
 
 ```bash
 uv run python -m unittest discover -s tests -v
 ```
+
+## Preflight before any hardware send
+
+Conversion produces the HP-GL plus resolved pen-plan and placement sidecars.
+Before transmitting a job, review all three together:
+
+```bash
+uv run python job_preflight.py output/drawing.hpgl
+```
+
+For a multi-pen job, physically verify the carriage against the printed plan,
+then record that confirmation and write the audit report:
+
+```bash
+uv run python job_preflight.py \
+  output/drawing.hpgl \
+  --confirm-pen-plan \
+  --write-report
+```
+
+The report is written as `output/drawing.preflight.json`. A normal hardware
+send should proceed only when the report would have `ready_to_send: true`.
+See [`JOB_PREFLIGHT.md`](JOB_PREFLIGHT.md) for the complete validation contract.
 
 ## Find the serial port
 
@@ -91,21 +114,33 @@ uv run python send_hpgl.py --list-ports
 ## Send
 
 ```bash
-uv run python send_hpgl.py --port /dev/cu.usbserial-XXXXXXXX output/drawing.hpgl
+uv run python send_hpgl.py \
+  --port /dev/cu.usbserial-XXXXXXXX \
+  --confirm-pen-plan \
+  output/drawing.hpgl
 ```
 
 Windows example:
 
 ```powershell
-uv run python send_hpgl.py --port COM3 output/drawing.hpgl
+uv run python send_hpgl.py `
+  --port COM3 `
+  --confirm-pen-plan `
+  output/drawing.hpgl
 ```
+
+`send_hpgl.py` re-runs unified preflight immediately before opening the serial
+connection. Do not use `--allow-unvalidated-job` for normal plotter operation.
 
 ## Project files
 
 - `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
 - `vpype.toml` — centered and lower-left DPX-3300 paper/coordinate profiles.
-- `send_hpgl.py` — explicit pySerial sender using 9600 8N1 and XON/XOFF.
+- `job_preflight.py` — unified HP-GL, pen-plan, and placement validation.
+- `send_hpgl.py` — preflight-gated pySerial sender using 9600 8N1 and XON/XOFF.
+- `JOB_PREFLIGHT.md` — pre-send validation and operator-confirmation contract.
 - `playbook.md` — selected hardware, switch settings, operating procedure, and troubleshooting.
+- `docs/HARDWARE_VALIDATION.md` — known-good physical commissioning record and golden-fixture policy.
 - `pyproject.toml` — uv project metadata and dependencies.
 - `input/` — source SVG files.
 - `output/` — generated HP-GL files.
@@ -159,7 +194,7 @@ docker run --rm \
   --group-add "$(stat -c '%g' /dev/ttyUSB0)" \
   --mount type=bind,src="$(pwd)/output",dst=/app/output,readonly \
   dpx3300-plotter:local \
-  send_hpgl.py --port /dev/ttyUSB0 /app/output/drawing.hpgl
+  send_hpgl.py --port /dev/ttyUSB0 --confirm-pen-plan /app/output/drawing.hpgl
 ```
 
 The optional `sender` service in `compose.yaml` demonstrates the same pattern.

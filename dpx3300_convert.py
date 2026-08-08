@@ -74,6 +74,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from svg_pen_contract import inspect_pen_layer_contract
+from hpgl_placement import validate_hpgl_placement, write_placement_report
 from pen_plan import (
     PEN_POLICIES,
     PenPlanError,
@@ -454,6 +455,23 @@ def convert_files(
 
         if not dry_run:
             validate_hpgl(destination, expected_pens=expected_logical_pens)
+            placement_report = validate_hpgl_placement(
+                destination,
+                config_path=config_path,
+                device=device,
+                page_profile=device_page_size,
+                margin=margin,
+            )
+            placement_path = destination.with_suffix(".placement.json")
+            write_placement_report(placement_report, placement_path)
+            LOG.info(
+                "Placement validated: drawing X=%.0f..%.0f, Y=%.0f..%.0f; report=%s",
+                placement_report.drawing_bounds.min_x,
+                placement_report.drawing_bounds.max_x,
+                placement_report.drawing_bounds.min_y,
+                placement_report.drawing_bounds.max_y,
+                placement_path,
+            )
             if resolved_pen_plan is not None:
                 remap_hpgl_pen_selections(destination, resolved_pen_plan)
                 validate_hpgl(

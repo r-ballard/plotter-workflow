@@ -73,6 +73,8 @@ import sys
 from pathlib import Path
 from typing import Iterable, Sequence
 
+from svg_pen_contract import inspect_pen_layer_contract
+
 LOG = logging.getLogger("dpx3300")
 DEFAULT_VPYPE_CONFIG = Path(__file__).resolve().with_name("vpype.toml")
 
@@ -295,7 +297,9 @@ def run_command(command: Sequence[str], dry_run: bool = False) -> None:
         ) from exc
 
 
-def validate_hpgl(path: Path) -> None:
+def validate_hpgl(
+    path: Path, expected_pens: tuple[int, ...] | None = None
+) -> None:
     """
     Perform lightweight safety checks on a generated HP-GL file.
 
@@ -311,6 +315,15 @@ def validate_hpgl(path: Path) -> None:
         raise ConversionError(
             f"{path} does not appear to contain ordinary HP-GL instructions."
         )
+
+
+    if expected_pens:
+        missing = [pen for pen in expected_pens if f"SP{pen};" not in text]
+        if missing:
+            raise ConversionError(
+                f"{path} is missing expected HP-GL pen selections: "
+                + ", ".join(f"SP{pen}" for pen in missing)
+            )
 
 
 def send_with_chiplotle(hpgl_path: Path) -> None:
@@ -377,6 +390,14 @@ def convert_files(
     )
 
     for source in sources:
+        pen_contract = inspect_pen_layer_contract(source)
+        expected_pens = pen_contract.pens if pen_contract is not None else None
+        if expected_pens:
+            LOG.info(
+                "Detected explicit SVG pen layers: %s",
+                ", ".join(f"pen-{pen}" for pen in expected_pens),
+            )
+
         destination = output_dir / f"{source.stem}.hpgl"
 
         if destination.exists() and not overwrite:
@@ -400,7 +421,7 @@ def convert_files(
         run_command(command, dry_run=dry_run)
 
         if not dry_run:
-            validate_hpgl(destination)
+            validate_hpgl(destination, expected_pens=expected_pens)
             LOG.info(
                 "Created %s (%d bytes)", destination, destination.stat().st_size
             )

@@ -17,6 +17,7 @@ from pathlib import Path
 
 import serial
 from serial.tools import list_ports
+from job_preflight import JobPreflightError, format_job_preflight, run_job_preflight, write_preflight_report
 from pen_plan import (
     PenPlanError,
     format_pen_plan,
@@ -131,6 +132,28 @@ def parse_args() -> argparse.Namespace:
             "the carriage-plan safety check and should be used only for legacy jobs."
         ),
     )
+    parser.add_argument(
+        "--placement-report",
+        type=Path,
+        help=(
+            "Resolved .placement.json sidecar. By default the sender looks beside "
+            "the HP-GL file for <stem>.placement.json."
+        ),
+    )
+    parser.add_argument(
+        "--vpype-config",
+        type=Path,
+        default=Path(__file__).resolve().with_name("vpype.toml"),
+        help="vpype TOML configuration used to revalidate physical placement.",
+    )
+    parser.add_argument(
+        "--allow-unvalidated-job",
+        action="store_true",
+        help=(
+            "Skip the unified placement/sidecar preflight for a deliberately "
+            "reviewed legacy job. Existing sender safety checks still apply."
+        ),
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable detailed logging.")
     return parser.parse_args()
 
@@ -157,6 +180,21 @@ def main() -> int:
         return 2
 
     try:
+        if not args.allow_unvalidated_job:
+            report, preflight_plan = run_job_preflight(
+                args.hpgl,
+                config_path=args.vpype_config,
+                pen_plan_path=args.pen_plan,
+                placement_report_path=args.placement_report,
+                require_operator_confirmation=True,
+                operator_confirmed=args.confirm_pen_plan,
+            )
+            for line in format_job_preflight(report, preflight_plan).splitlines():
+                LOG.info("%s", line)
+            preflight_path = args.hpgl.with_suffix(".preflight.json")
+            write_preflight_report(report, preflight_path)
+            LOG.info("Created preflight audit: %s", preflight_path)
+
         physical_pens = physical_pens_in_hpgl(args.hpgl)
         sidecar = (
             args.pen_plan.expanduser().resolve()
@@ -192,7 +230,7 @@ def main() -> int:
             chunk_size=args.chunk_size,
             inter_chunk_delay=args.inter_chunk_delay,
         )
-    except (OSError, serial.SerialException, ValueError) as exc:
+    except (OSError, serial.SerialException, ValueError, JobPreflightError) as exc:
         LOG.error("%s", exc)
         return 1
     return 0

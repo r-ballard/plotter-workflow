@@ -25,6 +25,21 @@ to the third internal column fold.
 
 Supported landscape sheets are `letter`, `a4`, `a3`, and `tabloid`.
 
+## Development verification
+
+From the repository root, synchronize the project environment and run the full
+test suite with:
+
+```bash
+uv sync
+uv run python -m pytest -v
+```
+
+Use `python -m pytest` rather than invoking the `pytest` console script directly.
+The repository currently uses top-level Python modules such as
+`dpx3300_convert.py` and `booklet_impose.py`; module invocation keeps the
+repository root on the Python import path consistently across platforms.
+
 ## Simple eight-file input
 
 Put exactly eight SVG files in a directory. Natural filename order becomes
@@ -151,9 +166,90 @@ post-conversion safety envelope for actual pen-down coordinates.
 
 Then use the normal pen-plan, placement, unified preflight, and send workflow.
 
-If the optional guide SVG is converted for plotting, convert it as a separate
-job. Its fold lines intentionally reach the sheet boundary, so use `--margin 0mm`
-for placement validation and review that guide job independently before sending.
+## End-to-end production workflow
+
+The following example shows the complete path for a Letter-size booklet stored
+in `input/my_book/`. It keeps imposition, conversion, validation, and physical
+transmission as separate reviewable stages.
+
+1. Impose the logical pages onto the physical sheet:
+
+   ```bash
+   uv run python booklet_impose.py input/my_book \
+     --sheet-size letter \
+     --page-margin-mm 6 \
+     --output output/my_book.imposed.svg \
+     --guides \
+     --overwrite
+   ```
+
+2. Review `output/my_book.imposed.svg` and
+   `output/my_book.imposed.imposition.json`. If guides were requested, review
+   `output/my_book.imposed.guides.svg` separately; the guide file is not merged
+   into the artwork job.
+
+3. Convert the imposed artwork without changing its established fold-cell
+   coordinates:
+
+   ```bash
+   uv run python dpx3300_convert.py \
+     --input-dir ./output \
+     --output-dir ./output \
+     --file my_book.imposed.svg \
+     --page-size letter \
+     --landscape \
+     --paper-position lower-left \
+     --margin 4mm \
+     --absolute \
+     --overwrite
+   ```
+
+   The output job is `output/my_book.imposed.hpgl`, with the normal resolved
+   sidecars produced by the converter for the source mode in use.
+
+4. Run unified preflight before any hardware send:
+
+   ```bash
+   uv run python job_preflight.py output/my_book.imposed.hpgl
+   ```
+
+   Review the reported placement and pen mapping. For a multi-pen booklet,
+   physically verify the loaded carriage, then record that confirmation and
+   write the audit report:
+
+   ```bash
+   uv run python job_preflight.py \
+     output/my_book.imposed.hpgl \
+     --confirm-pen-plan \
+     --write-report
+   ```
+
+5. Send the exact reviewed HP-GL through the normal transport. For example, a
+   serial multi-pen job on Windows uses:
+
+   ```powershell
+   uv run python send_hpgl.py `
+     --port COM3 `
+     --confirm-pen-plan `
+     output/my_book.imposed.hpgl
+   ```
+
+   Replace `COM3` with the actual serial port. `send_hpgl.py` re-runs unified
+   preflight before opening the serial connection. For raw parallel transport,
+   run standalone preflight with `--confirm-pen-plan --write-report` first and
+   transmit the same HP-GL bytes without modifying them afterward.
+
+6. Cut and fold only after the plotted sheet has been checked for expected page
+   placement and orientation. For a new paper size or layout change, use the
+   physical golden fixture before plotting production artwork.
+
+### Plotting the optional guide sheet
+
+If the optional guide SVG is plotted, convert it as a separate job. Its fold
+lines intentionally reach the physical sheet boundary, so use `--margin 0mm`
+for placement validation and review/preflight the guide HP-GL independently
+before sending it. Do not combine the guide job with the production artwork
+merely to share a physical pen slot.
 
 ## Audit sidecar
 

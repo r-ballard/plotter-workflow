@@ -79,8 +79,12 @@ edges.
 Run the regression tests with:
 
 ```bash
-uv run python -m unittest discover -s tests -v
+uv run python -m pytest -v
 ```
+
+Invoke pytest through `python -m` from the repository root. The project currently
+uses top-level Python modules, so this keeps the repository root on the import
+path consistently across platforms.
 
 ## Preflight before any hardware send
 

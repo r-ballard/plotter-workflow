@@ -135,6 +135,8 @@ connection. Do not use `--allow-unvalidated-job` for normal plotter operation.
 ## Project files
 
 - `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
+- `booklet_impose.py` — physical imposition for one-sheet eight-page mini-books.
+- `BOOKLET_IMPOSITION.md` — booklet layout, spread, guide, and conversion contract.
 - `vpype.toml` — centered and lower-left DPX-3300 paper/coordinate profiles.
 - `job_preflight.py` — unified HP-GL, pen-plan, and placement validation.
 - `send_hpgl.py` — preflight-gated pySerial sender using 9600 8N1 and XON/XOFF.

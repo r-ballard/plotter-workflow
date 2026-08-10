@@ -70,6 +70,7 @@ import logging
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -132,6 +133,30 @@ def existing_file(value: str) -> Path:
     if not path.is_file():
         raise argparse.ArgumentTypeError(f"File does not exist: {path}")
     return path
+
+
+def preserved_physical_layout_metadata(path: Path) -> tuple[str, str] | None:
+    """Return declared page size/orientation for a pre-imposed physical SVG."""
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        return None
+
+    if root.get("data-plotter-workflow-layout") != "preserve":
+        return None
+
+    page_size = root.get("data-plotter-workflow-page-size")
+    orientation = root.get("data-plotter-workflow-orientation")
+    if not page_size or orientation not in {"landscape", "portrait"}:
+        raise ConversionError(
+            "Preserved-layout SVG is missing valid physical page size/orientation metadata."
+        )
+    return page_size, orientation
+
+
+def svg_preserves_physical_layout(path: Path) -> bool:
+    """Return True when *path* declares already-imposed physical coordinates."""
+    return preserved_physical_layout_metadata(path) is not None
 
 
 def resolve_device_page_size(
@@ -245,6 +270,26 @@ def build_vpype_command(
     if device_page_size is None:
         device_page_size = page_size
 
+    physical_layout = preserved_physical_layout_metadata(source)
+    preserve_layout = physical_layout is not None
+    if physical_layout is not None:
+        expected_page_size, expected_orientation = physical_layout
+        if expected_page_size.lower() != page_size.lower():
+            raise ConversionError(
+                "Preserved-layout SVG expects page size "
+                f"{expected_page_size!r}, not {page_size!r}."
+            )
+        if (expected_orientation == "landscape") != landscape:
+            raise ConversionError(
+                f"Preserved-layout SVG expects {expected_orientation} orientation."
+            )
+        LOG.info(
+            "Preserving physical SVG layout for %s (%s %s).",
+            source.name,
+            expected_page_size,
+            expected_orientation,
+        )
+
     command = [
         "vpype",
         "--config",
@@ -255,25 +300,25 @@ def build_vpype_command(
         "linesimplify",
         "reloop",
         "linesort",
-        "layout",
-        "--fit-to-margins",
-        margin,
     ]
 
-    if landscape:
-        command.append("--landscape")
+    if not preserve_layout:
+        command.extend(["layout", "--fit-to-margins", margin])
+        if landscape:
+            command.append("--landscape")
+        command.append(page_size)
 
     command.extend(
         [
-            page_size,
             "write",
             "--device",
             device,
             "--page-size",
             device_page_size,
-            "--center",
         ]
     )
+    if not preserve_layout:
+        command.append("--center")
 
     if landscape:
         command.append("--landscape")

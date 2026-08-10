@@ -1,0 +1,20 @@
+{
+  "fixture_schema_version": 1,
+  "layout": "pocketmod8",
+  "logical_to_physical": {
+    "1": {"row": 1, "column": 3, "rotation_degrees": 0},
+    "2": {"row": 0, "column": 3, "rotation_degrees": 180},
+    "3": {"row": 0, "column": 2, "rotation_degrees": 180},
+    "4": {"row": 0, "column": 1, "rotation_degrees": 180},
+    "5": {"row": 0, "column": 0, "rotation_degrees": 180},
+    "6": {"row": 1, "column": 0, "rotation_degrees": 0},
+    "7": {"row": 1, "column": 1, "rotation_degrees": 0},
+    "8": {"row": 1, "column": 2, "rotation_degrees": 0}
+  },
+  "center_cut": {
+    "row_boundary": 1,
+    "column_start": 1,
+    "column_end": 3
+  },
+  "facing_spreads": [[2, 3], [4, 5], [6, 7], [8, 1]]
+}

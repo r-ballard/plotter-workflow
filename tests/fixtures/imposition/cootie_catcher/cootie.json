@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "layout": "cootie_catcher",
+  "panels": [
+    {
+      "slot": "outer-1",
+      "source": "validation_panels/outer-1.svg"
+    },
+    {
+      "slot": "outer-2",
+      "source": "validation_panels/outer-2.svg"
+    },
+    {
+      "slot": "outer-3",
+      "source": "validation_panels/outer-3.svg"
+    },
+    {
+      "slot": "outer-4",
+      "source": "validation_panels/outer-4.svg"
+    },
+    {
+      "slot": "selector-1",
+      "source": "validation_panels/selector-1.svg"
+    },
+    {
+      "slot": "selector-2",
+      "source": "validation_panels/selector-2.svg"
+    },
+    {
+      "slot": "selector-3",
+      "source": "validation_panels/selector-3.svg"
+    },
+    {
+      "slot": "selector-4",
+      "source": "validation_panels/selector-4.svg"
+    },
+    {
+      "slot": "selector-5",
+      "source": "validation_panels/selector-5.svg"
+    },
+    {
+      "slot": "selector-6",
+      "source": "validation_panels/selector-6.svg"
+    },
+    {
+      "slot": "selector-7",
+      "source": "validation_panels/selector-7.svg"
+    },
+    {
+      "slot": "selector-8",
+      "source": "validation_panels/selector-8.svg"
+    },
+    {
+      "slot": "reveal-1",
+      "source": "validation_panels/reveal-1.svg"
+    },
+    {
+      "slot": "reveal-2",
+      "source": "validation_panels/reveal-2.svg"
+    },
+    {
+      "slot": "reveal-3",
+      "source": "validation_panels/reveal-3.svg"
+    },
+    {
+      "slot": "reveal-4",
+      "source": "validation_panels/reveal-4.svg"
+    },
+    {
+      "slot": "reveal-5",
+      "source": "validation_panels/reveal-5.svg"
+    },
+    {
+      "slot": "reveal-6",
+      "source": "validation_panels/reveal-6.svg"
+    },
+    {
+      "slot": "reveal-7",
+      "source": "validation_panels/reveal-7.svg"
+    },
+    {
+      "slot": "reveal-8",
+      "source": "validation_panels/reveal-8.svg"
+    }
+  ]
+}

@@ -1,0 +1,423 @@
+{
+  "fixture_schema_version": 1,
+  "layout": "cootie_catcher",
+  "orientation_validation": "provisional",
+  "semantic_coverage_fraction": 1.0,
+  "logical_to_physical": {
+    "outer-1": {
+      "kind": "outer",
+      "index": 1,
+      "rotation_degrees": 0,
+      "polygon_normalized": [
+        [
+          0,
+          0
+        ],
+        [
+          0.25,
+          0
+        ],
+        [
+          0.25,
+          0.25
+        ],
+        [
+          0,
+          0.25
+        ]
+      ]
+    },
+    "outer-2": {
+      "kind": "outer",
+      "index": 2,
+      "rotation_degrees": 90,
+      "polygon_normalized": [
+        [
+          0.75,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          0.25
+        ],
+        [
+          0.75,
+          0.25
+        ]
+      ]
+    },
+    "outer-3": {
+      "kind": "outer",
+      "index": 3,
+      "rotation_degrees": 180,
+      "polygon_normalized": [
+        [
+          0.75,
+          0.75
+        ],
+        [
+          1,
+          0.75
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0.75,
+          1
+        ]
+      ]
+    },
+    "outer-4": {
+      "kind": "outer",
+      "index": 4,
+      "rotation_degrees": 270,
+      "polygon_normalized": [
+        [
+          0,
+          0.75
+        ],
+        [
+          0.25,
+          0.75
+        ],
+        [
+          0.25,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    "selector-1": {
+      "kind": "selector",
+      "index": 1,
+      "rotation_degrees": 0,
+      "polygon_normalized": [
+        [
+          0.25,
+          0
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    "selector-2": {
+      "kind": "selector",
+      "index": 2,
+      "rotation_degrees": 0,
+      "polygon_normalized": [
+        [
+          0.5,
+          0
+        ],
+        [
+          0.75,
+          0
+        ],
+        [
+          0.75,
+          0.25
+        ]
+      ]
+    },
+    "selector-3": {
+      "kind": "selector",
+      "index": 3,
+      "rotation_degrees": 90,
+      "polygon_normalized": [
+        [
+          1,
+          0.25
+        ],
+        [
+          1,
+          0.5
+        ],
+        [
+          0.75,
+          0.25
+        ]
+      ]
+    },
+    "selector-4": {
+      "kind": "selector",
+      "index": 4,
+      "rotation_degrees": 90,
+      "polygon_normalized": [
+        [
+          1,
+          0.5
+        ],
+        [
+          1,
+          0.75
+        ],
+        [
+          0.75,
+          0.75
+        ]
+      ]
+    },
+    "selector-5": {
+      "kind": "selector",
+      "index": 5,
+      "rotation_degrees": 180,
+      "polygon_normalized": [
+        [
+          0.75,
+          1
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.75,
+          0.75
+        ]
+      ]
+    },
+    "selector-6": {
+      "kind": "selector",
+      "index": 6,
+      "rotation_degrees": 180,
+      "polygon_normalized": [
+        [
+          0.5,
+          1
+        ],
+        [
+          0.25,
+          1
+        ],
+        [
+          0.25,
+          0.75
+        ]
+      ]
+    },
+    "selector-7": {
+      "kind": "selector",
+      "index": 7,
+      "rotation_degrees": 270,
+      "polygon_normalized": [
+        [
+          0,
+          0.75
+        ],
+        [
+          0,
+          0.5
+        ],
+        [
+          0.25,
+          0.75
+        ]
+      ]
+    },
+    "selector-8": {
+      "kind": "selector",
+      "index": 8,
+      "rotation_degrees": 270,
+      "polygon_normalized": [
+        [
+          0,
+          0.5
+        ],
+        [
+          0,
+          0.25
+        ],
+        [
+          0.25,
+          0.25
+        ]
+      ]
+    },
+    "reveal-1": {
+      "kind": "reveal",
+      "index": 1,
+      "rotation_degrees": 0,
+      "polygon_normalized": [
+        [
+          0.25,
+          0.25
+        ],
+        [
+          0.5,
+          0
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-2": {
+      "kind": "reveal",
+      "index": 2,
+      "rotation_degrees": 0,
+      "polygon_normalized": [
+        [
+          0.5,
+          0
+        ],
+        [
+          0.75,
+          0.25
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-3": {
+      "kind": "reveal",
+      "index": 3,
+      "rotation_degrees": 90,
+      "polygon_normalized": [
+        [
+          0.75,
+          0.25
+        ],
+        [
+          1,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-4": {
+      "kind": "reveal",
+      "index": 4,
+      "rotation_degrees": 90,
+      "polygon_normalized": [
+        [
+          1,
+          0.5
+        ],
+        [
+          0.75,
+          0.75
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-5": {
+      "kind": "reveal",
+      "index": 5,
+      "rotation_degrees": 180,
+      "polygon_normalized": [
+        [
+          0.75,
+          0.75
+        ],
+        [
+          0.5,
+          1
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-6": {
+      "kind": "reveal",
+      "index": 6,
+      "rotation_degrees": 180,
+      "polygon_normalized": [
+        [
+          0.5,
+          1
+        ],
+        [
+          0.25,
+          0.75
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-7": {
+      "kind": "reveal",
+      "index": 7,
+      "rotation_degrees": 270,
+      "polygon_normalized": [
+        [
+          0.25,
+          0.75
+        ],
+        [
+          0,
+          0.5
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    },
+    "reveal-8": {
+      "kind": "reveal",
+      "index": 8,
+      "rotation_degrees": 270,
+      "polygon_normalized": [
+        [
+          0,
+          0.5
+        ],
+        [
+          0.25,
+          0.25
+        ],
+        [
+          0.5,
+          0.5
+        ]
+      ]
+    }
+  },
+  "selector_reveal_pairs": {
+    "selector-1": "reveal-1",
+    "selector-2": "reveal-2",
+    "selector-3": "reveal-3",
+    "selector-4": "reveal-4",
+    "selector-5": "reveal-5",
+    "selector-6": "reveal-6",
+    "selector-7": "reveal-7",
+    "selector-8": "reveal-8"
+  },
+  "default_letter_square": {
+    "sheet_width_mm": 279.4,
+    "sheet_height_mm": 215.9,
+    "position": "left",
+    "x_mm": 0.0,
+    "y_mm": 0.0,
+    "size_mm": 215.9,
+    "trim_edge_count": 1
+  }
+}

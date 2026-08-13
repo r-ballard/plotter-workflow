@@ -31,10 +31,15 @@ import math
 import sys
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
+from itertools import pairwise
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
+from imposition.model import ObjectPlacement, SheetSpec
+from imposition.objects.cootie_catcher import COOTIE_CATCHER, CootieCatcherError
+from imposition.source import ImpositionSourceError, inspect_svg_source
 from svg_pen_contract import PenLayerContractError, inspect_pen_layer_contract
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -238,6 +243,10 @@ def _resolve_source(input_dir: Path, raw: object) -> Path:
         raise ImpositionError(f"Source SVG does not exist: {source}")
     if source.suffix.lower() != ".svg":
         raise ImpositionError(f"Only SVG source files are supported: {source}")
+    try:
+        inspect_svg_source(source)
+    except ImpositionSourceError as exc:
+        raise ImpositionError(str(exc)) from exc
     return source
 
 
@@ -342,34 +351,35 @@ def square_placement(
     """Return the square's placement within a supported landscape sheet."""
     if sheet_size not in SHEET_SIZES_MM:
         raise ImpositionError(f"Unsupported sheet size {sheet_size!r}.")
-    if position not in SQUARE_POSITIONS:
-        raise ImpositionError(f"square position must be one of {sorted(SQUARE_POSITIONS)}.")
 
     sheet_width, sheet_height = SHEET_SIZES_MM[sheet_size]
-    maximum = min(sheet_width, sheet_height)
-    size = maximum if square_size_mm is None else float(square_size_mm)
-    if not math.isfinite(size) or size <= 0:
-        raise ImpositionError("square size must be greater than zero.")
-    if size > maximum + 1e-9:
-        raise ImpositionError(
-            f"square size {size:g}mm exceeds the {maximum:g}mm maximum for {sheet_size}."
+    sheet = SheetSpec(
+        name=sheet_size,
+        width_mm=sheet_width,
+        height_mm=sheet_height,
+        orientation="landscape",
+    )
+    try:
+        resolved = COOTIE_CATCHER.resolve_placement(
+            sheet,
+            {"position": position, "square_size_mm": square_size_mm},
         )
+    except CootieCatcherError as exc:
+        raise ImpositionError(str(exc)) from exc
 
-    if position == "left":
-        x = 0.0
-    elif position == "center":
-        x = (sheet_width - size) / 2.0
-    else:
-        x = sheet_width - size
-    y = (sheet_height - size) / 2.0
-    return SquarePlacement(x_mm=x, y_mm=y, size_mm=size, position=position)
+    return SquarePlacement(
+        x_mm=resolved.x_mm,
+        y_mm=resolved.y_mm,
+        size_mm=resolved.width_mm,
+        position=position,
+    )
 
 
 def panel_polygon_normalized(slot: str) -> Polygon:
     try:
-        return COOTIE_PANEL_POLYGONS[slot]
-    except KeyError as exc:
-        raise ImpositionError(f"Unknown cootie-catcher slot {slot!r}.") from exc
+        return COOTIE_CATCHER.slot(slot).polygon
+    except CootieCatcherError as exc:
+        raise ImpositionError(str(exc)) from exc
 
 
 def panel_polygon_px(slot: str, placement: SquarePlacement) -> Polygon:
@@ -551,7 +561,7 @@ def clip_line_collection(lines: Any, polygon: Sequence[Point]) -> Any:
     for raw_line in lines:
         points = [complex(point) for point in raw_line]
         current: list[complex] = []
-        for first, second in zip(points, points[1:]):
+        for first, second in pairwise(points):
             clipped = clip_segment_to_convex_polygon(
                 (first.real, first.imag), (second.real, second.imag), polygon
             )
@@ -938,15 +948,27 @@ def _line_path(parent: ET.Element, p1: Point, p2: Point) -> None:
 def guide_segments(
     sheet_size: str, placement: SquarePlacement
 ) -> dict[str, list[tuple[Point, Point]]]:
-    """Return trim and crease segments in physical SVG pixels."""
+    """Return object-owned trim and crease segments in physical SVG pixels."""
+    if sheet_size not in SHEET_SIZES_MM:
+        raise ImpositionError(f"Unsupported sheet size {sheet_size!r}.")
+
     sheet_width_mm, sheet_height_mm = SHEET_SIZES_MM[sheet_size]
-    sw = _mm_to_px(sheet_width_mm)
-    sh = _mm_to_px(sheet_height_mm)
-    x = _mm_to_px(placement.x_mm)
-    y = _mm_to_px(placement.y_mm)
-    s = _mm_to_px(placement.size_mm)
-    q = s / 4.0
-    c = s / 2.0
+    object_placement = ObjectPlacement(
+        sheet=SheetSpec(
+            name=sheet_size,
+            width_mm=sheet_width_mm,
+            height_mm=sheet_height_mm,
+            orientation="landscape",
+        ),
+        x_mm=placement.x_mm,
+        y_mm=placement.y_mm,
+        width_mm=placement.size_mm,
+        height_mm=placement.size_mm,
+    )
+    try:
+        guides = COOTIE_CATCHER.guides(object_placement)
+    except CootieCatcherError as exc:
+        raise ImpositionError(str(exc)) from exc
 
     segments: dict[str, list[tuple[Point, Point]]] = {
         "trim": [],
@@ -954,40 +976,16 @@ def guide_segments(
         "second-blintz": [],
         "center-prefold": [],
     }
-    tolerance = 1e-7
-    if x > tolerance:
-        segments["trim"].append(((x, y), (x, y + s)))
-    if x + s < sw - tolerance:
-        segments["trim"].append(((x + s, y), (x + s, y + s)))
-    if y > tolerance:
-        segments["trim"].append(((x, y), (x + s, y)))
-    if y + s < sh - tolerance:
-        segments["trim"].append(((x, y + s), (x + s, y + s)))
-
-    top = (x + c, y)
-    right = (x + s, y + c)
-    bottom = (x + c, y + s)
-    left = (x, y + c)
-    segments["first-blintz"].extend(
-        [(top, right), (right, bottom), (bottom, left), (left, top)]
-    )
-
-    nw = (x + q, y + q)
-    ne = (x + 3 * q, y + q)
-    se = (x + 3 * q, y + 3 * q)
-    sw_corner = (x + q, y + 3 * q)
-    segments["second-blintz"].extend(
-        [(nw, ne), (ne, se), (se, sw_corner), (sw_corner, nw)]
-    )
-
-    segments["center-prefold"].extend(
-        [
-            ((x, y), (x + s, y + s)),
-            ((x + s, y), (x, y + s)),
-            ((x, y + c), (x + s, y + c)),
-            ((x + c, y), (x + c, y + s)),
-        ]
-    )
+    for guide in guides:
+        points = guide.points
+        point_pairs = pairwise((*points, points[0])) if guide.closed else pairwise(points)
+        for start, end in point_pairs:
+            segments[guide.kind].append(
+                (
+                    (_mm_to_px(start[0]), _mm_to_px(start[1])),
+                    (_mm_to_px(end[0]), _mm_to_px(end[1])),
+                )
+            )
     return segments
 
 

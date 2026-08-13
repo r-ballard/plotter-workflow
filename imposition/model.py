@@ -10,6 +10,11 @@ Point = tuple[float, float]
 Polygon = tuple[Point, ...]
 FitMode = Literal["contain", "cover"]
 SheetOrientation = Literal["landscape", "portrait"]
+OrientationPolicy = Literal[
+    "explicit-override",
+    "intrinsic-up-vector",
+    "legacy-default",
+]
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,17 @@ class IntrinsicCanvas:
     up_anchor: str
     up_vector: Point
     clip_id: str | None = None
+
+
+@dataclass(frozen=True)
+class OrientationResolution:
+    """Auditable result of mapping source orientation into an imposition slot."""
+
+    policy: OrientationPolicy
+    source_up_vector: Point | None
+    target_up_vector: Point
+    override_degrees: float | None
+    resolved_degrees: float
 
 
 class ImpositionObject(Protocol):

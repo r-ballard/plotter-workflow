@@ -7,12 +7,14 @@ from .geometry import (
     normalize_vector,
     resolve_orientation_degrees,
     rotate_vector_clockwise,
+    rotated_rectangle_size,
 )
 from .model import (
     Guide,
     ImpositionObject,
     IntrinsicCanvas,
     ObjectPlacement,
+    OrientationResolution,
     OrientationTarget,
     Point,
     Polygon,
@@ -28,6 +30,7 @@ __all__ = [
     "ImpositionSourceError",
     "IntrinsicCanvas",
     "ObjectPlacement",
+    "OrientationResolution",
     "OrientationTarget",
     "Point",
     "Polygon",
@@ -40,4 +43,5 @@ __all__ = [
     "parse_intrinsic_canvas",
     "resolve_orientation_degrees",
     "rotate_vector_clockwise",
+    "rotated_rectangle_size",
 ]

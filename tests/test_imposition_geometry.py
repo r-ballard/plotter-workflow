@@ -9,6 +9,7 @@ from imposition.geometry import (
     normalize_vector,
     resolve_orientation_degrees,
     rotate_vector_clockwise,
+    rotated_rectangle_size,
 )
 from imposition.model import ObjectPlacement, SheetSpec
 
@@ -80,3 +81,15 @@ def test_map_normalized_polygon_rejects_invalid_placement() -> None:
                 height_mm=100.0,
             ),
         )
+
+
+def test_rotated_rectangle_size_supports_arbitrary_angles() -> None:
+    width, height = rotated_rectangle_size(100.0, 50.0, 45.0)
+    expected = 75.0 * 2**0.5
+    assert width == pytest.approx(expected)
+    assert height == pytest.approx(expected)
+
+
+def test_rotated_rectangle_size_preserves_quarter_turn_contract() -> None:
+    assert rotated_rectangle_size(100.0, 50.0, 0.0) == pytest.approx((100.0, 50.0))
+    assert rotated_rectangle_size(100.0, 50.0, 90.0) == pytest.approx((50.0, 100.0))

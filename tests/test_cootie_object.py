@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from imposition.geometry import rotate_vector_clockwise
-from imposition.model import ObjectPlacement, SheetSpec
+from imposition.model import IntrinsicCanvas, ObjectPlacement, SheetSpec
 from imposition.objects.cootie_catcher import (
     COOTIE_CATCHER,
     EXPECTED_SLOTS,
@@ -87,3 +87,56 @@ def test_guides_require_sheet_context_on_placement() -> None:
     )
     trim = [guide for guide in COOTIE_CATCHER.guides(placement) if guide.kind == "trim"]
     assert len(trim) == 2
+
+
+def _intrinsic_canvas(up_vector: tuple[float, float]) -> IntrinsicCanvas:
+    return IntrinsicCanvas(
+        version=1,
+        shape="triangle",
+        coordinate_system="svg-y-down",
+        polygon=((0.0, 0.0), (1.0, 0.0), (0.5, 1.0)),
+        up_anchor="vertex:0",
+        up_vector=up_vector,
+    )
+
+
+def test_orientation_uses_legacy_default_for_generic_svg() -> None:
+    resolved = COOTIE_CATCHER.resolve_orientation(
+        "selector-3", source_canvas=None
+    )
+    assert resolved.policy == "legacy-default"
+    assert resolved.source_up_vector is None
+    assert resolved.target_up_vector == (1.0, 0.0)
+    assert resolved.resolved_degrees == pytest.approx(90.0)
+
+
+def test_orientation_uses_intrinsic_up_vector_when_available() -> None:
+    resolved = COOTIE_CATCHER.resolve_orientation(
+        "selector-3",
+        source_canvas=_intrinsic_canvas((0.0, -1.0)),
+    )
+    assert resolved.policy == "intrinsic-up-vector"
+    assert resolved.source_up_vector == (0.0, -1.0)
+    assert resolved.target_up_vector == (1.0, 0.0)
+    assert resolved.resolved_degrees == pytest.approx(90.0)
+
+
+def test_orientation_override_is_absolute() -> None:
+    resolved = COOTIE_CATCHER.resolve_orientation(
+        "selector-3",
+        source_canvas=_intrinsic_canvas((0.0, 1.0)),
+        override_degrees=270.0,
+    )
+    assert resolved.policy == "explicit-override"
+    assert resolved.override_degrees == pytest.approx(270.0)
+    assert resolved.resolved_degrees == pytest.approx(270.0)
+
+
+def test_intrinsic_orientation_can_resolve_non_quarter_turn() -> None:
+    diagonal = 2**-0.5
+    resolved = COOTIE_CATCHER.resolve_orientation(
+        "selector-1",
+        source_canvas=_intrinsic_canvas((diagonal, -diagonal)),
+    )
+    assert resolved.policy == "intrinsic-up-vector"
+    assert resolved.resolved_degrees == pytest.approx(315.0)

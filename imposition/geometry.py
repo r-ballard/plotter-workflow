@@ -86,6 +86,28 @@ def resolve_orientation_degrees(
     return clockwise_angle_degrees(source_up, target_up)
 
 
+def rotated_rectangle_size(
+    width: float,
+    height: float,
+    rotation_degrees: float,
+) -> tuple[float, float]:
+    """Return the axis-aligned bounds of a rectangle after center rotation."""
+
+    if width <= 0 or height <= 0:
+        raise ImpositionGeometryError("Rectangle dimensions must be greater than zero.")
+    if not all(math.isfinite(value) for value in (width, height, rotation_degrees)):
+        raise ImpositionGeometryError(
+            "Rectangle dimensions and rotation must be finite."
+        )
+
+    radians = math.radians(rotation_degrees)
+    cosine = abs(math.cos(radians))
+    sine = abs(math.sin(radians))
+    rotated_width = width * cosine + height * sine
+    rotated_height = width * sine + height * cosine
+    return rotated_width, rotated_height
+
+
 def map_normalized_polygon(
     polygon: Sequence[Point],
     placement: ObjectPlacement,

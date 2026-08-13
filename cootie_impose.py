@@ -37,7 +37,8 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from imposition.model import ObjectPlacement, SheetSpec
+from imposition.geometry import rotated_rectangle_size
+from imposition.model import IntrinsicCanvas, ObjectPlacement, SheetSpec
 from imposition.objects.cootie_catcher import COOTIE_CATCHER, CootieCatcherError
 from imposition.source import ImpositionSourceError, inspect_svg_source
 from svg_pen_contract import PenLayerContractError, inspect_pen_layer_contract
@@ -145,7 +146,11 @@ class PanelEntry:
     source: Path
     fit: str
     margin_mm: float
-    rotation_degrees: int
+    rotation_degrees: float
+    orientation_policy: str = "legacy-default"
+    rotation_override_degrees: int | None = None
+    source_intrinsic_canvas: IntrinsicCanvas | None = None
+    target_up_vector: Point | None = None
 
     @property
     def kind(self) -> str:
@@ -187,9 +192,13 @@ class RenderedPanel:
     source: str
     fit: str
     margin_mm: float
-    rotation_degrees: int
+    rotation_degrees: float
     polygon_normalized: tuple[tuple[float, float], ...]
     polygon_mm: tuple[tuple[float, float], ...]
+    orientation_policy: str = "legacy-default"
+    rotation_override_degrees: int | None = None
+    source_intrinsic_canvas: IntrinsicCanvas | None = None
+    target_up_vector: Point | None = None
 
 
 def _local_name(tag: str) -> str:
@@ -303,22 +312,51 @@ def load_manifest(
             raise ImpositionError(f"fit must be one of {sorted(FIT_MODES)}, got {fit!r}.")
         margin_mm = _float_field(raw, "margin_mm", default_margin_mm)
 
-        rotation_raw = raw.get("rotation_degrees", COOTIE_PANEL_ROTATIONS[slot])
+        source = _resolve_source(input_dir, raw.get("source"))
         try:
-            rotation = int(rotation_raw)
-        except (TypeError, ValueError) as exc:
-            raise ImpositionError("rotation_degrees must be an integer multiple of 90.") from exc
-        if rotation % 90:
-            raise ImpositionError("rotation_degrees must be an integer multiple of 90.")
-        rotation %= 360
+            source_canvas = inspect_svg_source(source)
+        except ImpositionSourceError as exc:
+            raise ImpositionError(str(exc)) from exc
+
+        rotation_override: int | None = None
+        if "rotation_degrees" in raw:
+            rotation_raw = raw["rotation_degrees"]
+            try:
+                rotation_override = int(rotation_raw)
+            except (TypeError, ValueError) as exc:
+                raise ImpositionError(
+                    "rotation_degrees must be an integer multiple of 90."
+                ) from exc
+            if rotation_override % 90:
+                raise ImpositionError(
+                    "rotation_degrees must be an integer multiple of 90."
+                )
+            rotation_override %= 360
+
+        orientation = COOTIE_CATCHER.resolve_orientation(
+            slot,
+            source_canvas=source_canvas,
+            override_degrees=rotation_override,
+        )
+        # Keep legacy/explicit quarter-turns as integers in the sidecar so
+        # existing generic fixtures retain their serialized numeric form.
+        resolved_rotation = (
+            rotation_override
+            if rotation_override is not None
+            else orientation.resolved_degrees
+        )
 
         entries.append(
             PanelEntry(
                 slot=slot,
-                source=_resolve_source(input_dir, raw.get("source")),
+                source=source,
                 fit=fit,
                 margin_mm=margin_mm,
-                rotation_degrees=rotation,
+                rotation_degrees=resolved_rotation,
+                orientation_policy=orientation.policy,
+                rotation_override_degrees=rotation_override,
+                source_intrinsic_canvas=source_canvas,
+                target_up_vector=orientation.target_up_vector,
             )
         )
         assigned.append(slot)
@@ -463,8 +501,16 @@ def inset_convex_polygon(polygon: Sequence[Point], inset: float) -> Polygon:
     return result
 
 
-def _rotated_canvas_size(width: float, height: float, rotation_degrees: int) -> tuple[float, float]:
-    return (height, width) if rotation_degrees % 180 else (width, height)
+def _rotated_canvas_size(
+    width: float,
+    height: float,
+    rotation_degrees: float,
+) -> tuple[float, float]:
+    """Return arbitrary-angle source bounds after center rotation."""
+    try:
+        return rotated_rectangle_size(width, height, rotation_degrees)
+    except ValueError as exc:
+        raise ImpositionError(str(exc)) from exc
 
 
 def _largest_centered_canvas_scale(
@@ -895,6 +941,10 @@ def impose(
                 rotation_degrees=entry.rotation_degrees,
                 polygon_normalized=COOTIE_PANEL_POLYGONS[entry.slot],
                 polygon_mm=polygon_mm,
+                orientation_policy=entry.orientation_policy,
+                rotation_override_degrees=entry.rotation_override_degrees,
+                source_intrinsic_canvas=entry.source_intrinsic_canvas,
+                target_up_vector=entry.target_up_vector,
             )
         )
 

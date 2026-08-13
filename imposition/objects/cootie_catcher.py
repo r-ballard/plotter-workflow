@@ -5,9 +5,12 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 
+from ..geometry import resolve_orientation_degrees
 from ..model import (
     Guide,
+    IntrinsicCanvas,
     ObjectPlacement,
+    OrientationResolution,
     OrientationTarget,
     Polygon,
     SheetSpec,
@@ -57,9 +60,9 @@ SELECTOR_REVEAL_PAIRS = {
     f"selector-{number}": f"reveal-{number}" for number in range(1, 9)
 }
 
-# Compatibility contract for the current physically inspected implementation.
-# Rendering still uses these values until target vectors have been validated as
-# the authoritative folded-reading orientation model.
+# Compatibility contract for generic sources without intrinsic orientation.
+# The same values seed provisional slot target vectors, so canonical-up sources
+# retain the current physically inspected flat-layout behavior.
 LEGACY_ROTATIONS: dict[str, int] = {
     "outer-1": 0,
     "outer-2": 90,
@@ -129,6 +132,40 @@ class CootieCatcher:
             return self._slot_by_id[slot_id]
         except KeyError as exc:
             raise CootieCatcherError(f"Unknown cootie-catcher slot {slot_id!r}.") from exc
+
+    def resolve_orientation(
+        self,
+        slot_id: str,
+        *,
+        source_canvas: IntrinsicCanvas | None,
+        override_degrees: float | None = None,
+    ) -> OrientationResolution:
+        """Resolve artwork rotation while preserving the legacy fallback contract."""
+
+        target_up = self.slot(slot_id).target_orientation.up_vector
+        source_up = source_canvas.up_vector if source_canvas is not None else None
+
+        if override_degrees is not None:
+            resolved = resolve_orientation_degrees(
+                source_up or (0.0, -1.0),
+                target_up,
+                override_degrees=override_degrees,
+            )
+            policy = "explicit-override"
+        elif source_up is not None:
+            resolved = resolve_orientation_degrees(source_up, target_up)
+            policy = "intrinsic-up-vector"
+        else:
+            resolved = LEGACY_ROTATIONS[slot_id]
+            policy = "legacy-default"
+
+        return OrientationResolution(
+            policy=policy,
+            source_up_vector=source_up,
+            target_up_vector=target_up,
+            override_degrees=override_degrees,
+            resolved_degrees=resolved,
+        )
 
     def resolve_placement(
         self,

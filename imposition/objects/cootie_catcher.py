@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 
-from ..geometry import resolve_orientation_degrees
+from ..geometry import resolve_orientation_degrees, resolve_orientation_frame_degrees
 from ..model import (
     Guide,
     IntrinsicCanvas,
@@ -92,6 +92,12 @@ _TARGET_UP_BY_ROTATION = {
     180: (0.0, 1.0),
     270: (-1.0, 0.0),
 }
+_TARGET_RIGHT_BY_ROTATION = {
+    0: (1.0, 0.0),
+    90: (0.0, 1.0),
+    180: (-1.0, 0.0),
+    270: (0.0, -1.0),
+}
 
 
 class CootieCatcherError(ValueError):
@@ -117,6 +123,7 @@ class CootieCatcher:
                 target_orientation=OrientationTarget(
                     up_vector=_TARGET_UP_BY_ROTATION[LEGACY_ROTATIONS[slot_id]],
                     validation="provisional",
+                    right_vector=_TARGET_RIGHT_BY_ROTATION[LEGACY_ROTATIONS[slot_id]],
                 ),
             )
             for slot_id in EXPECTED_SLOTS
@@ -152,8 +159,11 @@ class CootieCatcher:
                 override_degrees=override_degrees,
             )
             policy = "explicit-override"
-        elif source_up is not None:
-            resolved = resolve_orientation_degrees(source_up, target_up)
+        elif source_canvas is not None:
+            resolved = resolve_orientation_frame_degrees(
+                source_canvas.orientation_frame,
+                self.slot(slot_id).target_orientation.frame,
+            )
             policy = "intrinsic-up-vector"
         else:
             resolved = LEGACY_ROTATIONS[slot_id]

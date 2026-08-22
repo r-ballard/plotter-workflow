@@ -28,11 +28,37 @@ class SheetSpec:
 
 
 @dataclass(frozen=True)
+class OrientationFrame:
+    """Semantic two-dimensional orientation independent of polygon geometry.
+
+    ``up_vector`` is sufficient for rotation-only placement. ``right_vector`` is
+    optional and, when present on both source and target frames, lets the
+    resolver detect handedness/reflection mismatches. ``anchor`` identifies the
+    source geometric feature carrying the semantic orientation (for example
+    ``vertex:0`` or ``edge:1``) without constraining the vector direction.
+    """
+
+    up_vector: Point
+    right_vector: Point | None = None
+    anchor: str | None = None
+
+
+@dataclass(frozen=True)
 class OrientationTarget:
-    """Semantic reading direction expected for artwork placed in a slot."""
+    """Semantic reading frame expected for artwork placed in a slot."""
 
     up_vector: Point
     validation: str | None = None
+    right_vector: Point | None = None
+
+    @property
+    def frame(self) -> OrientationFrame:
+        """Return the target as a general orientation frame."""
+
+        return OrientationFrame(
+            up_vector=self.up_vector,
+            right_vector=self.right_vector,
+        )
 
 
 @dataclass(frozen=True)
@@ -77,6 +103,15 @@ class IntrinsicCanvas:
     up_anchor: str
     up_vector: Point
     clip_id: str | None = None
+
+    @property
+    def orientation_frame(self) -> OrientationFrame:
+        """Promote the v1 ``up_anchor``/``up_vector`` contract to a frame."""
+
+        return OrientationFrame(
+            up_vector=self.up_vector,
+            anchor=self.up_anchor,
+        )
 
 
 @dataclass(frozen=True)

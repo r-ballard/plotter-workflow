@@ -6,6 +6,7 @@ from .geometry import (
     map_normalized_polygon,
     normalize_vector,
     resolve_orientation_degrees,
+    resolve_orientation_frame_degrees,
     rotate_vector_clockwise,
     rotated_rectangle_size,
 )
@@ -14,6 +15,7 @@ from .model import (
     ImpositionObject,
     IntrinsicCanvas,
     ObjectPlacement,
+    OrientationFrame,
     OrientationResolution,
     OrientationTarget,
     Point,
@@ -30,6 +32,7 @@ __all__ = [
     "ImpositionSourceError",
     "IntrinsicCanvas",
     "ObjectPlacement",
+    "OrientationFrame",
     "OrientationResolution",
     "OrientationTarget",
     "Point",
@@ -42,6 +45,7 @@ __all__ = [
     "normalize_vector",
     "parse_intrinsic_canvas",
     "resolve_orientation_degrees",
+    "resolve_orientation_frame_degrees",
     "rotate_vector_clockwise",
     "rotated_rectangle_size",
 ]

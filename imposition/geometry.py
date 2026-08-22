@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 
-from .model import ObjectPlacement, Point, Polygon
+from .model import ObjectPlacement, OrientationFrame, Point, Polygon
 
 
 class ImpositionGeometryError(ValueError):
@@ -84,6 +84,64 @@ def resolve_orientation_degrees(
         result = override_degrees % 360.0
         return 0.0 if math.isclose(result, 0.0, abs_tol=1e-10) else result
     return clockwise_angle_degrees(source_up, target_up)
+
+
+def _normalized_frame(frame: OrientationFrame) -> tuple[Point, Point | None]:
+    """Normalize and validate an orientation frame."""
+
+    up = normalize_vector(frame.up_vector)
+    if frame.right_vector is None:
+        return up, None
+
+    right = normalize_vector(frame.right_vector)
+    dot = up[0] * right[0] + up[1] * right[1]
+    if not math.isclose(dot, 0.0, abs_tol=1e-7):
+        raise ImpositionGeometryError(
+            "Orientation frame up/right vectors must be perpendicular."
+        )
+    return up, right
+
+
+def resolve_orientation_frame_degrees(
+    source_frame: OrientationFrame,
+    target_frame: OrientationFrame,
+    *,
+    override_degrees: float | None = None,
+) -> float:
+    """Resolve a source frame into a target frame using rotation only.
+
+    The v1 intrinsic-canvas contract supplies only an ``up_vector`` and is
+    therefore fully supported. When both frames also provide ``right_vector``,
+    the secondary axis is checked after rotation. A mismatch indicates that the
+    two frames differ by reflection/handedness and cannot be satisfied by a
+    rotation-only imposition transform.
+    """
+
+    if override_degrees is not None:
+        return resolve_orientation_degrees(
+            source_frame.up_vector,
+            target_frame.up_vector,
+            override_degrees=override_degrees,
+        )
+
+    source_up, source_right = _normalized_frame(source_frame)
+    target_up, target_right = _normalized_frame(target_frame)
+    resolved = clockwise_angle_degrees(source_up, target_up)
+
+    if source_right is not None and target_right is not None:
+        rotated_right = normalize_vector(
+            rotate_vector_clockwise(source_right, resolved)
+        )
+        if not (
+            math.isclose(rotated_right[0], target_right[0], abs_tol=1e-7)
+            and math.isclose(rotated_right[1], target_right[1], abs_tol=1e-7)
+        ):
+            raise ImpositionGeometryError(
+                "Orientation frames differ in handedness; rotation alone cannot "
+                "map source right-vector to target right-vector."
+            )
+
+    return resolved
 
 
 def rotated_rectangle_size(

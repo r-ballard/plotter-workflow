@@ -15,6 +15,7 @@ from pen_plan import (
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_pen_plan_for_hpgl,
+    discover_resolved_pen_plan_path,
 )
 
 
@@ -180,7 +181,7 @@ def run_job_preflight(
 
     resolved_plan: ResolvedPenPlan | None = None
     if pen_plan_path is None:
-        candidate = hpgl_path.with_suffix(".penplan.json")
+        candidate = discover_resolved_pen_plan_path(hpgl_path)
     else:
         candidate = Path(pen_plan_path).expanduser().resolve()
 

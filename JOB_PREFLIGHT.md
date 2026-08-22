@@ -4,7 +4,7 @@ The final pre-send check combines three independently useful artifacts:
 
 ```text
 <stem>.hpgl
-<stem>.penplan.json
+<stem>.resolved.penplan.json
 <stem>.placement.json
 ```
 
@@ -57,7 +57,7 @@ uv run python send_hpgl.py \
 By default the sender discovers adjacent resolved sidecars:
 
 ```text
-output/plant_test_drawing.penplan.json
+output/plant_test_drawing.resolved.penplan.json
 output/plant_test_drawing.placement.json
 ```
 
@@ -102,3 +102,5 @@ A validated multi-pen job requires:
 - multi-pen send has explicit operator confirmation.
 
 The operator remains responsible for confirming actual paper placement, pen/tool loading, pen condition, and a conservative first hardware test.
+
+Legacy generated `<stem>.penplan.json` files remain readable when their JSON `kind` is `resolved-dpx3300-pen-plan`.

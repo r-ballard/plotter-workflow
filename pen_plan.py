@@ -19,6 +19,9 @@ import xml.etree.ElementTree as ET
 MAX_DPX_PENS = 8
 PEN_POLICIES = ("preserve", "compact", "explicit")
 PEN_PLAN_SCHEMA_VERSION = 1
+PEN_PLAN_SUFFIX = ".penplan.json"
+RESOLVED_PEN_PLAN_SUFFIX = ".resolved.penplan.json"
+RESOLVED_PEN_PLAN_KIND = "resolved-dpx3300-pen-plan"
 PEN_ID_RE = re.compile(r"^pen-(\d+)$")
 SP_RE = re.compile(r"SP([0-8]);", re.IGNORECASE)
 _DRAWABLE_TAGS = {
@@ -211,12 +214,54 @@ def parse_pen_map(raw: str | None) -> tuple[RequestedAssignment, ...]:
     return tuple(assignments)
 
 
-def discover_pen_plan(source_svg: Path, explicit_path: Path | None = None) -> Path | None:
-    """Return an explicit plan or an adjacent ``<stem>.penplan.json`` if present."""
+def default_pen_plan_path(source_svg: Path) -> Path:
+    # Conventional user-authored pen-plan path for an SVG.
+    return Path(source_svg).with_suffix(PEN_PLAN_SUFFIX)
+
+
+def default_resolved_pen_plan_path(hpgl_path: Path) -> Path:
+    # Generated resolved pen-plan path for an HP-GL job.
+    return Path(hpgl_path).with_suffix(RESOLVED_PEN_PLAN_SUFFIX)
+
+
+def _json_kind(path: Path) -> str | None:
+    # Return a JSON object's kind discriminator when it can be read.
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    kind = raw.get("kind")
+    return str(kind) if kind is not None else None
+
+
+def discover_pen_plan(
+    source_svg: Path, explicit_path: Path | None = None
+) -> Path | None:
+    # Return an explicit plan or an adjacent user-authored plan if present.
     if explicit_path is not None:
         return explicit_path
-    adjacent = source_svg.with_suffix(".penplan.json")
-    return adjacent if adjacent.is_file() else None
+    adjacent = default_pen_plan_path(source_svg)
+    if not adjacent.is_file():
+        return None
+    # Old converter output used the same suffix as user-authored input plans.
+    # Do not parse a generated resolved audit sidecar as an input specification.
+    if _json_kind(adjacent) == RESOLVED_PEN_PLAN_KIND:
+        return None
+    return adjacent
+
+
+def discover_resolved_pen_plan_path(hpgl_path: Path) -> Path:
+    # Find a resolved sidecar, with read-only support for the legacy name.
+    preferred = default_resolved_pen_plan_path(hpgl_path)
+    if preferred.is_file():
+        return preferred
+
+    legacy = Path(hpgl_path).with_suffix(PEN_PLAN_SUFFIX)
+    if legacy.is_file() and _json_kind(legacy) == RESOLVED_PEN_PLAN_KIND:
+        return legacy
+    return preferred
 
 
 def inspect_logical_layers(source_svg: Path) -> tuple[LogicalLayer, ...]:
@@ -602,7 +647,7 @@ def validate_resolved_pen_plan_for_hpgl(
 ) -> ResolvedPenPlan:
     """Verify a resolved sidecar against the actual HP-GL pen selections."""
     if sidecar_path is None:
-        sidecar_path = hpgl_path.with_suffix(".penplan.json")
+        sidecar_path = discover_resolved_pen_plan_path(hpgl_path)
     if not sidecar_path.is_file():
         raise PenPlanError(f"Resolved pen-plan sidecar does not exist: {sidecar_path}")
     plan = load_resolved_pen_plan(sidecar_path)

@@ -84,6 +84,7 @@ from pen_plan import (
     remap_hpgl_pen_selections,
     resolve_pen_plan,
     write_resolved_pen_plan,
+    default_resolved_pen_plan_path,
 )
 
 LOG = logging.getLogger("dpx3300")
@@ -522,7 +523,7 @@ def convert_files(
                 validate_hpgl(
                     destination, expected_pens=resolved_pen_plan.physical_pens
                 )
-                sidecar = destination.with_suffix(".penplan.json")
+                sidecar = default_resolved_pen_plan_path(destination)
                 write_resolved_pen_plan(sidecar, resolved_pen_plan)
                 LOG.info("Created resolved pen plan: %s", sidecar)
                 if send and len(resolved_pen_plan.physical_pens) > 1:

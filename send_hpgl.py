@@ -24,6 +24,7 @@ from pen_plan import (
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_pen_plan_for_hpgl,
+    discover_resolved_pen_plan_path,
 )
 
 LOG = logging.getLogger("dpx3300.sender")
@@ -115,8 +116,9 @@ def parse_args() -> argparse.Namespace:
         "--pen-plan",
         type=Path,
         help=(
-            "Resolved .penplan.json sidecar. By default the sender looks beside "
-            "the HP-GL file for <stem>.penplan.json."
+            "Resolved .resolved.penplan.json sidecar. By default the sender "
+            "discovers <stem>.resolved.penplan.json beside the HP-GL file, "
+            "with read-only fallback for legacy resolved <stem>.penplan.json."
         ),
     )
     parser.add_argument(
@@ -199,7 +201,7 @@ def main() -> int:
         sidecar = (
             args.pen_plan.expanduser().resolve()
             if args.pen_plan is not None
-            else args.hpgl.with_suffix(".penplan.json")
+            else discover_resolved_pen_plan_path(args.hpgl)
         )
         resolved_plan = None
         if sidecar.is_file():

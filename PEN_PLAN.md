@@ -40,7 +40,7 @@ sidecar** beside the HPGL output:
 
 ```text
 output/plant_test_drawing.hpgl
-output/plant_test_drawing.penplan.json
+output/plant_test_drawing.resolved.penplan.json
 ```
 
 The output sidecar records the exact logical-to-physical mapping used, inactive
@@ -276,7 +276,7 @@ The adjacent `input/plant_test_drawing.penplan.json` is discovered automatically
 
 ## Resolved output sidecar
 
-The generated `output/<stem>.penplan.json` includes fields such as:
+The generated `output/<stem>.resolved.penplan.json` includes fields such as:
 
 ```json
 {
@@ -311,3 +311,23 @@ The generated `output/<stem>.penplan.json` includes fields such as:
 The SVG preview color and the physical ink color are deliberately separate.
 `preview_color` describes the producer's logical layer; `color` describes the
 physical tool the user intends to load.
+
+## Input versus resolved sidecar filenames
+
+Pen-plan input specifications and generated resolved audit artifacts use distinct
+filenames:
+
+```text
+<stem>.penplan.json
+    Optional user-authored input specification adjacent to the source SVG.
+
+<stem>.resolved.penplan.json
+    Generated resolved physical-slot audit sidecar adjacent to the HP-GL output.
+```
+
+This distinction allows SVG input and HP-GL output to occupy the same directory
+without the converter reading its own prior output as a new input plan. For
+backward compatibility, preflight and sending may read a legacy
+`<stem>.penplan.json` as a resolved sidecar only when its JSON `kind` is
+`resolved-dpx3300-pen-plan`. New conversions never write the legacy resolved
+filename.

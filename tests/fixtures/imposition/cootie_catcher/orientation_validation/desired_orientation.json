@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "layout": "cootie_catcher",
+  "status": "design-target",
+  "feature_maps": {
+    "square": {
+      "vertices": {
+        "A": "vertex:0",
+        "B": "vertex:1",
+        "C": "vertex:2",
+        "D": "vertex:3"
+      },
+      "edges": {
+        "AB": "edge:0",
+        "BC": "edge:1",
+        "CD": "edge:2",
+        "DA": "edge:3"
+      }
+    },
+    "triangle": {
+      "vertices": {
+        "A": "vertex:0",
+        "B": "vertex:1",
+        "C": "vertex:2"
+      },
+      "edges": {
+        "AB": "edge:0",
+        "BC": "edge:1",
+        "CA": "edge:2"
+      }
+    }
+  },
+  "slots": [
+    {
+      "slot": "outer-1",
+      "family": "outer",
+      "shape": "square",
+      "desired_top_feature": "C",
+      "desired_right_feature": "D"
+    },
+    {
+      "slot": "outer-2",
+      "family": "outer",
+      "shape": "square",
+      "desired_top_feature": "C",
+      "desired_right_feature": "D"
+    },
+    {
+      "slot": "outer-3",
+      "family": "outer",
+      "shape": "square",
+      "desired_top_feature": "C",
+      "desired_right_feature": "D"
+    },
+    {
+      "slot": "outer-4",
+      "family": "outer",
+      "shape": "square",
+      "desired_top_feature": "C",
+      "desired_right_feature": "D"
+    },
+    {
+      "slot": "selector-1",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "CA",
+      "desired_right_feature": "AB"
+    },
+    {
+      "slot": "selector-2",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "AB",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "selector-3",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "CA",
+      "desired_right_feature": "AB"
+    },
+    {
+      "slot": "selector-4",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "AB",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "selector-5",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "CA",
+      "desired_right_feature": "AB"
+    },
+    {
+      "slot": "selector-6",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "AB",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "selector-7",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "CA",
+      "desired_right_feature": "AB"
+    },
+    {
+      "slot": "selector-8",
+      "family": "selector",
+      "shape": "triangle",
+      "desired_top_feature": "AB",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "reveal-1",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "B",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "reveal-2",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "C",
+      "desired_right_feature": "A"
+    },
+    {
+      "slot": "reveal-3",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "B",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "reveal-4",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "C",
+      "desired_right_feature": "A"
+    },
+    {
+      "slot": "reveal-5",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "B",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "reveal-6",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "C",
+      "desired_right_feature": "A"
+    },
+    {
+      "slot": "reveal-7",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "B",
+      "desired_right_feature": "BC"
+    },
+    {
+      "slot": "reveal-8",
+      "family": "reveal",
+      "shape": "triangle",
+      "desired_top_feature": "C",
+      "desired_right_feature": "A"
+    }
+  ]
+}

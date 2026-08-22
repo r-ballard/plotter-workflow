@@ -9,15 +9,34 @@ and uses canonical SVG-up `(0,-1)`. Selector and reveal sources use triangular
 canvases with `up_anchor="vertex:0"`; outer sources use square canvases with
 `up_anchor="edge:0"`.
 
-Each source contains four deliberately asymmetric features:
+Each source contains deliberately asymmetric and geometrically labeled features:
 
 - a prominent arrow from the interior toward semantic top;
 - an outline of its intrinsic canvas;
 - a triangular mark on source-left and a different multi-stroke mark on
-  source-right, making reflection visible; and
-- a vector-path family/index identifier (`O1`-`O4`, `S1`-`S8`, `R1`-`R8`).
+  source-right, making reflection visible;
+- a vector-path family/index identifier (`O1`-`O4`, `S1`-`S8`, `R1`-`R8`); and
+- vector-path vertex labels `A`-`D` for squares and `A`-`C` for triangles.
 
 No SVG `<text>` is used.
+
+The labels identify geometry independently of the current semantic-up arrow.
+They follow polygon order:
+
+```text
+square:
+  A=vertex:0  B=vertex:1  C=vertex:2  D=vertex:3
+  AB=edge:0   BC=edge:1   CD=edge:2   DA=edge:3
+
+triangle:
+  A=vertex:0  B=vertex:1  C=vertex:2
+  AB=edge:0   BC=edge:1   CA=edge:2
+```
+
+For the canonical triangle, `A` is the unique/apex vertex, `BC` is the base,
+and `AB` / `CA` are the two legs. Any vertex or edge may be designated as
+reader-top. A second feature may be designated as reader-right to remove
+orientation ambiguity.
 
 ## 1. Generate the sources
 
@@ -106,14 +125,16 @@ Use sacrificial Letter paper. Plot the artwork and, if needed, the construction
 guide. Trim to the square and perform the complete cootie-catcher fold.
 
 For every visible state, use the asymmetric markers rather than memory of the
-flat SVG:
+flat SVG. The arrow records the fixture's **current** semantic-up direction; it
+does not constrain the desired orientation. Record instead:
 
-- the arrow must point toward the intended reading top;
-- the source-left triangle must still be on the reader's left;
-- the source-right multi-stroke mark must still be on the reader's right;
-- `S1` must correspond to `R1`, ..., `S8` to `R8`.
+- which labeled vertex or edge should be at reader-top;
+- which labeled feature should be toward reader-right;
+- whether the asymmetric source-left/source-right marks retain handedness; and
+- whether `S1` corresponds to `R1`, ..., `S8` to `R8`.
 
 A left/right reversal is a reflection defect, not merely a rotation defect.
+Corner-up, edge-up, and either-leg-up orientations are valid desired states.
 
 ## 6. Record observations
 
@@ -127,13 +148,25 @@ cp \
 
 For each slot record:
 
-- `upright_after_fold`: `true` or `false`;
+- `desired_top_feature`: labeled vertex or edge that should be reader-top;
+- `desired_right_feature`: labeled feature that should lie toward reader-right;
+- `observed_top_feature_after_fold`: feature actually at reader-top after fold;
+- `observed_right_feature_after_fold`: feature actually toward reader-right;
 - `mirrored_after_fold`: `true` or `false`;
-- `required_rotation_correction_degrees`: `0`, `90`, `180`, or `270` clockwise
-  as viewed by the reader, or `null` if not yet determined;
 - `pairing_correct`: for selectors/reveals, whether the semantic pairing is
   correct; and
 - free-form `notes` for ambiguous fold/view states.
+
+Use feature labels (`A`, `AB`, `BC`, and so on), not a derived rotation. A
+corner-up square may require a 45-degree frame change, and a triangle with a leg
+as top is not generally a quarter-turn from apex-up.
+
+Examples:
+
+```json
+{"slot": "outer-1", "desired_top_feature": "A", "desired_right_feature": "B"}
+{"slot": "reveal-1", "desired_top_feature": "AB", "desired_right_feature": "A"}
+```
 
 Set `validation_status` to `complete` only after all 20 slots have been
 physically inspected.
@@ -144,10 +177,10 @@ Software tests and a clean sidecar do **not** change the object-level validation
 state. Promote target orientations from `provisional` only when the completed
 physical observation record demonstrates:
 
-- all required panels are upright in their intended folded reading state;
+- each panel's observed top/right features match its desired orientation frame;
 - no panel is reflected;
 - selector/reveal pairings are correct; and
-- any necessary target-vector corrections have been encoded and re-tested.
+- the resulting source/target frame changes have been encoded and re-tested.
 
 Keep the completed observation record as the physical validation artifact. Do
 not replace semantic regression fixtures with exact vpype path or HP-GL byte

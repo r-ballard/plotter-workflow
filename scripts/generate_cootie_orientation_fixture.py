@@ -29,6 +29,33 @@ SVG_NS = "http://www.w3.org/2000/svg"
 CANVAS_SIZE = 100
 CANONICAL_UP = (0.0, -1.0)
 
+SQUARE_FEATURE_MAP: dict[str, dict[str, str]] = {
+    "vertices": {
+        "A": "vertex:0",
+        "B": "vertex:1",
+        "C": "vertex:2",
+        "D": "vertex:3",
+    },
+    "edges": {
+        "AB": "edge:0",
+        "BC": "edge:1",
+        "CD": "edge:2",
+        "DA": "edge:3",
+    },
+}
+TRIANGLE_FEATURE_MAP: dict[str, dict[str, str]] = {
+    "vertices": {
+        "A": "vertex:0",
+        "B": "vertex:1",
+        "C": "vertex:2",
+    },
+    "edges": {
+        "AB": "edge:0",
+        "BC": "edge:1",
+        "CA": "edge:2",
+    },
+}
+
 _SEGMENTS: dict[str, tuple[tuple[float, float, float, float], ...]] = {
     "0": ((0, 0, 8, 0), (8, 0, 8, 8), (8, 8, 8, 16), (0, 16, 8, 16), (0, 8, 0, 16), (0, 0, 0, 8)),
     "1": ((8, 0, 8, 8), (8, 8, 8, 16)),
@@ -42,6 +69,34 @@ _SEGMENTS: dict[str, tuple[tuple[float, float, float, float], ...]] = {
     "O": ((0, 0, 8, 0), (8, 0, 8, 16), (8, 16, 0, 16), (0, 16, 0, 0)),
     "S": ((8, 0, 0, 0), (0, 0, 0, 8), (0, 8, 8, 8), (8, 8, 8, 16), (8, 16, 0, 16)),
     "R": ((0, 16, 0, 0), (0, 0, 8, 0), (8, 0, 8, 8), (8, 8, 0, 8), (0, 8, 8, 16)),
+    "A": ((0, 16, 4, 0), (4, 0, 8, 16), (2, 8, 6, 8)),
+    "B": (
+        (0, 0, 0, 16),
+        (0, 0, 6, 0),
+        (6, 0, 8, 2),
+        (8, 2, 8, 6),
+        (8, 6, 6, 8),
+        (0, 8, 6, 8),
+        (6, 8, 8, 10),
+        (8, 10, 8, 14),
+        (8, 14, 6, 16),
+        (0, 16, 6, 16),
+    ),
+    "C": (
+        (8, 0, 2, 0),
+        (2, 0, 0, 2),
+        (0, 2, 0, 14),
+        (0, 14, 2, 16),
+        (2, 16, 8, 16),
+    ),
+    "D": (
+        (0, 0, 0, 16),
+        (0, 0, 5, 0),
+        (5, 0, 8, 3),
+        (8, 3, 8, 13),
+        (8, 13, 5, 16),
+        (0, 16, 5, 16),
+    ),
 }
 
 
@@ -72,6 +127,30 @@ def _identifier_path(slot: str, *, triangle: bool) -> str:
     )
 
 
+def _feature_label_elements(*, triangle: bool) -> str:
+    """Return vector-only vertex labels for physical orientation annotation."""
+
+    positions = (
+        {
+            "A": (46.0, 5.0),
+            "B": (89.0, 87.0),
+            "C": (7.0, 87.0),
+        }
+        if triangle
+        else {
+            "A": (7.0, 7.0),
+            "B": (89.0, 7.0),
+            "C": (89.0, 88.0),
+            "D": (7.0, 88.0),
+        }
+    )
+    return "\n".join(
+        f'    <path data-validation-feature="vertex:{label}" '
+        f'stroke-width="1" d="{_glyph_path(label, x, y, 0.4)}"/>'
+        for label, (x, y) in positions.items()
+    )
+
+
 def _asymmetric_markers(*, triangle: bool) -> str:
     """Return paths whose handedness is obvious after a reflection."""
 
@@ -85,7 +164,7 @@ def _asymmetric_markers(*, triangle: bool) -> str:
         arrow = "M 50 50 L 50 14 M 42 23 L 50 14 L 58 23"
         left = "M 16 78 L 25 69 L 25 87 Z"
         right = "M 73 69 L 84 69 L 84 80 L 73 80 Z M 76 85 L 87 85"
-    return " ".join((border, arrow, left, right))
+    return f"{border} {arrow} {left} {right}"
 
 
 def source_svg(slot: str) -> str:
@@ -94,15 +173,28 @@ def source_svg(slot: str) -> str:
     family = slot.split("-", 1)[0]
     triangle = family in {"selector", "reveal"}
     if triangle:
+        feature_map = TRIANGLE_FEATURE_MAP
         shape = "triangle"
         polygon = "50,0 100,100 0,100"
         up_anchor = "vertex:0"
     else:
+        feature_map = SQUARE_FEATURE_MAP
         shape = "square"
         polygon = "0,0 100,0 100,100 0,100"
         up_anchor = "edge:0"
 
-    paths = f"{_asymmetric_markers(triangle=triangle)} {_identifier_path(slot, triangle=triangle)}"
+    paths = (
+        f"{_asymmetric_markers(triangle=triangle)} "
+        f"{_identifier_path(slot, triangle=triangle)}"
+    )
+    vertex_map = ";".join(
+        f"{label}={anchor}" for label, anchor in feature_map["vertices"].items()
+    )
+    edge_map = ";".join(
+        f"{label}={anchor}" for label, anchor in feature_map["edges"].items()
+    )
+    feature_labels = _feature_label_elements(triangle=triangle)
+
     return (
         f'<svg xmlns="{SVG_NS}" width="{CANVAS_SIZE}" height="{CANVAS_SIZE}" '
         f'viewBox="0 0 {CANVAS_SIZE} {CANVAS_SIZE}" '
@@ -112,14 +204,16 @@ def source_svg(slot: str) -> str:
         f'data-viz-canvas-up-anchor="{up_anchor}" '
         'data-viz-canvas-up-vector="0,-1" '
         f'data-viz-canvas-polygon="{polygon}" '
+        f'data-validation-vertex-map="{vertex_map}" '
+        f'data-validation-edge-map="{edge_map}" '
         f'data-validation-slot="{slot}">\n'
         '  <g fill="none" stroke="#000000" stroke-width="2" '
         'stroke-linecap="round" stroke-linejoin="round">\n'
         f'    <path d="{paths}"/>\n'
+        f'{feature_labels}\n'
         '  </g>\n'
         '</svg>\n'
     )
-
 
 def _canonical_canvas(slot: str) -> IntrinsicCanvas:
     family = slot.split("-", 1)[0]
@@ -173,21 +267,29 @@ def observation_template() -> dict[str, object]:
     slots: list[dict[str, object]] = []
     for slot in EXPECTED_SLOTS:
         family = slot.split("-", 1)[0]
+        shape = "triangle" if family in {"selector", "reveal"} else "square"
         slots.append(
             {
                 "slot": slot,
                 "family": family,
-                "upright_after_fold": None,
+                "shape": shape,
+                "desired_top_feature": None,
+                "desired_right_feature": None,
+                "observed_top_feature_after_fold": None,
+                "observed_right_feature_after_fold": None,
                 "mirrored_after_fold": None,
-                "required_rotation_correction_degrees": None,
-                "pairing_correct": None if family == "outer" else None,
+                "pairing_correct": None,
                 "notes": "",
             }
         )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "layout": "cootie_catcher",
         "validation_status": "not-performed",
+        "feature_maps": {
+            "square": SQUARE_FEATURE_MAP,
+            "triangle": TRIANGLE_FEATURE_MAP,
+        },
         "physical_job": {
             "sheet_size": "letter",
             "square_position": "left",
@@ -197,7 +299,6 @@ def observation_template() -> dict[str, object]:
         "slots": slots,
         "overall_notes": "",
     }
-
 
 def generate_fixture(output_dir: Path, *, overwrite: bool = False) -> None:
     """Create source SVGs, manifest, expected orientation, and observation template."""

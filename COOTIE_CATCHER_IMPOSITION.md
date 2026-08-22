@@ -133,6 +133,49 @@ the orientation table based on observed folded behavior.
 A manifest entry may temporarily override `rotation_degrees` in multiples of 90
 to experiment without changing the default table.
 
+
+### Intrinsic source orientation frames
+
+Source orientation is independent of the slot polygon. The v1 intrinsic-canvas
+contract identifies a semantic geometric anchor and a normalized direction:
+
+```xml
+data-viz-canvas-up-anchor="vertex:0"
+data-viz-canvas-up-vector="0,-1"
+```
+
+`data-viz-canvas-up-anchor` accepts `vertex:N` or `edge:N`. The anchor records
+which feature of the intrinsic source geometry carries the semantic orientation;
+`data-viz-canvas-up-vector` records the direction that source considers "up" in
+SVG y-down coordinates. The vector is not restricted to the four cardinal axes.
+
+For example, a square whose north-west corner is semantic top may declare:
+
+```xml
+data-viz-canvas-up-anchor="vertex:0"
+data-viz-canvas-up-vector="-0.7071067811865476,-0.7071067811865476"
+```
+
+When imposed into a slot whose target up-vector is `(0,-1)`, this resolves to a
+45-degree clockwise rotation. The polygon itself remains an ordinary square.
+
+Likewise, an isosceles-triangle source may use a side as its semantic reference
+and orient the triangle laterally:
+
+```xml
+data-viz-canvas-up-anchor="edge:1"
+data-viz-canvas-up-vector="1,0"
+```
+
+Against a `(0,-1)` target this resolves to 270 degrees clockwise, giving a
+triangle with one corner up, one corner down, and the remaining corner lateral.
+This does not require a different triangle polygon or a per-slot rotation hack.
+
+The richer internal `OrientationFrame` may also carry a secondary right-vector
+for handedness/reflection validation. The SVG v1 contract does not yet serialize
+that secondary axis; add it only when a concrete producer/consumer requirement
+needs reflection to be represented explicitly in source metadata.
+
 ## Manifest input
 
 V1 uses an explicit manifest as the canonical input interface. This avoids

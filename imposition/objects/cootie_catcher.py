@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 
+from ..feature_orientation import resolve_feature_orientation_degrees
 from ..geometry import resolve_orientation_degrees, resolve_orientation_frame_degrees
 from ..model import (
     Guide,
@@ -99,6 +100,32 @@ _TARGET_RIGHT_BY_ROTATION = {
     270: (0.0, -1.0),
 }
 
+# Physically annotated desired source-feature orientation. These are semantic
+# feature anchors, not precomputed rotations. The rules collapse the 20-slot
+# design specification into one outer rule plus odd/even selector and reveal
+# rules.
+_OUTER_FEATURE_ANCHORS = ("vertex:2", "vertex:3")
+_SELECTOR_FEATURE_ANCHORS = {
+    1: ("edge:2", "edge:0"),
+    0: ("edge:0", "edge:1"),
+}
+_REVEAL_FEATURE_ANCHORS = {
+    1: ("vertex:1", "edge:1"),
+    0: ("vertex:2", "vertex:0"),
+}
+
+
+def _desired_feature_anchors(slot_id: str) -> tuple[str, str]:
+    family, raw_index = slot_id.rsplit("-", 1)
+    index = int(raw_index)
+    if family == "outer":
+        return _OUTER_FEATURE_ANCHORS
+    if family == "selector":
+        return _SELECTOR_FEATURE_ANCHORS[index % 2]
+    if family == "reveal":
+        return _REVEAL_FEATURE_ANCHORS[index % 2]
+    raise CootieCatcherError(f"Unknown cootie-catcher slot family {family!r}.")
+
 
 class CootieCatcherError(ValueError):
     """Raised when cootie-catcher object geometry cannot be resolved."""
@@ -124,6 +151,8 @@ class CootieCatcher:
                     up_vector=_TARGET_UP_BY_ROTATION[LEGACY_ROTATIONS[slot_id]],
                     validation="provisional",
                     right_vector=_TARGET_RIGHT_BY_ROTATION[LEGACY_ROTATIONS[slot_id]],
+                    top_feature_anchor=_desired_feature_anchors(slot_id)[0],
+                    right_feature_anchor=_desired_feature_anchors(slot_id)[1],
                 ),
             )
             for slot_id in EXPECTED_SLOTS
@@ -146,10 +175,18 @@ class CootieCatcher:
         *,
         source_canvas: IntrinsicCanvas | None,
         override_degrees: float | None = None,
+        use_feature_orientation: bool = False,
     ) -> OrientationResolution:
-        """Resolve artwork rotation while preserving the legacy fallback contract."""
+        """Resolve artwork rotation while preserving compatibility by default.
 
-        target_up = self.slot(slot_id).target_orientation.up_vector
+        Feature orientation is opt-in for this transition. When enabled, the
+        physically annotated source top/right features are resolved against the
+        slot's existing reader frame. Explicit manifest rotation remains the
+        highest-precedence override.
+        """
+
+        target = self.slot(slot_id).target_orientation
+        target_up = target.up_vector
         source_up = source_canvas.up_vector if source_canvas is not None else None
 
         if override_degrees is not None:
@@ -159,10 +196,23 @@ class CootieCatcher:
                 override_degrees=override_degrees,
             )
             policy = "explicit-override"
+        elif (
+            use_feature_orientation
+            and source_canvas is not None
+            and target.top_feature_anchor is not None
+            and target.right_feature_anchor is not None
+        ):
+            resolved = resolve_feature_orientation_degrees(
+                source_canvas.polygon,
+                top_anchor=target.top_feature_anchor,
+                right_anchor=target.right_feature_anchor,
+                target_frame=target.frame,
+            )
+            policy = "feature-frame"
         elif source_canvas is not None:
             resolved = resolve_orientation_frame_degrees(
                 source_canvas.orientation_frame,
-                self.slot(slot_id).target_orientation.frame,
+                target.frame,
             )
             policy = "intrinsic-up-vector"
         else:

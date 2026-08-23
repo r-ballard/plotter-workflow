@@ -12,6 +12,7 @@ FitMode = Literal["contain", "cover"]
 SheetOrientation = Literal["landscape", "portrait"]
 OrientationPolicy = Literal[
     "explicit-override",
+    "feature-frame",
     "intrinsic-up-vector",
     "legacy-default",
 ]
@@ -45,11 +46,19 @@ class OrientationFrame:
 
 @dataclass(frozen=True)
 class OrientationTarget:
-    """Semantic reading frame expected for artwork placed in a slot."""
+    """Semantic reading frame expected for artwork placed in a slot.
+
+    ``top_feature_anchor`` and ``right_feature_anchor`` optionally identify
+    source-polygon features that should be aligned with the target reader frame.
+    The top feature is aligned exactly with ``up_vector``; the right feature is
+    required to land in the positive ``right_vector`` half-plane.
+    """
 
     up_vector: Point
     validation: str | None = None
     right_vector: Point | None = None
+    top_feature_anchor: str | None = None
+    right_feature_anchor: str | None = None
 
     @property
     def frame(self) -> OrientationFrame:

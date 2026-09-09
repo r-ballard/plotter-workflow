@@ -143,6 +143,7 @@ connection. Do not use `--allow-unvalidated-job` for normal plotter operation.
 - `BOOKLET_IMPOSITION.md` — booklet layout, spread, guide, and conversion contract.
 - `cootie_impose.py` — physical imposition for one-sheet cootie-catcher fortune tellers.
 - `COOTIE_CATCHER_IMPOSITION.md` — cootie-catcher geometry, guide, and validation contract.
+- `docs/how-to/impose-and-plot-polygon-bundle.md` — end-to-end Git Bash operator guide from a 20-surface polygon bundle through physical plotting.
 - `vpype.toml` — centered and lower-left DPX-3300 paper/coordinate profiles.
 - `job_preflight.py` — unified HP-GL, pen-plan, and placement validation.
 - `send_hpgl.py` — preflight-gated pySerial sender using 9600 8N1 and XON/XOFF.

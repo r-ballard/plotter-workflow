@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "logical_layer_contract": "viz-logical-layers/v1",
+  "logical_layers": [
+    {
+      "id": "orbit",
+      "ordinal": 1,
+      "label": "Orbit",
+      "projection_rule_index": 0,
+      "group_values": {},
+      "preview_style": {"stroke": "#112233"}
+    },
+    {
+      "id": "body-s-planet-a",
+      "ordinal": 2,
+      "label": "Body S Planet A",
+      "projection_rule_index": 1,
+      "group_values": {"body": "planet-a"}
+    }
+  ],
+  "projection": {"id": "fixture/v1", "rules": []},
+  "surfaces": [
+    {
+      "surface_id": "planet-a",
+      "domain_id": "planet-a",
+      "path": "two-surface-v1.svg",
+      "sha256": "c8be21f24be15832f42ce332b936decb0ff94fa9a79277cba40ea05bf90136fa",
+      "logical_layer_ids": ["orbit", "body-s-planet-a"],
+      "feature_aliases": {},
+      "producing_pass_ids": ["fixture"]
+    }
+  ]
+}

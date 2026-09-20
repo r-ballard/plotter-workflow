@@ -1,0 +1,2 @@
+# Neutral SVG fixture hashes bind exact bytes recorded in design.json.
+tests/fixtures/logical_layers/*.svg text eol=lf

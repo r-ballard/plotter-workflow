@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" data-viz-layer-contract="viz-logical-layers/v1">
+  <g id="local-orbit" data-viz-layer-id="orbit" data-viz-layer-ordinal="1" data-viz-layer-label="Orbit" fill="none" stroke="#000">
+    <path d="M 0 0 L 10 10" data-viz-path-id="orbit-1" data-viz-domain-id="planet-a" data-viz-feature-role="orbit" />
+  </g>
+  <g id="local-body" data-viz-layer-id="body-s-planet-a" data-viz-layer-ordinal="2" data-viz-layer-label="Body S Planet A" fill="none" stroke="#000">
+    <path d="M 1 1 L 2 2" data-viz-path-id="body-1" data-viz-domain-id="planet-a" data-viz-feature-role="body" />
+  </g>
+</svg>

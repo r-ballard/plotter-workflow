@@ -34,6 +34,7 @@ output/*
 # Optional local working areas
 scratch/
 tmp/
+.worktrees/
 
 # Serial/debug logs
 *.log

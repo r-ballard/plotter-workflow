@@ -99,15 +99,35 @@ class LogicalLayerManifest:
     raw: dict[str, Any]
 
 
-def inspect_svg_contract(path: Path) -> LogicalLayerContract:
+def inspect_svg_contract(
+    path: Path, *, catalog: tuple[LogicalLayerMetadata, ...] | None = None
+) -> LogicalLayerContract:
     """Inspect ``path`` and classify it as neutral, legacy, or generic.
 
     Neutral metadata is validated strictly for v1.  Legacy validation remains
     owned by :func:`svg_pen_contract.inspect_pen_layer_contract`; its errors
-    and return value are propagated unchanged.
+    and return value are propagated unchanged. An authoritative ``catalog``
+    permits sparse surface/sheet subsets while validating every retained ID,
+    ordinal, and label. Without one, standalone ordinals remain contiguous.
     """
 
-    return _inspect_svg_contract(path, allow_sparse_neutral_ordinals=False)
+    contract = _inspect_svg_contract(
+        path, allow_sparse_neutral_ordinals=catalog is not None
+    )
+    if catalog is not None:
+        if contract.mode is not InputMode.NEUTRAL:
+            raise LogicalLayerContractError(f"{path}: catalog requires neutral input")
+        _load_manifest_layers(Path(path), [
+            {"id": layer.id, "ordinal": layer.ordinal, "label": layer.label}
+            for layer in catalog
+        ])
+        expected = {layer.id: layer for layer in catalog}
+        for layer in contract.layers:
+            if expected.get(layer.id) != layer:
+                raise LogicalLayerContractError(
+                    f"{path}: neutral layer {layer.id!r} differs from authoritative catalog"
+                )
+    return contract
 
 
 def _inspect_svg_contract(

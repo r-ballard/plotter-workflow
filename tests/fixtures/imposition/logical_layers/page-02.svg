@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" data-viz-layer-contract="viz-logical-layers/v1">
+  <defs><clipPath id="surface-clip"><path d="M0 0 L100 0 L100 100 L0 100 Z"/></clipPath></defs>
+  <g id="orbit" data-viz-layer-id="orbit" data-viz-layer-ordinal="1" data-viz-layer-label="Orbits" fill="none" stroke="#123456" clip-path="url(#surface-clip)">
+    <path id="segment" data-viz-path-id="p2-orbit" data-viz-domain-id="page-02" data-viz-feature-role="orbit" d="M10 80 L90 80"/>
+  </g>
+  <g id="body" data-viz-layer-id="body-2" data-viz-layer-ordinal="4" data-viz-layer-label="Body Two" fill="none" stroke="#abcdef">
+    <path data-viz-path-id="p2-body" data-viz-domain-id="page-02" data-viz-feature-role="body" d="M60 50 L70 60"/>
+  </g>
+</svg>

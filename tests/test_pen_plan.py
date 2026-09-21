@@ -4,7 +4,9 @@ from pathlib import Path
 import pytest
 
 from pen_plan import (
+    LogicalPenPlanSpec,
     PenPlanError,
+    PenPlanSpec,
     format_pen_plan,
     inspect_logical_layers,
     load_pen_plan,
@@ -12,6 +14,34 @@ from pen_plan import (
     resolve_pen_plan,
     write_resolved_pen_plan,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+LOGICAL_MULTIPASS_EXAMPLE = (
+    ROOT / "examples" / "penplans" / "logical-multipass.penplan.json"
+)
+PEN_PLAN_SCHEMA = ROOT / "penplan.schema.json"
+
+
+def write_pen_plan(tmp_path: Path, payload: object) -> Path:
+    path = tmp_path / "test.penplan.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def valid_v2_plan() -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "passes": [
+            {
+                "id": "pass-1",
+                "assignments": [
+                    {"layer_ids": ["orbit"], "physical_slot": 1},
+                ],
+            }
+        ],
+        "omitted_layers": [],
+        "repeated_layers": [],
+    }
 
 
 def write_svg(tmp_path: Path) -> Path:
@@ -114,6 +144,329 @@ def test_duplicate_physical_slots_are_rejected(tmp_path: Path):
     )
     with pytest.raises(PenPlanError, match="Duplicate physical_slot"):
         load_pen_plan(path)
+
+
+def test_v1_still_loads_into_existing_numeric_model(tmp_path: Path):
+    path = write_pen_plan(
+        tmp_path,
+        {
+            "schema_version": 1,
+            "policy": "explicit",
+            "assignments": [
+                {"logical_layer": 2, "physical_slot": 8},
+                {"logical_layer": 4, "physical_slot": 3},
+            ],
+            "slots": [
+                {"slot": 8, "tool": "Micron 01"},
+                {"slot": 3, "label": "red technical pen"},
+            ],
+            "notes": "Keep this legacy plan numeric.",
+        },
+    )
+
+    plan = load_pen_plan(path)
+
+    assert isinstance(plan, PenPlanSpec)
+    assert plan.policy == "explicit"
+    assert tuple(item.logical_layer for item in plan.assignments) == (2, 4)
+    assert tuple(item.physical_slot for item in plan.assignments) == (8, 3)
+    assert tuple(item.slot for item in plan.slots) == (3, 8)
+    assert plan.notes == "Keep this legacy plan numeric."
+
+
+def test_v2_supports_string_ids_merge_and_multiple_passes():
+    plan = load_pen_plan(LOGICAL_MULTIPASS_EXAMPLE)
+
+    assert isinstance(plan, LogicalPenPlanSpec)
+    assert [plot_pass.id for plot_pass in plan.passes] == ["warm", "cool"]
+    assert plan.passes[0].assignments[0].layer_ids == ("orbit", "accent")
+    assert plan.passes[0].assignments[0].physical_slot == 1
+    assert plan.omitted_layers == ("registration-guide",)
+    assert plan.repeated_layers == ("orbit",)
+
+
+def test_v2_preserves_pass_assignment_and_layer_order(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"] = [
+        {
+            "id": "second-on-paper",
+            "assignments": [
+                {"layer_ids": ["zeta", "alpha"], "physical_slot": 7},
+                {"layer_ids": ["middle"], "physical_slot": 2},
+            ],
+        },
+        {
+            "id": "first-by-name",
+            "assignments": [
+                {"layer_ids": ["beta"], "physical_slot": 4},
+            ],
+        },
+    ]
+    plan = load_pen_plan(write_pen_plan(tmp_path, payload))
+
+    assert isinstance(plan, LogicalPenPlanSpec)
+    assert tuple(plot_pass.id for plot_pass in plan.passes) == (
+        "second-on-paper",
+        "first-by-name",
+    )
+    assert tuple(
+        assignment.physical_slot for assignment in plan.passes[0].assignments
+    ) == (7, 2)
+    assert plan.passes[0].assignments[0].layer_ids == ("zeta", "alpha")
+
+
+def test_v2_rejects_duplicate_pass_ids(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"] = [payload["passes"][0], payload["passes"][0]]
+
+    with pytest.raises(PenPlanError, match=r"passes\[1\]\.id.*duplicate"):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_duplicate_slots_within_a_pass(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"][0]["assignments"].append(
+        {"layer_ids": ["accent"], "physical_slot": 1}
+    )
+
+    with pytest.raises(
+        PenPlanError,
+        match=r"passes\[0\]\.assignments\[1\]\.physical_slot.*duplicate",
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_more_than_eight_assignments_in_a_pass(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"][0]["assignments"] = [
+        {"layer_ids": [f"layer-{slot}"], "physical_slot": slot}
+        for slot in range(1, 10)
+    ]
+
+    with pytest.raises(
+        PenPlanError, match=r"passes\[0\]\.assignments.*at most 8"
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+@pytest.mark.parametrize("slot", [0, 9, True, 1.0, "1"])
+def test_v2_rejects_invalid_physical_slots(tmp_path: Path, slot: object):
+    payload = valid_v2_plan()
+    payload["passes"][0]["assignments"][0]["physical_slot"] = slot
+
+    with pytest.raises(
+        PenPlanError,
+        match=r"passes\[0\]\.assignments\[0\]\.physical_slot",
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_duplicate_ids_inside_a_merge(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"][0]["assignments"][0]["layer_ids"] = ["orbit", "orbit"]
+
+    with pytest.raises(
+        PenPlanError,
+        match=r"passes\[0\]\.assignments\[0\]\.layer_ids\[1\].*duplicate",
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_a_layer_used_twice_in_one_pass(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"][0]["assignments"].append(
+        {"layer_ids": ["orbit"], "physical_slot": 2}
+    )
+
+    with pytest.raises(
+        PenPlanError,
+        match=r"passes\[0\]\.assignments\[1\]\.layer_ids\[0\].*already assigned",
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_requires_cross_pass_repetition_to_be_declared(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["passes"].append(
+        {
+            "id": "pass-2",
+            "assignments": [{"layer_ids": ["orbit"], "physical_slot": 2}],
+        }
+    )
+
+    with pytest.raises(
+        PenPlanError,
+        match=r"passes\[1\]\.assignments\[0\]\.layer_ids\[0\].*repeated_layers",
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_declared_repetition_that_does_not_repeat(tmp_path: Path):
+    payload = valid_v2_plan()
+    payload["repeated_layers"] = ["orbit"]
+
+    with pytest.raises(
+        PenPlanError, match=r"repeated_layers\[0\].*does not repeat"
+    ):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+@pytest.mark.parametrize("conflict_field", ["assigned", "repeated"])
+def test_v2_rejects_omitted_layer_conflicts(
+    tmp_path: Path, conflict_field: str
+):
+    payload = valid_v2_plan()
+    payload["omitted_layers"] = ["orbit"]
+    if conflict_field == "repeated":
+        payload["passes"].append(
+            {
+                "id": "pass-2",
+                "assignments": [{"layer_ids": ["orbit"], "physical_slot": 2}],
+            }
+        )
+        payload["repeated_layers"] = ["orbit"]
+
+    with pytest.raises(PenPlanError, match=r"omitted_layers\[0\].*orbit"):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("omitted_layers", ["guide", "guide"], r"omitted_layers\[1\].*duplicate"),
+        ("omitted_layers", [""], r"omitted_layers\[0\]"),
+        ("omitted_layers", [1], r"omitted_layers\[0\]"),
+        ("repeated_layers", ["orbit", "orbit"], r"repeated_layers\[1\].*duplicate"),
+        ("repeated_layers", ["  "], r"repeated_layers\[0\]"),
+        ("repeated_layers", [False], r"repeated_layers\[0\]"),
+    ],
+)
+def test_v2_rejects_duplicate_or_malformed_accounting_ids(
+    tmp_path: Path, field: str, value: list[object], message: str
+):
+    payload = valid_v2_plan()
+    payload[field] = value
+
+    with pytest.raises(PenPlanError, match=message):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+@pytest.mark.parametrize(
+    ("location", "message"),
+    [
+        ("top", r"unknown top-level field.*surprise"),
+        ("pass", r"passes\[0\].*unknown field.*surprise"),
+        ("assignment", r"passes\[0\]\.assignments\[0\].*unknown field.*surprise"),
+    ],
+)
+def test_v2_rejects_unknown_fields(
+    tmp_path: Path, location: str, message: str
+):
+    payload = valid_v2_plan()
+    if location == "top":
+        payload["surprise"] = True
+    elif location == "pass":
+        payload["passes"][0]["surprise"] = True
+    else:
+        payload["passes"][0]["assignments"][0]["surprise"] = True
+
+    with pytest.raises(PenPlanError, match=message):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+@pytest.mark.parametrize("version", [None, 0, 3, True, "2"])
+def test_pen_plan_requires_an_explicit_supported_schema_version(
+    tmp_path: Path, version: object
+):
+    payload = valid_v2_plan()
+    if version is None:
+        del payload["schema_version"]
+    else:
+        payload["schema_version"] = version
+
+    with pytest.raises(PenPlanError, match="schema_version"):
+        load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_requires_explicit_omission_and_repetition_arrays(tmp_path: Path):
+    for field in ("omitted_layers", "repeated_layers"):
+        payload = valid_v2_plan()
+        del payload[field]
+        with pytest.raises(PenPlanError, match=field):
+            load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_v2_rejects_malformed_pass_and_assignment_fields(tmp_path: Path):
+    mutations = [
+        ("passes", [], "passes"),
+        ("pass id", " ", r"passes\[0\]\.id"),
+        ("assignments", [], r"passes\[0\]\.assignments"),
+        ("layer_ids", [], r"passes\[0\]\.assignments\[0\]\.layer_ids"),
+        ("layer id", "", r"layer_ids\[0\]"),
+    ]
+    for mutation, value, message in mutations:
+        payload = valid_v2_plan()
+        if mutation == "passes":
+            payload["passes"] = value
+        elif mutation == "pass id":
+            payload["passes"][0]["id"] = value
+        elif mutation == "assignments":
+            payload["passes"][0]["assignments"] = value
+        elif mutation == "layer_ids":
+            payload["passes"][0]["assignments"][0]["layer_ids"] = value
+        else:
+            payload["passes"][0]["assignments"][0]["layer_ids"][0] = value
+
+        with pytest.raises(PenPlanError, match=message):
+            load_pen_plan(write_pen_plan(tmp_path, payload))
+
+
+def test_legacy_svg_resolver_does_not_interpret_v2_plan(tmp_path: Path):
+    svg = write_svg(tmp_path)
+    path = svg.with_suffix(".penplan.json")
+    path.write_text(json.dumps(valid_v2_plan()), encoding="utf-8")
+
+    with pytest.raises(PenPlanError, match="schema_version=2.*logical-layer"):
+        resolve_pen_plan(svg)
+
+
+def test_pen_plan_schema_declares_strict_v1_v2_discriminated_shapes():
+    schema = json.loads(PEN_PLAN_SCHEMA.read_text(encoding="utf-8"))
+
+    assert schema["oneOf"] == [
+        {"$ref": "#/$defs/v1"},
+        {"$ref": "#/$defs/v2"},
+    ]
+    v1 = schema["$defs"]["v1"]
+    v2 = schema["$defs"]["v2"]
+    assert v1["additionalProperties"] is False
+    assert v1["properties"]["schema_version"] == {"const": 1}
+    assert v2["additionalProperties"] is False
+    assert v2["required"] == [
+        "schema_version",
+        "passes",
+        "omitted_layers",
+        "repeated_layers",
+    ]
+    assert v2["properties"]["schema_version"] == {"const": 2}
+    passes = v2["properties"]["passes"]
+    assert passes["minItems"] == 1
+    pass_schema = passes["items"]
+    assert pass_schema["additionalProperties"] is False
+    assignments = pass_schema["properties"]["assignments"]
+    assert assignments["minItems"] == 1
+    assert assignments["maxItems"] == 8
+    assignment = assignments["items"]
+    assert assignment["additionalProperties"] is False
+    assert assignment["properties"]["layer_ids"]["minItems"] == 1
+    assert assignment["properties"]["layer_ids"]["uniqueItems"] is True
+    assert assignment["properties"]["physical_slot"] == {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 8,
+    }
+    assert v2["properties"]["omitted_layers"]["uniqueItems"] is True
+    assert v2["properties"]["repeated_layers"]["uniqueItems"] is True
 
 
 def test_hpgl_remap_is_collision_safe(tmp_path: Path):

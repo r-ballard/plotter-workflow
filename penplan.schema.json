@@ -3,64 +3,140 @@
   "$id": "https://example.invalid/plotter-workflow/penplan.schema.json",
   "title": "DPX-3300 user pen plan",
   "description": "User-authored logical-layer to physical-carriage configuration for plotter-workflow.",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schema_version", "policy"],
-  "properties": {
-    "schema_version": {
-      "const": 1
+  "oneOf": [
+    {"$ref": "#/$defs/v1"},
+    {"$ref": "#/$defs/v2"}
+  ],
+  "$defs": {
+    "nonemptyId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
     },
-    "policy": {
-      "enum": ["preserve", "compact", "explicit"]
+    "physicalSlot": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
     },
-    "assignments": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["logical_layer", "physical_slot"],
-        "properties": {
-          "logical_layer": {"type": "integer", "minimum": 1, "maximum": 8},
-          "physical_slot": {"type": "integer", "minimum": 1, "maximum": 8}
-        }
-      }
-    },
-    "slots": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["slot"],
-        "properties": {
-          "slot": {"type": "integer", "minimum": 1, "maximum": 8},
-          "tool": {"type": "string", "minLength": 1},
-          "color": {"type": "string", "minLength": 1},
-          "label": {"type": "string", "minLength": 1},
-          "notes": {"type": "string", "minLength": 1}
-        }
-      }
-    },
-    "notes": {"type": "string", "minLength": 1}
-  },
-  "allOf": [
-    {
-      "if": {
-        "properties": {"policy": {"const": "explicit"}},
-        "required": ["policy"]
+    "v1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "policy"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "policy": {"enum": ["preserve", "compact", "explicit"]},
+        "assignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["logical_layer", "physical_slot"],
+            "properties": {
+              "logical_layer": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "physical_slot": {"$ref": "#/$defs/physicalSlot"}
+            }
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["slot"],
+            "properties": {
+              "slot": {"$ref": "#/$defs/physicalSlot"},
+              "tool": {"type": "string", "minLength": 1},
+              "color": {"type": "string", "minLength": 1},
+              "label": {"type": "string", "minLength": 1},
+              "notes": {"type": "string", "minLength": 1}
+            }
+          }
+        },
+        "notes": {"type": "string", "minLength": 1}
       },
-      "then": {
-        "required": ["assignments"],
-        "properties": {"assignments": {"minItems": 1}}
-      }
+      "allOf": [
+        {
+          "if": {
+            "properties": {"policy": {"const": "explicit"}},
+            "required": ["policy"]
+          },
+          "then": {
+            "required": ["assignments"],
+            "properties": {"assignments": {"minItems": 1}}
+          }
+        },
+        {
+          "if": {
+            "properties": {"policy": {"enum": ["preserve", "compact"]}},
+            "required": ["policy"]
+          },
+          "then": {
+            "properties": {"assignments": {"maxItems": 0}}
+          }
+        }
+      ]
     },
-    {
-      "if": {
-        "properties": {"policy": {"enum": ["preserve", "compact"]}},
-        "required": ["policy"]
-      },
-      "then": {
-        "properties": {"assignments": {"maxItems": 0}}
+    "v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "passes",
+        "omitted_layers",
+        "repeated_layers"
+      ],
+      "properties": {
+        "schema_version": {"const": 2},
+        "passes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "assignments"],
+            "properties": {
+              "id": {"$ref": "#/$defs/nonemptyId"},
+              "assignments": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["layer_ids", "physical_slot"],
+                  "properties": {
+                    "layer_ids": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {"$ref": "#/$defs/nonemptyId"}
+                    },
+                    "physical_slot": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 8
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "omitted_layers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonemptyId"}
+        },
+        "repeated_layers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonemptyId"}
+        }
       }
     }
-  ]
+  }
 }

@@ -9,16 +9,18 @@ layout processing.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import json
-from pathlib import Path
 import re
-from typing import Any, Iterable
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
 
 MAX_DPX_PENS = 8
 PEN_POLICIES = ("preserve", "compact", "explicit")
 PEN_PLAN_SCHEMA_VERSION = 1
+LOGICAL_PEN_PLAN_SCHEMA_VERSION = 2
 PEN_PLAN_SUFFIX = ".penplan.json"
 RESOLVED_PEN_PLAN_SUFFIX = ".resolved.penplan.json"
 RESOLVED_PEN_PLAN_KIND = "resolved-dpx3300-pen-plan"
@@ -72,6 +74,26 @@ class PenPlanSpec:
 
 
 @dataclass(frozen=True)
+class LogicalAssignment:
+    layer_ids: tuple[str, ...]
+    physical_slot: int
+
+
+@dataclass(frozen=True)
+class PassSpec:
+    id: str
+    assignments: tuple[LogicalAssignment, ...]
+
+
+@dataclass(frozen=True)
+class LogicalPenPlanSpec:
+    schema_version: int
+    passes: tuple[PassSpec, ...]
+    omitted_layers: tuple[str, ...]
+    repeated_layers: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ResolvedAssignment:
     logical_layer: int
     physical_slot: int
@@ -112,7 +134,7 @@ class ResolvedPenPlan:
         )
 
 
-def load_pen_plan(path: Path) -> PenPlanSpec:
+def load_pen_plan(path: Path) -> PenPlanSpec | LogicalPenPlanSpec:
     """Load and validate a user-authored ``*.penplan.json`` file."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -122,12 +144,19 @@ def load_pen_plan(path: Path) -> PenPlanSpec:
     if not isinstance(raw, dict):
         raise PenPlanError(f"Pen plan {path} must contain a JSON object")
 
-    version = raw.get("schema_version", PEN_PLAN_SCHEMA_VERSION)
-    if version != PEN_PLAN_SCHEMA_VERSION:
+    if "schema_version" not in raw:
+        raise PenPlanError(f"Pen plan {path} requires an explicit schema_version")
+    version = raw["schema_version"]
+    if type(version) is not int or version not in (
+        PEN_PLAN_SCHEMA_VERSION,
+        LOGICAL_PEN_PLAN_SCHEMA_VERSION,
+    ):
         raise PenPlanError(
             f"Pen plan {path} uses schema_version={version!r}; "
-            f"supported version is {PEN_PLAN_SCHEMA_VERSION}"
+            "supported versions are 1 and 2"
         )
+    if version == LOGICAL_PEN_PLAN_SCHEMA_VERSION:
+        return _load_logical_pen_plan(raw)
 
     policy = raw.get("policy", "preserve")
     _validate_policy(policy)
@@ -190,6 +219,174 @@ def load_pen_plan(path: Path) -> PenPlanSpec:
         slots=tuple(sorted(slots, key=lambda item: item.slot)),
         notes=_optional_text(raw.get("notes")),
     )
+
+
+def _load_logical_pen_plan(raw: dict[str, Any]) -> LogicalPenPlanSpec:
+    _reject_unknown_fields(
+        raw,
+        {"schema_version", "passes", "omitted_layers", "repeated_layers"},
+        "pen plan",
+        top_level=True,
+    )
+    for field in ("passes", "omitted_layers", "repeated_layers"):
+        if field not in raw:
+            raise PenPlanError(f"v2 pen plan requires '{field}'")
+
+    passes_raw = _require_array(raw["passes"], "passes")
+    if not passes_raw:
+        raise PenPlanError("v2 pen-plan 'passes' must contain at least one pass")
+
+    passes: list[PassSpec] = []
+    seen_pass_ids: set[str] = set()
+    layer_locations: dict[str, list[str]] = {}
+    for pass_index, item in enumerate(passes_raw):
+        pass_path = f"passes[{pass_index}]"
+        if not isinstance(item, dict):
+            raise PenPlanError(f"{pass_path} must be a JSON object")
+        _reject_unknown_fields(item, {"id", "assignments"}, pass_path)
+        pass_id = _require_nonempty_text(item, "id", pass_path)
+        if pass_id in seen_pass_ids:
+            raise PenPlanError(f"{pass_path}.id has duplicate value {pass_id!r}")
+        seen_pass_ids.add(pass_id)
+
+        if "assignments" not in item:
+            raise PenPlanError(f"{pass_path} requires 'assignments'")
+        assignments_raw = _require_array(
+            item["assignments"], f"{pass_path}.assignments"
+        )
+        if not assignments_raw:
+            raise PenPlanError(
+                f"{pass_path}.assignments must contain at least one assignment"
+            )
+        if len(assignments_raw) > MAX_DPX_PENS:
+            raise PenPlanError(
+                f"{pass_path}.assignments must contain at most {MAX_DPX_PENS} assignments"
+            )
+
+        assignments: list[LogicalAssignment] = []
+        seen_slots: set[int] = set()
+        seen_in_pass: set[str] = set()
+        for assignment_index, assignment_raw in enumerate(assignments_raw):
+            assignment_path = f"{pass_path}.assignments[{assignment_index}]"
+            if not isinstance(assignment_raw, dict):
+                raise PenPlanError(f"{assignment_path} must be a JSON object")
+            _reject_unknown_fields(
+                assignment_raw,
+                {"layer_ids", "physical_slot"},
+                assignment_path,
+            )
+            for field in ("layer_ids", "physical_slot"):
+                if field not in assignment_raw:
+                    raise PenPlanError(f"{assignment_path} requires '{field}'")
+
+            layer_ids = _parse_logical_ids(
+                assignment_raw["layer_ids"],
+                f"{assignment_path}.layer_ids",
+                require_nonempty=True,
+            )
+            slot = assignment_raw["physical_slot"]
+            slot_path = f"{assignment_path}.physical_slot"
+            if type(slot) is not int:
+                raise PenPlanError(f"{slot_path} must be an integer from 1 through 8")
+            if not 1 <= slot <= MAX_DPX_PENS:
+                raise PenPlanError(f"{slot_path}={slot} is outside the range 1-8")
+            if slot in seen_slots:
+                raise PenPlanError(f"{slot_path} has duplicate value {slot}")
+            seen_slots.add(slot)
+
+            for layer_index, layer_id in enumerate(layer_ids):
+                layer_path = f"{assignment_path}.layer_ids[{layer_index}]"
+                if layer_id in seen_in_pass:
+                    raise PenPlanError(
+                        f"{layer_path}={layer_id!r} is already assigned in {pass_path}"
+                    )
+                seen_in_pass.add(layer_id)
+                layer_locations.setdefault(layer_id, []).append(layer_path)
+            assignments.append(LogicalAssignment(layer_ids, slot))
+        passes.append(PassSpec(pass_id, tuple(assignments)))
+
+    omitted_layers = _parse_logical_ids(raw["omitted_layers"], "omitted_layers")
+    repeated_layers = _parse_logical_ids(raw["repeated_layers"], "repeated_layers")
+    repeated_set = set(repeated_layers)
+
+    for index, layer_id in enumerate(omitted_layers):
+        if layer_id in layer_locations or layer_id in repeated_set:
+            raise PenPlanError(
+                f"omitted_layers[{index}]={layer_id!r} cannot also be assigned or repeated"
+            )
+
+    for layer_id, locations in layer_locations.items():
+        if len(locations) > 1 and layer_id not in repeated_set:
+            raise PenPlanError(
+                f"{locations[1]}={layer_id!r} repeats across passes but is absent "
+                "from repeated_layers"
+            )
+
+    for index, layer_id in enumerate(repeated_layers):
+        if len(layer_locations.get(layer_id, ())) < 2:
+            raise PenPlanError(
+                f"repeated_layers[{index}]={layer_id!r} does not repeat across passes"
+            )
+
+    return LogicalPenPlanSpec(
+        schema_version=LOGICAL_PEN_PLAN_SCHEMA_VERSION,
+        passes=tuple(passes),
+        omitted_layers=omitted_layers,
+        repeated_layers=repeated_layers,
+    )
+
+
+def _reject_unknown_fields(
+    record: dict[str, Any],
+    allowed: set[str],
+    path: str,
+    *,
+    top_level: bool = False,
+) -> None:
+    unknown = sorted(set(record) - allowed)
+    if not unknown:
+        return
+    description = "unknown top-level field" if top_level else "unknown field"
+    raise PenPlanError(
+        f"{path} has {description}{'s' if len(unknown) != 1 else ''}: "
+        + ", ".join(unknown)
+    )
+
+
+def _require_array(value: object, path: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise PenPlanError(f"{path} must be a JSON array")
+    return value
+
+
+def _require_nonempty_text(
+    record: dict[str, Any], field: str, path: str
+) -> str:
+    if field not in record:
+        raise PenPlanError(f"{path} requires '{field}'")
+    value = record[field]
+    if not isinstance(value, str) or not value.strip():
+        raise PenPlanError(f"{path}.{field} must be a nonempty string")
+    return value
+
+
+def _parse_logical_ids(
+    value: object, path: str, *, require_nonempty: bool = False
+) -> tuple[str, ...]:
+    items = _require_array(value, path)
+    if require_nonempty and not items:
+        raise PenPlanError(f"{path} must contain at least one logical layer ID")
+    parsed: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(items):
+        item_path = f"{path}[{index}]"
+        if not isinstance(item, str) or not item.strip():
+            raise PenPlanError(f"{item_path} must be a nonempty string")
+        if item in seen:
+            raise PenPlanError(f"{item_path} has duplicate logical layer ID {item!r}")
+        seen.add(item)
+        parsed.append(item)
+    return tuple(parsed)
 
 
 def parse_pen_map(raw: str | None) -> tuple[RequestedAssignment, ...]:
@@ -312,6 +509,11 @@ def resolve_pen_plan(
                 "Do not combine a .penplan.json file with --pen-policy or --pen-map"
             )
         spec = load_pen_plan(discovered)
+        if isinstance(spec, LogicalPenPlanSpec):
+            raise PenPlanError(
+                "schema_version=2 requires logical-layer catalog resolution; "
+                "the legacy SVG resolver only supports v1 numeric plans"
+            )
     else:
         policy = cli_policy or ("explicit" if cli_pen_map else "preserve")
         _validate_policy(policy)

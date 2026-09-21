@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "passes": [
+    {
+      "id": "warm",
+      "assignments": [
+        {"layer_ids": ["orbit", "accent"], "physical_slot": 1},
+        {"layer_ids": ["body-warm"], "physical_slot": 3}
+      ]
+    },
+    {
+      "id": "cool",
+      "assignments": [
+        {"layer_ids": ["body-cool"], "physical_slot": 2},
+        {"layer_ids": ["orbit"], "physical_slot": 4}
+      ]
+    }
+  ],
+  "omitted_layers": ["registration-guide"],
+  "repeated_layers": ["orbit"]
+}

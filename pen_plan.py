@@ -17,6 +17,13 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from logical_layer_contract import (
+    InputMode,
+    LogicalLayerContract,
+    LogicalLayerManifest,
+    LogicalLayerMetadata,
+)
+
 MAX_DPX_PENS = 8
 PEN_POLICIES = ("preserve", "compact", "explicit")
 PEN_PLAN_SCHEMA_VERSION = 1
@@ -25,6 +32,7 @@ PEN_PLAN_SUFFIX = ".penplan.json"
 RESOLVED_PEN_PLAN_SUFFIX = ".resolved.penplan.json"
 RESOLVED_PEN_PLAN_KIND = "resolved-dpx3300-pen-plan"
 PEN_ID_RE = re.compile(r"^pen-(\d+)$")
+_MANIFEST_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SP_RE = re.compile(r"SP([0-8]);", re.IGNORECASE)
 _DRAWABLE_TAGS = {
     "path",
@@ -91,6 +99,24 @@ class LogicalPenPlanSpec:
     passes: tuple[PassSpec, ...]
     omitted_layers: tuple[str, ...]
     repeated_layers: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ResolvedLogicalAssignment:
+    """A catalog-ordered logical merge assigned to one physical slot."""
+
+    layer_ids: tuple[str, ...]
+    physical_slot: int
+
+
+@dataclass(frozen=True)
+class ResolvedPlotPass:
+    """One validated physical pass of a neutral logical-layer job."""
+
+    id: str
+    assignments: tuple[ResolvedLogicalAssignment, ...]
+    omitted_layers: tuple[str, ...]
+    source_manifest_hash: str
 
 
 @dataclass(frozen=True)
@@ -387,6 +413,269 @@ def _parse_logical_ids(
         seen.add(item)
         parsed.append(item)
     return tuple(parsed)
+
+
+def resolve_logical_pen_plan(
+    contract_or_catalog: LogicalLayerContract
+    | LogicalLayerManifest
+    | tuple[LogicalLayerMetadata, ...]
+    | list[LogicalLayerMetadata],
+    spec: LogicalPenPlanSpec | None,
+    *,
+    source_manifest_hash: str | None = None,
+) -> tuple[ResolvedPlotPass, ...]:
+    """Resolve a validated neutral catalog into explicit physical passes.
+
+    The neutral catalog is authoritative for IDs and ordering.  This resolver
+    never discovers or infers layers from arbitrary strings or SVG structure;
+    callers must provide the inspected contract/catalog and the exact source
+    manifest hash that established it.
+    """
+    _validate_source_manifest_hash(source_manifest_hash)
+    catalog = _validated_neutral_catalog(contract_or_catalog)
+    catalog_ids = tuple(layer.id for layer in catalog)
+    catalog_index = {layer_id: index for index, layer_id in enumerate(catalog_ids)}
+
+    if spec is None:
+        if len(catalog) > MAX_DPX_PENS:
+            raise PenPlanError(
+                f"Catalog has {len(catalog)} active logical layers; use an explicit "
+                "merge or multiple passes plan before physical resolution"
+            )
+        return (
+            ResolvedPlotPass(
+                id="preserve",
+                assignments=tuple(
+                    ResolvedLogicalAssignment((layer.id,), index)
+                    for index, layer in enumerate(catalog, start=1)
+                ),
+                omitted_layers=(),
+                source_manifest_hash=source_manifest_hash,
+            ),
+        )
+
+    if not isinstance(spec, LogicalPenPlanSpec) or spec.schema_version != 2:
+        raise PenPlanError(
+            "Logical catalog resolution requires a validated schema_version=2 "
+            "logical-layer pen plan"
+        )
+    if not isinstance(spec.passes, (tuple, list)) or not spec.passes:
+        raise PenPlanError("passes must contain at least one pass")
+
+    omitted_layers = _validated_accounting_ids(
+        spec.omitted_layers, "omitted_layers", catalog_index
+    )
+    repeated_layers = _validated_accounting_ids(
+        spec.repeated_layers, "repeated_layers", catalog_index
+    )
+    omitted_set = set(omitted_layers)
+    repeated_set = set(repeated_layers)
+    if omitted_set & repeated_set:
+        conflict = tuple(sorted(omitted_set & repeated_set))
+        raise PenPlanError(
+            "omitted_layers cannot also declare repeated layers: "
+            + ", ".join(conflict)
+        )
+
+    resolved_passes: list[ResolvedPlotPass] = []
+    placements: dict[str, list[str]] = {layer_id: [] for layer_id in catalog_ids}
+    pass_ids: set[str] = set()
+    for pass_index, plot_pass in enumerate(spec.passes):
+        pass_path = f"passes[{pass_index}]"
+        if not isinstance(plot_pass, PassSpec):
+            raise PenPlanError(f"{pass_path} must be a PassSpec")
+        if not isinstance(plot_pass.id, str) or not plot_pass.id.strip():
+            raise PenPlanError(f"{pass_path}.id must be a nonempty string")
+        if plot_pass.id in pass_ids:
+            raise PenPlanError(f"{pass_path}.id has duplicate value {plot_pass.id!r}")
+        pass_ids.add(plot_pass.id)
+        if not isinstance(plot_pass.assignments, (tuple, list)):
+            raise PenPlanError(f"{pass_path}.assignments must be a sequence")
+        if not plot_pass.assignments:
+            raise PenPlanError(
+                f"{pass_path}.assignments must contain at least one assignment"
+            )
+        if len(plot_pass.assignments) > MAX_DPX_PENS:
+            raise PenPlanError(
+                f"{pass_path}.assignments must contain at most {MAX_DPX_PENS} assignments"
+            )
+
+        pass_assignments: list[ResolvedLogicalAssignment] = []
+        seen_slots: set[int] = set()
+        seen_ids: set[str] = set()
+        for assignment_index, assignment in enumerate(plot_pass.assignments):
+            assignment_path = f"{pass_path}.assignments[{assignment_index}]"
+            if not isinstance(assignment, LogicalAssignment):
+                raise PenPlanError(f"{assignment_path} must be a LogicalAssignment")
+            slot = assignment.physical_slot
+            if type(slot) is not int or not 1 <= slot <= MAX_DPX_PENS:
+                raise PenPlanError(
+                    f"{assignment_path}.physical_slot must be an integer from 1 through 8"
+                )
+            if slot in seen_slots:
+                raise PenPlanError(
+                    f"{assignment_path}.physical_slot has duplicate physical slot {slot}"
+                )
+            seen_slots.add(slot)
+            layer_ids = _validated_assignment_ids(
+                assignment.layer_ids, assignment_path, catalog_index
+            )
+            for layer_id in layer_ids:
+                if layer_id in seen_ids:
+                    raise PenPlanError(
+                        f"{assignment_path} repeats logical layer {layer_id!r} in {plot_pass.id!r}"
+                    )
+                seen_ids.add(layer_id)
+                placements[layer_id].append(plot_pass.id)
+            normalized = tuple(sorted(layer_ids, key=catalog_index.__getitem__))
+            pass_assignments.append(
+                ResolvedLogicalAssignment(normalized, slot)
+            )
+        resolved_passes.append(
+            ResolvedPlotPass(
+                id=plot_pass.id,
+                assignments=tuple(pass_assignments),
+                omitted_layers=omitted_layers,
+                source_manifest_hash=source_manifest_hash,
+            )
+        )
+
+    for layer_id in omitted_layers:
+        if placements[layer_id]:
+            raise PenPlanError(
+                f"omitted layer {layer_id!r} is also assigned in a pass"
+            )
+
+    for layer_id, pass_locations in placements.items():
+        count = len(pass_locations)
+        if layer_id in omitted_set:
+            if count:
+                raise PenPlanError(
+                    f"omitted layer {layer_id!r} is also assigned in a pass"
+                )
+            continue
+        if layer_id in repeated_set:
+            if count < 2:
+                raise PenPlanError(
+                    f"repeated_layers declaration for {layer_id!r} does not repeat across passes"
+                )
+            continue
+        if count == 0:
+            raise PenPlanError(
+                f"logical catalog layer {layer_id!r} is not accounted for; "
+                "assign it or explicitly omit it"
+            )
+        if count > 1:
+            raise PenPlanError(
+                f"logical catalog layer {layer_id!r} repeats across passes but is absent "
+                "from repeated_layers"
+            )
+
+    return tuple(resolved_passes)
+
+
+def _validate_source_manifest_hash(value: object) -> None:
+    if not isinstance(value, str) or _MANIFEST_SHA256_RE.fullmatch(value) is None:
+        raise PenPlanError(
+            "source manifest hash must be a lowercase 64-character SHA-256"
+        )
+
+
+def _validated_neutral_catalog(
+    contract_or_catalog: object,
+) -> tuple[LogicalLayerMetadata, ...]:
+    allow_sparse_ordinals = False
+    if isinstance(contract_or_catalog, LogicalLayerContract):
+        if contract_or_catalog.mode is not InputMode.NEUTRAL:
+            raise PenPlanError(
+                "logical catalog resolution requires a validated neutral contract"
+            )
+        catalog = contract_or_catalog.layers
+        allow_sparse_ordinals = True
+    elif isinstance(contract_or_catalog, LogicalLayerManifest):
+        catalog = contract_or_catalog.layers
+    elif isinstance(contract_or_catalog, (tuple, list)):
+        catalog = tuple(contract_or_catalog)
+    else:
+        raise PenPlanError(
+            "logical catalog resolution requires a validated neutral catalog or contract"
+        )
+
+    if not catalog:
+        raise PenPlanError("neutral catalog has no active logical layers")
+    previous_ordinal = 0
+    for index, layer in enumerate(catalog, start=1):
+        if not isinstance(layer, LogicalLayerMetadata):
+            raise PenPlanError(
+                "logical catalog must contain validated LogicalLayerMetadata entries"
+            )
+        if not isinstance(layer.id, str) or not layer.id.strip():
+            raise PenPlanError(f"catalog layer {index} has an invalid ID")
+        if type(layer.ordinal) is not int:
+            raise PenPlanError(f"catalog layer {layer.id!r} has an invalid ordinal")
+        if allow_sparse_ordinals:
+            if layer.ordinal <= previous_ordinal:
+                raise PenPlanError(
+                    "active neutral contract ordinals must be positive, unique, and "
+                    "strictly increasing in authoritative order"
+                )
+            previous_ordinal = layer.ordinal
+        elif layer.ordinal != index:
+            raise PenPlanError(
+                "logical catalog ordinals must be contiguous in authoritative order"
+            )
+        if not isinstance(layer.label, str) or not layer.label.strip():
+            raise PenPlanError(f"catalog layer {layer.id!r} has an invalid label")
+    ids = [layer.id for layer in catalog]
+    if len(set(ids)) != len(ids):
+        raise PenPlanError("logical catalog contains duplicate layer IDs")
+    return tuple(catalog)
+
+
+def _validated_accounting_ids(
+    values: object,
+    field: str,
+    catalog_index: dict[str, int],
+) -> tuple[str, ...]:
+    if not isinstance(values, (tuple, list)):
+        raise PenPlanError(f"{field} must be a sequence of logical layer IDs")
+    seen: set[str] = set()
+    result: list[str] = []
+    for index, value in enumerate(values):
+        if not isinstance(value, str) or not value.strip():
+            raise PenPlanError(f"{field}[{index}] must be a nonempty string")
+        if value in seen:
+            raise PenPlanError(f"{field}[{index}] has duplicate logical layer ID {value!r}")
+        if value not in catalog_index:
+            raise PenPlanError(f"{field}[{index}] names unknown logical layer {value!r}")
+        seen.add(value)
+        result.append(value)
+    return tuple(result)
+
+
+def _validated_assignment_ids(
+    values: object,
+    path: str,
+    catalog_index: dict[str, int],
+) -> tuple[str, ...]:
+    if not isinstance(values, (tuple, list)) or not values:
+        raise PenPlanError(f"{path}.layer_ids must contain at least one logical layer ID")
+    seen: set[str] = set()
+    result: list[str] = []
+    for index, value in enumerate(values):
+        if not isinstance(value, str) or not value.strip():
+            raise PenPlanError(f"{path}.layer_ids[{index}] must be a nonempty string")
+        if value in seen:
+            raise PenPlanError(
+                f"{path}.layer_ids[{index}] has duplicate logical layer ID {value!r}"
+            )
+        if value not in catalog_index:
+            raise PenPlanError(
+                f"{path}.layer_ids[{index}] names unknown logical layer {value!r}"
+            )
+        seen.add(value)
+        result.append(value)
+    return tuple(result)
 
 
 def parse_pen_map(raw: str | None) -> tuple[RequestedAssignment, ...]:

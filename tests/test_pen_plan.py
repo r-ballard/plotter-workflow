@@ -3,14 +3,24 @@ from pathlib import Path
 
 import pytest
 
+from logical_layer_contract import (
+    InputMode,
+    LogicalLayerContract,
+    LogicalLayerMetadata,
+    inspect_svg_contract,
+)
 from pen_plan import (
+    LogicalAssignment,
     LogicalPenPlanSpec,
+    PassSpec,
     PenPlanError,
     PenPlanSpec,
+    ResolvedPlotPass,
     format_pen_plan,
     inspect_logical_layers,
     load_pen_plan,
     remap_hpgl_pen_selections,
+    resolve_logical_pen_plan,
     resolve_pen_plan,
     write_resolved_pen_plan,
 )
@@ -42,6 +52,32 @@ def valid_v2_plan() -> dict[str, object]:
         "omitted_layers": [],
         "repeated_layers": [],
     }
+
+
+MANIFEST_HASH = "a" * 64
+
+
+def logical_catalog(count: int) -> tuple[LogicalLayerMetadata, ...]:
+    return tuple(
+        LogicalLayerMetadata(
+            id=f"layer-{index}", ordinal=index, label=f"Layer {index}"
+        )
+        for index in range(1, count + 1)
+    )
+
+
+def logical_spec(
+    passes: tuple[PassSpec, ...],
+    *,
+    omitted_layers: tuple[str, ...] = (),
+    repeated_layers: tuple[str, ...] = (),
+) -> LogicalPenPlanSpec:
+    return LogicalPenPlanSpec(
+        schema_version=2,
+        passes=passes,
+        omitted_layers=omitted_layers,
+        repeated_layers=repeated_layers,
+    )
 
 
 def write_svg(tmp_path: Path) -> Path:
@@ -525,3 +561,327 @@ def test_resolved_sidecar_rejects_hpgl_pen_order_mismatch(tmp_path: Path):
 
     with pytest.raises(PenPlanError, match="does not match"):
         validate_resolved_pen_plan_for_hpgl(hpgl)
+
+
+@pytest.mark.parametrize("count", [1, 8])
+def test_logical_resolver_preserves_catalog_order(count: int):
+    resolved = resolve_logical_pen_plan(
+        logical_catalog(count), None, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert len(resolved) == 1
+    assert isinstance(resolved[0], ResolvedPlotPass)
+    assert resolved[0].id == "preserve"
+    assert [assignment.layer_ids for assignment in resolved[0].assignments] == [
+        (f"layer-{index}",) for index in range(1, count + 1)
+    ]
+    assert [assignment.physical_slot for assignment in resolved[0].assignments] == list(
+        range(1, count + 1)
+    )
+    assert resolved[0].source_manifest_hash == MANIFEST_HASH
+
+
+def test_logical_resolver_accepts_sparse_active_contract_from_inspection(
+    tmp_path: Path,
+):
+    catalog = tuple(
+        LogicalLayerMetadata(
+            id=f"layer-{index}", ordinal=index, label=f"Layer {index}"
+        )
+        for index in range(1, 5)
+    )
+    svg = tmp_path / "imposed.svg"
+    svg.write_text(
+        """<svg xmlns="http://www.w3.org/2000/svg"
+  data-viz-layer-contract="viz-logical-layers/v1">
+  <g data-viz-layer-id="layer-1" data-viz-layer-ordinal="1"
+    data-viz-layer-label="Layer 1"><path d="M0 0L1 1" /></g>
+  <g data-viz-layer-id="layer-3" data-viz-layer-ordinal="3"
+    data-viz-layer-label="Layer 3"><path d="M1 1L2 2" /></g>
+  <g data-viz-layer-id="layer-4" data-viz-layer-ordinal="4"
+    data-viz-layer-label="Layer 4"><path d="M2 2L3 3" /></g>
+</svg>""",
+        encoding="utf-8",
+    )
+    active_contract = inspect_svg_contract(svg, catalog=catalog)
+
+    resolved = resolve_logical_pen_plan(
+        active_contract, None, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert [assignment.layer_ids for assignment in resolved[0].assignments] == [
+        ("layer-1",),
+        ("layer-3",),
+        ("layer-4",),
+    ]
+    assert [assignment.physical_slot for assignment in resolved[0].assignments] == [
+        1,
+        2,
+        3,
+    ]
+
+
+def test_logical_resolver_requires_explicit_resolution_over_eight_layers():
+    with pytest.raises(PenPlanError, match="explicit merge or multiple passes"):
+        resolve_logical_pen_plan(
+            logical_catalog(9), None, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_accounts_for_nine_layers_in_ordered_passes():
+    spec = logical_spec(
+        (
+            PassSpec(
+                "pass-1",
+                tuple(
+                    LogicalAssignment((f"layer-{index}",), index)
+                    for index in range(1, 9)
+                ),
+            ),
+            PassSpec(
+                "pass-2", (LogicalAssignment(("layer-9",), 1),)
+            ),
+        )
+    )
+
+    resolved = resolve_logical_pen_plan(
+        logical_catalog(9), spec, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert [plot_pass.id for plot_pass in resolved] == ["pass-1", "pass-2"]
+    assert tuple(
+        layer_id
+        for plot_pass in resolved
+        for assignment in plot_pass.assignments
+        for layer_id in assignment.layer_ids
+    ) == tuple(f"layer-{index}" for index in range(1, 10))
+
+
+def test_logical_resolver_normalizes_merged_layers_to_catalog_order():
+    spec = logical_spec(
+        (PassSpec("merged", (LogicalAssignment(("layer-3", "layer-1"), 2),)),),
+        omitted_layers=("layer-2",),
+    )
+
+    resolved = resolve_logical_pen_plan(
+        logical_catalog(3), spec, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert resolved[0].assignments[0].layer_ids == ("layer-1", "layer-3")
+
+
+def test_logical_resolver_preserves_explicit_omissions():
+    spec = logical_spec(
+        (PassSpec("selected", (LogicalAssignment(("layer-1",), 1),)),),
+        omitted_layers=("layer-2",),
+    )
+
+    resolved = resolve_logical_pen_plan(
+        logical_catalog(2), spec, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert resolved[0].omitted_layers == ("layer-2",)
+
+
+def test_logical_resolver_allows_declared_repetition_across_passes():
+    spec = logical_spec(
+        (
+            PassSpec("first", (LogicalAssignment(("layer-1",), 1),)),
+            PassSpec("second", (LogicalAssignment(("layer-1",), 2),)),
+        ),
+        repeated_layers=("layer-1",),
+    )
+
+    resolved = resolve_logical_pen_plan(
+        logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert [assignment.layer_ids for plot_pass in resolved for assignment in plot_pass.assignments] == [
+        ("layer-1",),
+        ("layer-1",),
+    ]
+
+
+def test_logical_resolver_rejects_undeclared_repetition():
+    spec = logical_spec(
+        (
+            PassSpec("first", (LogicalAssignment(("layer-1",), 1),)),
+            PassSpec("second", (LogicalAssignment(("layer-1",), 2),)),
+        )
+    )
+
+    with pytest.raises(PenPlanError, match="repeated_layers"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_rejects_falsely_declared_repetition():
+    spec = logical_spec(
+        (PassSpec("only", (LogicalAssignment(("layer-1",), 1),)),),
+        repeated_layers=("layer-1",),
+    )
+
+    with pytest.raises(PenPlanError, match="does not repeat"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+@pytest.mark.parametrize("field", ["assigned", "omitted", "repeated"])
+def test_logical_resolver_rejects_unknown_catalog_ids(field: str):
+    if field == "assigned":
+        spec = logical_spec(
+            (PassSpec("bad", (LogicalAssignment(("missing",), 1),)),)
+        )
+    elif field == "omitted":
+        spec = logical_spec(
+            (PassSpec("good", (LogicalAssignment(("layer-1",), 1),)),),
+            omitted_layers=("missing",),
+        )
+    else:
+        spec = logical_spec(
+            (
+                PassSpec("first", (LogicalAssignment(("layer-1",), 1),)),
+                PassSpec("second", (LogicalAssignment(("layer-1",), 2),)),
+            ),
+            repeated_layers=("missing",),
+        )
+
+    with pytest.raises(PenPlanError, match="missing"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_rejects_unaccounted_catalog_layers():
+    spec = logical_spec(
+        (PassSpec("partial", (LogicalAssignment(("layer-1",), 1),)),)
+    )
+
+    with pytest.raises(PenPlanError, match="layer-2"):
+        resolve_logical_pen_plan(
+            logical_catalog(2), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_defensively_rejects_duplicate_slots_and_overflow():
+    duplicate_slots = logical_spec(
+        (
+            PassSpec(
+                "bad-slots",
+                (
+                    LogicalAssignment(("layer-1",), 1),
+                    LogicalAssignment(("layer-2",), 1),
+                ),
+            ),
+        )
+    )
+    overflow = logical_spec(
+        (
+            PassSpec(
+                "too-many",
+                tuple(
+                    LogicalAssignment((f"layer-{index}",), index)
+                    for index in range(1, 10)
+                ),
+            ),
+        )
+    )
+
+    with pytest.raises(PenPlanError, match="duplicate physical slot"):
+        resolve_logical_pen_plan(
+            logical_catalog(2), duplicate_slots, source_manifest_hash=MANIFEST_HASH
+        )
+    with pytest.raises(PenPlanError, match="at most 8"):
+        resolve_logical_pen_plan(
+            logical_catalog(9), overflow, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_defensively_rejects_programmatic_spec_without_passes():
+    spec = logical_spec((), omitted_layers=("layer-1",))
+
+    with pytest.raises(PenPlanError, match="passes.*at least one pass"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+def test_logical_resolver_defensively_rejects_programmatic_empty_pass():
+    spec = logical_spec(
+        (PassSpec("empty", ()),), omitted_layers=("layer-1",)
+    )
+
+    with pytest.raises(PenPlanError, match="assignments.*at least one assignment"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+@pytest.mark.parametrize(
+    "assignments",
+    [
+        (LogicalAssignment(("layer-1", "layer-1"), 1),),
+        (
+            LogicalAssignment(("layer-1",), 1),
+            LogicalAssignment(("layer-1",), 2),
+        ),
+    ],
+)
+def test_logical_resolver_defensively_rejects_duplicate_layer_ids(
+    assignments: tuple[LogicalAssignment, ...],
+):
+    spec = logical_spec((PassSpec("duplicate", assignments),))
+
+    with pytest.raises(PenPlanError, match="logical layer"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+@pytest.mark.parametrize("physical_slot", [0, 9, True])
+def test_logical_resolver_defensively_rejects_invalid_slots(
+    physical_slot: object,
+):
+    spec = logical_spec(
+        (
+            PassSpec(
+                "bad-slot",
+                (LogicalAssignment(("layer-1",), physical_slot),),  # type: ignore[arg-type]
+            ),
+        )
+    )
+
+    with pytest.raises(PenPlanError, match="integer from 1 through 8"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), spec, source_manifest_hash=MANIFEST_HASH
+        )
+
+
+@pytest.mark.parametrize("source_hash", [None, "A" * 64, "not-a-hash", "0" * 63])
+def test_logical_resolver_requires_exact_manifest_hash(source_hash: str | None):
+    with pytest.raises(PenPlanError, match="source manifest hash"):
+        resolve_logical_pen_plan(
+            logical_catalog(1), None, source_manifest_hash=source_hash
+        )
+
+
+def test_logical_resolver_rejects_non_neutral_contract_and_empty_catalog():
+    legacy = LogicalLayerContract(mode=InputMode.LEGACY)
+
+    with pytest.raises(PenPlanError, match="neutral"):
+        resolve_logical_pen_plan(legacy, None, source_manifest_hash=MANIFEST_HASH)
+    with pytest.raises(PenPlanError, match="no active"):
+        resolve_logical_pen_plan((), None, source_manifest_hash=MANIFEST_HASH)
+
+
+def test_logical_resolver_is_deterministic_for_repeated_calls():
+    resolved_a = resolve_logical_pen_plan(
+        logical_catalog(2), None, source_manifest_hash=MANIFEST_HASH
+    )
+    resolved_b = resolve_logical_pen_plan(
+        logical_catalog(2), None, source_manifest_hash=MANIFEST_HASH
+    )
+
+    assert resolved_a == resolved_b

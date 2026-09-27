@@ -182,3 +182,32 @@ The canonical reusable setup now lives in the `local-llm` worktree:
 task-spec format and run procedure. The watchdog enforces the two-attempt
 deadline and diff checks without model-side polling; the frontier orchestrator
 still reviews each proposed integration.
+
+## Third trial: neutral plotting operator guide
+
+The worker received a bounded, single-file documentation task in the isolated
+`experiment/qwen-task7-guide` worktree at `f81ee4f`. Its allowed output was
+`docs/how-to/neutral-logical-layer-plotting.md`. The watchdog waited on the
+worker process asynchronously and enforced two 1,800-second deadlines.
+
+| Attempt | Elapsed | Completed rounds | Tools | Input | Output | Cached read | Diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 1,800.73 s | 16 | 28 | 58,768 | 19,174 | 103,155 | none |
+| 2 | 1,800.44 s | 17 | 29 | 53,706 | 19,543 | 113,654 | none |
+| Total | 3,601.17 s | 33 | 57 | 112,474 | 38,717 | 216,809 | none |
+
+The trace's tool calls were reads, searches, and shell inspections; there was
+no write or patch call in either attempt. Both attempts timed out, and the
+worker worktree remained clean. Local token counts cover completed model
+rounds only; interrupted final rounds and cloud usage were not measured.
+The task produced no Qwen change to integrate. The orchestrator completed the
+guide in the plotter branch and checked it against the current CLIs.
+
+This run shows a concrete efficiency limit: asynchronous waiting prevented
+frontier model polling, but it did not prevent a local worker from spending an
+hour navigating context without producing a diff. For the next Qwen task,
+prepare the exact source excerpts and destination skeleton in the prompt,
+require an early first edit, and cap unproductive read/tool rounds in the
+external watchdog. Keep the two-strike correction loop and independent review;
+measure setup, review, and correction effort as well as local usage before
+claiming a workflow saving.

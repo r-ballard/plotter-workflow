@@ -19,13 +19,13 @@ Branch: `feat/logical-layer-plotter`
   Real neutral conversion output is preflighted in integration coverage.
   Commits: `27b1301`, `47b4c64`, `74bbdfb`. Full suite: 405 passed; Ruff and
   `git diff --check` passed.
+- Task 7 operator guide: `docs/how-to/neutral-logical-layer-plotting.md`
+  documents the Git Bash path from neutral bundle through registered passes.
+  The third Qwen trial was stopped by its watchdog after two 30-minute
+  attempts with no file edit; the guide was completed by the orchestrator.
 
 ## Remaining work
 
-- Finish and review the Git Bash neutral logical-layer operator guide. The
-  local Qwen worker is drafting its preparation and dry-run section in an
-  isolated worktree through the two-attempt watchdog. Add preflight and send
-  instructions only after reviewing the complete guide against the CLI.
 - Final environment validation from `generative-viz-workspace` is blocked by
   the absent sibling `viz_virtualserver` repository. Its read-only
   `scripts/verify-environment.sh` reports the missing path. The workspace

@@ -10,7 +10,7 @@ from dpx3300_convert import ConversionError, validate_hpgl
 from pen_plan import LogicalAssignment, LogicalPenPlanSpec, PassSpec, PenPlanError
 
 
-def neutral_job(tmp_path, count=2, geometry=None, definitions=""):
+def neutral_job(tmp_path, count=2, geometry=None, definitions="", imposed=True):
     layers = [
         {"id": f"layer-{n}", "ordinal": n, "label": f"Layer {n}"}
         for n in range(1, count + 1)
@@ -24,10 +24,19 @@ def neutral_job(tmp_path, count=2, geometry=None, definitions=""):
         for n, item in enumerate(layers)
     )
     source = tmp_path / "drawing.svg"
+    physical_layout = (
+        'data-plotter-workflow-layout="preserve" '
+        'data-plotter-workflow-page-size="a3" '
+        'data-plotter-workflow-orientation="portrait" '
+        if imposed
+        else ""
+    )
     source.write_text(
         '<svg xmlns="http://www.w3.org/2000/svg" '
         'width="100" height="100" viewBox="0 0 100 100" '
-        'data-viz-layer-contract="viz-logical-layers/v1">'
+        'data-viz-layer-contract="viz-logical-layers/v1" '
+        + physical_layout
+        + ">"
         + definitions
         + groups
         + "</svg>",
@@ -57,6 +66,7 @@ def neutral_job(tmp_path, count=2, geometry=None, definitions=""):
                 "schema_version": 1,
                 "source_mode": "neutral",
                 "logical_layer_contract": "viz-logical-layers/v1",
+                "sheet": {"name": "a3", "orientation": "portrait"},
                 "source_manifest_path": str(manifest),
                 "source_manifest_sha256": hashlib.sha256(
                     manifest.read_bytes()
@@ -229,6 +239,7 @@ def test_neutral_unsupported_clips_fail_before_execution(
         "schema_bool",
         "ordinal_bool",
         "source_label",
+        "sheet",
     ],
 )
 def test_neutral_invalid_audit_fails_before_execution(tmp_path, monkeypatch, damage):
@@ -248,6 +259,8 @@ def test_neutral_invalid_audit_fails_before_execution(tmp_path, monkeypatch, dam
             raw["schema_version"] = True
         elif damage == "ordinal_bool":
             raw["logical_layers"][0]["ordinal"] = True
+        elif damage == "sheet":
+            raw["sheet"]["orientation"] = "landscape"
         else:
             source.write_text(
                 source.read_text().replace(
@@ -257,7 +270,7 @@ def test_neutral_invalid_audit_fails_before_execution(tmp_path, monkeypatch, dam
         audit_path.write_text(json.dumps(raw))
     inputs = mock_vpype(monkeypatch)
     with pytest.raises(
-        (ConversionError, ValueError), match="audit|manifest|catalog|inventory"
+        (ConversionError, ValueError), match="audit|manifest|catalog|inventory|layout"
     ):
         converter.convert_neutral_svg(source, None, tmp_path / "out")
     assert inputs == []
@@ -357,6 +370,18 @@ def test_neutral_converter_integration_and_discovered_plan(tmp_path, monkeypatch
     assert "SP7;" in outputs[0].read_text()
 
 
+def test_neutral_requires_imposed_preserve_layout_before_execution(
+    tmp_path, monkeypatch
+):
+    source = neutral_job(tmp_path, 1, imposed=False)
+    inputs = mock_vpype(monkeypatch)
+    out = tmp_path / "out"
+    with pytest.raises(ConversionError, match="preserve-layout"):
+        converter.convert_neutral_svg(source, None, out)
+    assert inputs == []
+    assert not out.exists()
+
+
 @pytest.mark.parametrize(
     "options", [{"send": True}, {"pen_policy": "compact"}, {"pen_map": "1:2"}]
 )
@@ -410,6 +435,7 @@ def test_neutral_real_imposition_and_vpype_pipeline(tmp_path, monkeypatch):
         '<g clip-path="url(#domain)"><path d="M-5 25 L80 25"/></g>',
         '<defs><clipPath id="domain" clipPathUnits="userSpaceOnUse">'
         '<path d="M0 0 L50 0 L0 50 Z"/></clipPath></defs>',
+        imposed=False,
     )
     payload = json.loads((surface_dir / "design.json").read_text())
     payload["surfaces"][0]["path"] = "surfaces/drawing.svg"
@@ -514,6 +540,49 @@ def test_neutral_nested_svg_viewport_clips_crossing_geometry(tmp_path, monkeypat
         io.StringIO(ET.tostring(inputs[0], encoding="unicode")), quantization=0.1
     )
     assert lines.bounds() == pytest.approx((12, 33, 32, 33))
+
+
+def test_neutral_nested_svg_without_viewbox_translates_geometry_and_crop(
+    tmp_path, monkeypatch
+):
+    source = neutral_job(
+        tmp_path,
+        1,
+        '<g transform="translate(10,20)"><svg x="20" y="10" width="40" height="40">'
+        '<path d="M-10 5 L20 5"/></svg></g>',
+    )
+    inputs = mock_vpype(monkeypatch)
+    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    import io
+
+    import vpype
+
+    lines, _, _ = vpype.read_svg(
+        io.StringIO(ET.tostring(inputs[0], encoding="unicode")), quantization=0.1
+    )
+    assert lines.bounds() == pytest.approx((30, 35, 50, 35))
+
+
+@pytest.mark.parametrize("x", ["20%", "20% "])
+def test_neutral_nested_svg_percent_offset_uses_parent_viewport(
+    tmp_path, monkeypatch, x
+):
+    source = neutral_job(
+        tmp_path,
+        1,
+        f'<svg x="{x}" y="10" width="40" height="40">'
+        '<path d="M-10 5 L20 5"/></svg>',
+    )
+    inputs = mock_vpype(monkeypatch)
+    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    import io
+
+    import vpype
+
+    lines, _, _ = vpype.read_svg(
+        io.StringIO(ET.tostring(inputs[0], encoding="unicode")), quantization=0.1
+    )
+    assert lines.bounds() == pytest.approx((20, 15, 40, 15))
 
 
 @pytest.mark.parametrize("count", [1, 8])

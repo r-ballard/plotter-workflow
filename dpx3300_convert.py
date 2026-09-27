@@ -471,13 +471,16 @@ def _neutral_context(source: Path):
     if audit.get("logical_layer_ids") != [layer.id for layer in contract.layers]:
         raise ConversionError("SVG logical inventory differs from imposition audit")
     physical = preserved_physical_layout_metadata(source)
-    if physical is not None:
-        sheet = audit.get("sheet", {})
-        if (
-            not isinstance(sheet, dict)
-            or (sheet.get("name"), sheet.get("orientation")) != physical
-        ):
-            raise ConversionError("SVG physical layout differs from imposition audit")
+    if physical is None:
+        raise ConversionError(
+            "Neutral conversion requires an imposed preserve-layout SVG"
+        )
+    sheet = audit.get("sheet", {})
+    if (
+        not isinstance(sheet, dict)
+        or (sheet.get("name"), sheet.get("orientation")) != physical
+    ):
+        raise ConversionError("SVG physical layout differs from imposition audit")
     return contract, manifest_hash
 
 
@@ -558,14 +561,78 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
         fragment = copy.deepcopy(reader_root)
         fragment.attrib.pop("clip-path", None)
         parent = fragment
-        for ancestor in chain:
+
+        def parent_svg_index(before):
+            return next(
+                (i for i in range(before - 1, -1, -1) if local(chain[i]) == "svg"),
+                -1,
+            )
+
+        def viewport_extent(index, axis):
+            svg = root if index < 0 else chain[index]
+            viewbox = svg.get("viewBox")
+            if viewbox:
+                try:
+                    values = [float(v) for v in re.split(r"[\s,]+", viewbox.strip())]
+                    extent = values[2 if axis == "width" else 3]
+                except (ValueError, IndexError) as exc:
+                    raise ConversionError("Invalid SVG viewBox") from exc
+            else:
+                raw = svg.get(axis, "").strip()
+                if raw.endswith("%"):
+                    if index < 0:
+                        raise ConversionError("Unsupported root SVG percentage viewport")
+                    try:
+                        extent = float(raw[:-1]) / 100 * viewport_extent(
+                            parent_svg_index(index), axis
+                        )
+                    except ValueError as exc:
+                        raise ConversionError("Invalid nested SVG viewport size") from exc
+                else:
+                    try:
+                        extent = vpype.convert_length(raw)
+                    except ValueError as exc:
+                        raise ConversionError("Invalid nested SVG viewport size") from exc
+            if not math.isfinite(extent) or extent <= 0:
+                raise ConversionError("Invalid SVG viewport extent")
+            return extent
+
+        def offset(value, index, axis):
+            value = value.strip()
+            if not value.endswith("%"):
+                return value
+            try:
+                result = float(value[:-1]) / 100 * viewport_extent(
+                    parent_svg_index(index), axis
+                )
+            except ValueError as exc:
+                raise ConversionError("Invalid nested SVG percentage offset") from exc
+            if not math.isfinite(result):
+                raise ConversionError("Invalid nested SVG percentage offset")
+            return f"{result:.12g}"
+
+        for index, ancestor in enumerate(chain):
+            attributes = dict(ancestor.attrib)
+            nested_without_viewbox = (
+                local(ancestor) == "svg" and ancestor.get("viewBox") is None
+            )
+            if nested_without_viewbox:
+                # vpype omits x/y when reading a nested SVG without viewBox.
+                # Materialize that viewport translation for geometry; its crop
+                # is already materialized separately in visit().
+                x = offset(attributes.pop("x", "0"), index, "width")
+                y = offset(attributes.pop("y", "0"), index, "height")
             wrapper = ET.SubElement(
                 parent,
                 ancestor.tag if local(ancestor) in {"g", "svg"} else svg_ns + "g",
-                dict(ancestor.attrib),
+                attributes,
             )
             wrapper.attrib.pop("clip-path", None)
             parent = wrapper
+            if nested_without_viewbox:
+                parent = ET.SubElement(
+                    parent, svg_ns + "g", {"transform": f"translate({x},{y})"}
+                )
         element = copy.deepcopy(leaf)
         element.attrib.pop("clip-path", None)
         parent.append(element)

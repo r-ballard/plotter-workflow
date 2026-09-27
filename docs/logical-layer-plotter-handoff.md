@@ -26,12 +26,25 @@ Branch: `feat/logical-layer-plotter`
 
 ## Remaining work
 
-- Final environment validation from `generative-viz-workspace` is blocked by
-  the absent sibling `viz_virtualserver` repository. Its read-only
-  `scripts/verify-environment.sh` reports the missing path. The workspace
-  instructions prohibit cloning unless an operator explicitly uses
-  `--clone-missing`; no clone was attempted.
 - No physical plotter or serial-port test has been performed on this branch.
+
+## Final software validation
+
+After the operator cloned the sibling `viz_virtualserver` repository, the
+`generative-viz-workspace` bootstrap installed pinned uv 0.6.14 and CPython
+3.12.10 and created both repository environments. Its built-in verifier and
+a separate run of `scripts/verify-environment.sh` passed. The viz repository
+passed 483 tests and Ruff. The plotter repository passed 405 tests and Ruff;
+its pytest run needed an approved shell because the managed sandbox denied
+temporary fixture writes. A broad `pytest -q` also tried to collect an
+inaccessible ignored `tmp/pytest-of-hardcase` directory, so the final suite
+was run explicitly as `pytest tests -q`.
+
+Qwen's 65,536-context documentation task corrected the exact per-pass
+sidecar names in `PEN_PLAN.md` and the operator guide. Its attempt reached
+the 600-second deadline after editing; the watchdog returned `REVIEW`, and
+the orchestrator checked and integrated the in-scope diff. The documentation
+and benchmark are recorded in `docs/qwen-pilot-configuration-debrief.md`.
 
 ## Audit limits
 

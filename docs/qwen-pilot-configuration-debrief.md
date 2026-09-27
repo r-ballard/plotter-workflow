@@ -441,3 +441,32 @@ slower observed generation do not justify replacing the successful 65k
 default for short tasks. Use 131k as a per-task override when the prompt and
 expected trace need it; measure memory again after changing display load or
 model settings. The 65k service was restored after the benchmark.
+
+## Tenth trial: useful plotter documentation task at the 65k default
+
+With the tested 65,536 server/client context and 3,072 output cap, Qwen was
+assigned a narrow correction to two existing plotter documents. The brief
+gave the converter's exact per-pass sidecar naming rule and allowed edits only
+to `PEN_PLAN.md` and the neutral logical-layer operator guide. The watchdog
+used a 600-second deadline and checked whitespace plus exact filename examples.
+
+| Outcome | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| REVIEW, attempt 1 | 600.56 s | ~421 s | 8 | 10 | 20,115 | 4,364 | 115,138 | 0 |
+
+Both in-scope documents were edited and both independent checks passed, but
+OpenCode did not exit before the deadline. The watchdog therefore returned
+`REVIEW` and skipped the corrective retry. The orchestrator checked the diff
+against `pen_plan.py` and `dpx3300_convert.py`, reapplied it to the main
+branch, and reran the checks. The prose now states that the HP-GL file and
+both sidecars carry the pass ID. This was useful worker output despite the
+termination failure. The trace shows several extra reads and searches before
+the first edit despite the narrow brief, so first-edit latency remains an
+optimization target; no model-side polling was used.
+
+The operator-provided `viz_virtualserver` clone allowed the separate
+`generative-viz-workspace` bootstrap and verifier to complete. Both
+repository environments now use the pinned uv/Python toolchain. The viz
+repository passed 483 tests and Ruff; plotter passed 405 tests and Ruff after
+running pytest with filesystem access for temporary fixtures. Physical
+plotter validation remains open.

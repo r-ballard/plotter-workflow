@@ -95,8 +95,12 @@ uv run python dpx3300_convert.py \
   --margin 4mm --absolute
 ```
 
-For each pass ID, expect `booklet.imposed.<pass-id>.hpgl` and adjacent
-`.resolved.penplan.json` and `.placement.json` files. Inspect the generated
+For each pass ID, the converter writes `<svg-stem>.<pass-id>.hpgl` with
+`<svg-stem>.<pass-id>.resolved.penplan.json` and
+`<svg-stem>.<pass-id>.placement.json` beside it; the pass ID appears in all
+three names. For pass ID `warm` on `booklet.imposed.svg`, expect
+`booklet.imposed.warm.hpgl`, `booklet.imposed.warm.resolved.penplan.json`,
+and `booklet.imposed.warm.placement.json`. Inspect the generated
 filenames and resolved carriage table. Do not execute an `.hpgl` file as a
 shell command. The converter does not send neutral jobs directly; send each
 validated pass in plan order with `send_hpgl.py`.

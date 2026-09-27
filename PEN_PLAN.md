@@ -382,8 +382,9 @@ adapt them to the catalog IDs in your own `design.json` — they do not fit any
 arbitrary bundle.
 
 On conversion, one HP-GL per pass is emitted in plan order, named
-`<svg-stem>.<pass-id>.hpgl`, with adjacent `.resolved.penplan.json` and
-`.placement.json` sidecars. Neutral conversion does not use `--send`; preflight
+`<svg-stem>.<pass-id>.hpgl`, with `<svg-stem>.<pass-id>.resolved.penplan.json`
+and `<svg-stem>.<pass-id>.placement.json` sidecars; the pass ID appears in all
+three names. Neutral conversion does not use `--send`; preflight
 and send each pass separately in plan order.
 
 The v2 JSON structure is in [`penplan.schema.json`](penplan.schema.json). The

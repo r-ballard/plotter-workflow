@@ -5,12 +5,68 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+import pen_plan
 from pen_plan import (
     default_pen_plan_path,
     default_resolved_pen_plan_path,
     discover_pen_plan,
     discover_resolved_pen_plan_path,
 )
+
+
+def valid_logical_sidecar():
+    return {
+        "schema_version": 2,
+        "kind": "resolved-dpx3300-logical-pass",
+        "pass_id": "ink",
+        "pass_number": 1,
+        "pass_count": 2,
+        "source_svg": "drawing.svg",
+        "source_svg_sha256": "a" * 64,
+        "source_manifest_hash": "b" * 64,
+        "assignments": [{"layer_ids": ["orbit", "body"], "physical_slot": 7}],
+        "omitted_layers": ["accent"],
+        "repeated_layers": ["orbit"],
+        "physical_slots": [7],
+    }
+
+
+def test_logical_sidecar_round_trip_is_strict_and_deterministic(tmp_path):
+    path = tmp_path / "drawing.ink.resolved.penplan.json"
+    payload = valid_logical_sidecar()
+    pen_plan.write_resolved_plot_pass(path, payload)
+    first = path.read_bytes()
+    assert pen_plan.load_resolved_plot_pass(path) == payload
+    pen_plan.write_resolved_plot_pass(path, payload)
+    assert path.read_bytes() == first
+    with pytest.raises(pen_plan.PenPlanError, match="schema_version"):
+        pen_plan.load_resolved_pen_plan(path)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema_version", 1),
+        ("kind", "resolved-dpx3300-pen-plan"),
+        ("pass_number", True),
+        ("pass_number", 3),
+        ("pass_count", 0),
+        ("source_manifest_hash", "wrong"),
+        ("source_svg_sha256", ""),
+        ("physical_slots", [1]),
+        ("omitted_layers", ["orbit"]),
+        ("assignments", [{"layer_ids": ["orbit"], "physical_slot": 9}]),
+        ("assignments", [{"layer_ids": ["orbit", "orbit"], "physical_slot": 1}]),
+    ],
+)
+def test_logical_sidecar_rejects_ambiguous_or_invalid_payloads(tmp_path, field, value):
+    payload = valid_logical_sidecar()
+    payload[field] = value
+    path = _write_json(tmp_path / "pass.resolved.penplan.json", payload)
+    with pytest.raises(pen_plan.PenPlanError):
+        pen_plan.load_resolved_plot_pass(path)
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> Path:

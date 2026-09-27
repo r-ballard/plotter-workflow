@@ -31,6 +31,7 @@ LOGICAL_PEN_PLAN_SCHEMA_VERSION = 2
 PEN_PLAN_SUFFIX = ".penplan.json"
 RESOLVED_PEN_PLAN_SUFFIX = ".resolved.penplan.json"
 RESOLVED_PEN_PLAN_KIND = "resolved-dpx3300-pen-plan"
+RESOLVED_PLOT_PASS_KIND = "resolved-dpx3300-logical-pass"
 PEN_ID_RE = re.compile(r"^pen-(\d+)$")
 _MANIFEST_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 SP_RE = re.compile(r"SP([0-8]);", re.IGNORECASE)
@@ -927,6 +928,95 @@ def write_resolved_pen_plan(path: Path, plan: ResolvedPenPlan) -> None:
     if plan.notes:
         payload["notes"] = plan.notes
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _validate_resolved_plot_pass(raw: object) -> dict[str, Any]:
+    """Validate the standalone v2 audit contract without guessing legacy fields."""
+    fields = {
+        "schema_version",
+        "kind",
+        "pass_id",
+        "pass_number",
+        "pass_count",
+        "source_svg",
+        "source_svg_sha256",
+        "source_manifest_hash",
+        "assignments",
+        "omitted_layers",
+        "repeated_layers",
+        "physical_slots",
+    }
+    if not isinstance(raw, dict) or set(raw) != fields:
+        raise PenPlanError(
+            "Resolved logical pass must contain exactly the v2 audit fields"
+        )
+    if (
+        type(raw["schema_version"]) is not int
+        or raw["schema_version"] != 2
+        or raw["kind"] != RESOLVED_PLOT_PASS_KIND
+    ):
+        raise PenPlanError("Invalid resolved logical pass schema_version/kind")
+    for field in ("pass_number", "pass_count"):
+        if type(raw[field]) is not int or raw[field] < 1:
+            raise PenPlanError(f"Invalid resolved logical pass {field}")
+    if raw["pass_number"] > raw["pass_count"]:
+        raise PenPlanError("pass_number exceeds pass_count")
+    if not isinstance(raw["pass_id"], str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_-]*", raw["pass_id"]
+    ):
+        raise PenPlanError("Invalid resolved logical pass pass_id")
+    _require_nonempty_text(raw, "source_svg", "resolved pass")
+    _validate_source_manifest_hash(raw["source_manifest_hash"])
+    if not isinstance(
+        raw["source_svg_sha256"], str
+    ) or not _MANIFEST_SHA256_RE.fullmatch(raw["source_svg_sha256"]):
+        raise PenPlanError("Invalid source SVG SHA-256")
+    omitted = _parse_logical_ids(raw["omitted_layers"], "omitted_layers")
+    repeated = _parse_logical_ids(raw["repeated_layers"], "repeated_layers")
+    if set(omitted) & set(repeated):
+        raise PenPlanError("Omitted layers cannot be repeated")
+    assignments = _require_array(raw["assignments"], "assignments")
+    if not 1 <= len(assignments) <= 8:
+        raise PenPlanError("Resolved pass requires 1..8 assignments")
+    slots = []
+    included = set()
+    for item in assignments:
+        if not isinstance(item, dict) or set(item) != {"layer_ids", "physical_slot"}:
+            raise PenPlanError("Invalid resolved logical assignment")
+        layer_ids = _parse_logical_ids(
+            item["layer_ids"], "layer_ids", require_nonempty=True
+        )
+        slot = item["physical_slot"]
+        if type(slot) is not int or not 1 <= slot <= 8 or slot in slots:
+            raise PenPlanError("Invalid or duplicate resolved physical slot")
+        if included.intersection(layer_ids) or set(omitted).intersection(layer_ids):
+            raise PenPlanError("Assigned logical IDs must be unique and not omitted")
+        included.update(layer_ids)
+        slots.append(slot)
+    if (
+        not isinstance(raw["physical_slots"], list)
+        or any(type(slot) is not int for slot in raw["physical_slots"])
+        or raw["physical_slots"] != slots
+    ):
+        raise PenPlanError("physical_slots differs from ordered assignments")
+    return raw
+
+
+def write_resolved_plot_pass(path: Path, payload: dict[str, Any]) -> None:
+    """Write a deterministic, strictly validated neutral v2 pass audit."""
+    validated = _validate_resolved_plot_pass(payload)
+    path.write_text(
+        json.dumps(validated, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def load_resolved_plot_pass(path: Path) -> dict[str, Any]:
+    """Read only neutral v2 pass sidecars; legacy sidecars use their old API."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise PenPlanError(f"Invalid resolved logical pass {path}: {exc}") from exc
+    return _validate_resolved_plot_pass(raw)
 
 
 def format_pen_plan(plan: ResolvedPenPlan) -> str:

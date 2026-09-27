@@ -2,31 +2,40 @@
 
 Branch: `feat/logical-layer-plotter`
 
-This branch is an in-progress checkpoint for the neutral logical-layer plotter workflow. Tasks 1 through 5 are independently reviewed and committed. Task 6 is implemented and test-covered, but it is intentionally committed as work in progress because independent review identified two unresolved conversion defects.
+## Completed work
 
-## Completed checkpoints
+- Tasks 1–5: strict neutral SVG inspection; manifest, hash, catalog, and
+  surface-inventory validation; lossless neutral imposition; pen-plan v2;
+  logical catalog resolution into explicit physical passes.
+- Task 6: deterministic per-pass SVG/HP-GL conversion, v2 resolved sidecars,
+  supported clip materialization, dry-run planning, and failure cleanup. The
+  nested viewport translation and preserve-layout registration review findings
+  were fixed with RED/GREEN integration tests in `48cae13`, then independently
+  re-reviewed. The full suite and Ruff passed.
+- Task 7 code: v2 resolved logical-pass sidecars now pass preflight and the
+  sender's final sidecar check. The carriage table names logical layers and
+  physical slots; multi-pen sends still require operator confirmation. Legacy
+  v1 resolved plans retain the tool-or-label requirement and filename fallback.
+  Real neutral conversion output is preflighted in integration coverage.
+  Commits: `27b1301`, `47b4c64`, `74bbdfb`. Full suite: 405 passed; Ruff and
+  `git diff --check` passed.
 
-- `8af642c` — strict neutral SVG inspection
-- `8287613` — manifest, hash, catalog, and surface-inventory validation
-- `99fb33c` — lossless neutral imposition with authoritative manifest provenance
-- `eb941c4` — pen-plan v2 parser, immutable model, schema, and example
-- `46bb76a` — logical catalog resolution into explicit physical passes
+## Remaining work
 
-## Task 6 work in progress
+- Finish and review the Git Bash neutral logical-layer operator guide. The
+  local Qwen worker is drafting its preparation and dry-run section in an
+  isolated worktree through the two-attempt watchdog. Add preflight and send
+  instructions only after reviewing the complete guide against the CLI.
+- Final environment validation from `generative-viz-workspace` is blocked by
+  the absent sibling `viz_virtualserver` repository. Its read-only
+  `scripts/verify-environment.sh` reports the missing path. The workspace
+  instructions prohibit cloning unless an operator explicitly uses
+  `--clone-missing`; no clone was attempted.
+- No physical plotter or serial-port test has been performed on this branch.
 
-The uncommitted Task 6 implementation adds deterministic per-pass SVG/HP-GL conversion, resolved v2 sidecars, clip materialization for the supported subset, dry-run planning, and failure cleanup. Its tests were green before the review findings below, but review approval has not been granted.
+## Audit limits
 
-### Unresolved review findings
-
-1. Nested SVG viewport translation without a `viewBox` is incorrect. A nested `<svg x="20" y="10" width="40" height="40">` may have its viewport crop transformed while its geometry remains in the unshifted coordinate system. Add a failing integration test and make geometry and viewport use the same transform.
-2. Neutral conversion currently accepts SVGs without `data-plotter-workflow-layout="preserve"`. Because vpype fits each selected pass independently, differing pass bounds can lose registration. Require and validate imposed preserve-layout metadata before neutral multi-pass conversion, or compute one source-wide transform and reuse it for every pass. The intended MVP path is to require the Task 3 imposed preserve-layout artifact.
-
-Do not describe Task 6 as complete until both findings have strict RED/GREEN coverage, the focused and full suites pass, Ruff and `git diff --check` pass, and an independent re-review approves the result.
-
-## Remaining planned work
-
-- Finish and approve Task 6, then replace the WIP commit with a normal follow-up fix commit (history rewriting is not required).
-- Task 7: resolved-sidecar preflight, compatibility regression coverage, and Git Bash operator documentation.
-- Run final cross-repository integration validation from `generative-viz-workspace`.
-
-No physical plotter or serial-port testing has been performed on this branch.
+V2 preflight validates sidecar structure, HP-GL pen order, and current physical
+placement. It cannot recompute the recorded source SVG or manifest hashes from
+the HP-GL job alone; retain the source bundle and imposition audit with job
+records. `JOB_PREFLIGHT.md` describes the operator confirmation boundary.

@@ -211,3 +211,22 @@ require an early first edit, and cap unproductive read/tool rounds in the
 external watchdog. Keep the two-strike correction loop and independent review;
 measure setup, review, and correction effort as well as local usage before
 claiming a workflow saving.
+
+### Direct OpenCode write probe after the third trial
+
+An orchestrator shell probe had already written to the worker worktree. A
+separate direct OpenCode probe now confirms the worker's own write tool can do
+so: with the same OpenCode config and `experiment/qwen-task7-guide` worktree,
+Qwen made one completed `write` tool call, created
+`docs/how-to/qwen-write-probe.txt` with the requested content, and exited 0.
+The content was verified and the probe file removed; the worktree is clean.
+This rules out an OpenCode file-write denial as the explanation for the third
+trial's no-edit result.
+
+The first, sandboxed probe launch failed before reaching Qwen because OpenCode
+could not open `C:\Users\hardcase\.local\share\opencode\log\opencode.log`.
+The approved outside-sandbox launch succeeded. This is a launcher log-path
+permission issue, separate from worker worktree writes. Use the approved
+launch path until OpenCode's state and log directories are placed in a writable
+location and verified with an unapproved probe; a shell write probe alone does
+not check this boundary.

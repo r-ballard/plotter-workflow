@@ -82,3 +82,10 @@ Keep the canonical value for now. The watchdog now returns a timed-out,
 in-scope diff with passing checks as `REVIEW` and skips the automatic retry;
 the orchestrator must still inspect its content and decide whether to integrate
 it. A task without a diff or with failing checks retains the corrective loop.
+
+The sixth trial set `compaction.reserved` to 4,096 in a temporary config. It
+still compacted twice and timed out after producing a `REVIEW` diff. Mechanical
+checks passed but missed incorrect prose and filenames, so strengthen task
+checks where source contracts can be checked automatically. The reviewed
+fourth-trial section remains the version to use. See the sixth-trial debrief
+before choosing a larger server context for the next capacity test.

@@ -339,3 +339,41 @@ the canonical deployment. Once a clean baseline exists, test
 `max_agent_steps` separately to limit extra post-edit rounds. Do not infer
 support for the article's vLLM thinking budget from this llama.cpp endpoint;
 verify the server's accepted request fields before testing that setting.
+
+## Sixth trial: smaller compaction reserve
+
+The worker repeated the v2 documentation task from `68a9099` in a fresh
+worktree at 16,384 server/client context and 3,072 output. The temporary
+OpenCode 1.18.32 config set `compaction.auto: true` and
+`compaction.reserved: 4096`; the canonical config was unchanged. The prompt,
+independent checks, and 720-second attempt deadline matched the earlier task.
+The watchdog was newer (`f227e60`), so the retry behavior changed: a timed-out
+in-scope diff with passing checks returned `REVIEW` after one attempt.
+
+| Elapsed | First edit | Completed rounds | Tools | Input | Output | Cached read | Compactions |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 720.53 s | ~247 s | 5 | 3 | 23,118 | 7,259 | 16,920 | 2 |
+
+Qwen edited the allowed file, ran `git diff --check`, and both watchdog checks
+passed. OpenCode still did not exit before the deadline. One completed reply
+ended at the 3,072 output limit, and the trace has two synthetic
+`compaction_continue` events at about 511 and 649 seconds. The smaller reserve
+did not remove compaction or solve clean completion. It may have moved the
+first edit earlier than in trials 4 and 5, but one nondeterministic run is not
+enough to claim a timing improvement. Interrupted final-round and cloud usage
+were not measured.
+
+Orchestrator review rejected the draft despite the two passing checks. It
+incorrectly said every catalog ID is assigned exactly once while permitting
+repeated layers, and its resolved sidecar filename examples omitted the pass
+ID. The existing reviewed section remains authoritative. This demonstrates
+that `REVIEW` means only an in-scope, mechanically checked diff; for document
+tasks, add an independent check of parsed examples and exact artifact names
+when available, then still review the prose against the implementation.
+
+The next capacity test is a matched run with a larger **server and client**
+context, leaving the canonical 3,072 output cap and default compaction config
+unchanged. Start at 24,576 only after checking the local server's memory and
+throughput; compare compaction count, first-edit time, clean exit, and review
+quality. Keep the watchdog's reviewable-timeout path so a useful partial diff
+does not spend a second full attempt automatically.

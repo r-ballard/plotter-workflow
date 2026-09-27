@@ -54,3 +54,9 @@ the next trial, provide a smaller pre-extracted context and ask for a single
 file change with an explicit time limit. Keep the full diff, tests, and
 integration checks with the orchestrator. Do not infer a cloud token saving
 from this incomplete attempt.
+
+The reusable setup is now `opencode.qwen.json` plus
+`docs/qwen-worker-guidance.md`. See `docs/qwen-worker-runbook.md` for the
+asynchronous wait and two-strike procedure. The model configuration records
+instructions and model limits; the orchestrator still enforces attempt count,
+deadline, and diff scope.

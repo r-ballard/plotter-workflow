@@ -20,6 +20,34 @@ export BUNDLE_DIR=/c/path/to/neutral-booklet-bundle
 cd "$PLOTTER_REPO"
 uv sync
 test -f "$BUNDLE_DIR/design.json"
+```
+
+A neutral bundle generated in `viz_virtualserver` with
+`scripts/generate_domain_bundle.py` from
+`examples/domain-jobs/orbital-per-body.json` does not include `booklet.json`.
+If it is missing, save this software-only eight-page manifest example as
+`$BUNDLE_DIR/booklet.json` before continuing. The example is a software
+fixture, not a finished physical booklet design; inspect and adjust each page
+for any real artwork.
+
+```json
+{
+  "schema_version": 1,
+  "layout": "pocketmod8",
+  "pages": [
+    { "page": 1, "source": "surfaces/square.svg" },
+    { "page": 2, "source": "surfaces/triangle.svg" },
+    { "page": 3, "source": "surfaces/pentagon.svg" },
+    { "page": 4, "source": "surfaces/square.svg" },
+    { "page": 5, "source": "surfaces/triangle.svg" },
+    { "page": 6, "source": "surfaces/pentagon.svg" },
+    { "page": 7, "source": "surfaces/square.svg" },
+    { "page": 8, "source": "surfaces/triangle.svg" }
+  ]
+}
+```
+
+```bash
 test -f "$BUNDLE_DIR/booklet.json"
 ```
 

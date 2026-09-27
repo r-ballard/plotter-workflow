@@ -23,6 +23,9 @@ Branch: `feat/logical-layer-plotter`
   documents the Git Bash path from neutral bundle through registered passes.
   The third Qwen trial was stopped by its watchdog after two 30-minute
   attempts with no file edit; the guide was completed by the orchestrator.
+  A later Qwen trial added a validated, software-only `booklet.json` example
+  so the orbital-per-body bundle can follow the guide without inventing a
+  manifest.
 
 ## Remaining work
 

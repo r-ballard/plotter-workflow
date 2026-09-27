@@ -500,3 +500,21 @@ preserves the full wall deadline after an early edit. Twelve offline tests
 and Ruff passed. The change has not yet been exercised in a live Qwen task;
 480 seconds is the provisional first-edit limit for a 600-second documentation
 task, based on the observed successful first-edit times above.
+
+## Twelfth trial: booklet manifest guide with the guard enabled
+
+The default 65,536-context worker added a software-only `booklet.json`
+example to the neutral plotting guide. The task allowed one file, supplied
+the exact eight-page source order used by the successful integration run,
+and set a 600-second wall deadline plus a 480-second first-edit deadline.
+
+| Outcome | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| PASS, attempt 1 | 337.97 s | ~257 s | 6 | 5 | 11,155 | 2,481 | 53,317 | 0 |
+
+The worker exited cleanly. The watchdog's JSON check parsed the full manifest
+and verified page numbers and source order; the orchestrator independently
+compared it with the manifest used in the successful software-only run. The
+first-edit deadline was enabled but did not fire, so this live trial verifies
+normal completion with the guard configured, not the live early-stop path.
+The diff was reviewed and integrated. Cloud usage was not measured.

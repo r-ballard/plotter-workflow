@@ -7,6 +7,7 @@ import pytest
 
 import dpx3300_convert as converter
 from dpx3300_convert import ConversionError, validate_hpgl
+from job_preflight import run_job_preflight
 from pen_plan import LogicalAssignment, LogicalPenPlanSpec, PassSpec, PenPlanError
 
 
@@ -469,6 +470,12 @@ def test_neutral_real_imposition_and_vpype_pipeline(tmp_path, monkeypatch):
         ]
         == hashlib.sha256((tmp_path / "design.json").read_bytes()).hexdigest()
     )
+    report, plan = run_job_preflight(
+        outputs[0], config_path=Path(__file__).resolve().parents[1] / "vpype.toml"
+    )
+    assert report.pen_plan_status == "pass"
+    assert report.ready_to_send is False
+    assert plan["kind"] == "resolved-dpx3300-logical-pass"
 
 
 def test_neutral_nested_svg_viewbox_and_intersecting_clips(tmp_path, monkeypatch):

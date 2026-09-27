@@ -74,7 +74,8 @@ settings and newer permission profiles; [do not mix the two systems](https://lea
    $repo = 'C:\Users\hardcase\Documents\developer\codex-repos\plotter-workflow'
    $env:TEMP = "$repo\tmp\qwen-worker"
    $env:TMP = $env:TEMP
-   $env:OPENCODE_CONFIG = "$repo\opencode.qwen.json"
+   $localLlm = 'C:\Users\hardcase\Documents\developer\codex-repos\local-llm\.worktrees\local-coding-llm'
+   $env:OPENCODE_CONFIG = "$localLlm\config\opencode.qwen.json"
    ```
 
 4. Verify **without** an escalation in the new sandboxed Codex session.
@@ -175,8 +176,9 @@ file change with an explicit time limit. Keep the full diff, tests, and
 integration checks with the orchestrator. Do not infer a cloud token saving
 from this incomplete attempt.
 
-The reusable setup is now `opencode.qwen.json` plus
-`docs/qwen-worker-guidance.md`. See `docs/qwen-worker-runbook.md` for the
-asynchronous wait and two-strike procedure. The model configuration records
-instructions and model limits; the orchestrator still enforces attempt count,
-deadline, and diff scope.
+The canonical reusable setup now lives in the `local-llm` worktree:
+`config/opencode.qwen.json`, `docs/qwen-worker-guidance.md`, and
+`scripts/qwen_worker_watchdog.py`. Its `docs/qwen-worker-watchdog.md` gives the
+task-spec format and run procedure. The watchdog enforces the two-attempt
+deadline and diff checks without model-side polling; the frontier orchestrator
+still reviews each proposed integration.

@@ -1,49 +1,23 @@
-# Running the local Qwen worker
+# Running the local Qwen worker for plotter tasks
 
-This repository's `opencode.qwen.json` is an explicit OpenCode configuration
-for the demonstrated local provider. It is not an automatic project default.
-Run the model service with context 16,384, then set `OPENCODE_CONFIG` to this
-file in the worker process. Keep one local worker at a time in its own Git
-worktree. The server, OpenCode executable, Python environment, and log paths
-are machine-specific and stay outside Git.
+The canonical config, instructions, and watchdog live in the sibling
+`local-llm` repository's `local-coding-llm` worktree:
 
-The task prompt must name the starting commit, allowed files, expected edit,
-focused checks, Python path, `Attempt: 1 of 2`, and deliverables. Supply a few
-relevant code excerpts or line ranges for a large module. The worker guidance
-is loaded by the config; the task prompt still controls the file allowlist.
+- `config/opencode.qwen.json`
+- `docs/qwen-worker-guidance.md`
+- `docs/qwen-worker-watchdog.md`
+- `scripts/qwen_worker_watchdog.py`
 
-## Wait without token-heavy monitoring
+Start the Qwen server with context 16,384 and confirm `/health` is `ok`.
+Prepare an isolated, clean plotter worktree and a task spec outside that
+worktree. The spec names the OpenCode executable, the canonical model config,
+the task prompt, an exact file allowlist, independent checks, and an output
+directory outside the worktree. Follow `local-llm/docs/qwen-worker-watchdog.md`
+for the full spec and command.
 
-Launch `opencode run --format json --pure` once, save the JSONL event stream
-and process exit code in an ignored location, and wait for the process or a
-deadline. In a Codex tool session, keep the returned session ID and make one
-long `write_stdin` wait (up to the tool's five-minute limit) instead of polling
-status every few seconds. The wait itself does not require reasoning about
-each generated token. The orchestrator can do independent work while the local
-process runs, then inspect the completed trace and diff once.
-
-For an external PowerShell harness, launch the CLI with `Start-Process -PassThru
--WindowStyle Hidden` and redirected output, then use `Wait-Process -Id
-<process-id> -Timeout <seconds>`. Use a configurable deadline, initially 30
-minutes per attempt, rather than treating low tokens per second as failure.
-The wait returns at exit or timeout. On timeout, stop the process, preserve
-the trace, and count a strike. A separate watchdog may record heartbeat and
-tool progress, but should not continuously involve the orchestrator model.
-
-## Two attempts and review
-
-1. Run attempt 1. If it completes with an in-scope diff and passing checks,
-   review the diff and independently rerun checks. If it fails, record one
-   strike and summarize the specific failure from the trace.
-2. For attempt 2, give Qwen that feedback and narrow the prompt or context.
-   State `Attempt: 2 of 2`. Use the same isolated worktree only after checking
-   its diff; reset or create a fresh worktree if the first attempt left partial
-   changes. Wait asynchronously again.
-3. If attempt 2 fails, stop local retries and return the task to the
-   orchestrator. Preserve elapsed time, completed-round token counts, tool
-   counts, correction count, exit status, and changed files. Interrupted
-   rounds may lack usage records; label those totals as incomplete.
-
-The model config sets provider, context, output limit, and instructions. The
-orchestrator or external harness must enforce deadlines, attempt counts, and
-the worktree allowlist. OpenCode instructions alone cannot enforce them.
+The watchdog waits on the worker process without model-side polling. It
+permits one corrective retry, stops immediately for an out-of-scope edit,
+enforces an elapsed deadline, and writes JSONL logs plus a benchmark summary.
+The frontier orchestrator reviews the completed diff and reruns checks before
+integrating it. The configuration and sandbox setup findings remain in
+`docs/qwen-pilot-configuration-debrief.md` in this repository.

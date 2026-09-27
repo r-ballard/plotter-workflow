@@ -75,3 +75,10 @@ timed out after its diff check. Review its completed tool calls and diff before
 discarding a timed-out attempt. A redirected-path probe still hit the managed
 sandbox's nested `git` process restriction, so an approved launch is currently
 required. See the fourth-trial metrics in the debrief.
+
+The fifth trial repeated the same task with only `limit.output` raised from
+3,072 to 6,144. No response hit the new cap, yet both attempts timed out.
+Keep the canonical value for now. The watchdog now returns a timed-out,
+in-scope diff with passing checks as `REVIEW` and skips the automatic retry;
+the orchestrator must still inspect its content and decide whether to integrate
+it. A task without a diff or with failing checks retains the corrective loop.

@@ -274,3 +274,36 @@ the run output directory and accepts an optional `max_agent_steps` setting
 for OpenCode's build agent (`133801a`). Eight offline tests and Ruff pass.
 An agent-step limit bounds completed agent rounds, but a wall-clock deadline
 is still needed for a single slow reply. There is no no-edit-round guard yet.
+
+## Fifth trial: output-limit comparison
+
+To isolate the reply-cap hypothesis, the worker repeated the fourth trial's
+prompt, checks, starting commit (`68a9099`), 16,384-token server context, and
+720-second attempt deadline in a fresh worktree. The tested model setting was
+OpenCode's advertised `limit.output`, changed from 3,072 to 6,144. The watchdog
+also used its newer XDG state-path isolation, so this is a close comparison,
+not a perfectly identical replay. The canonical model config remains at 3,072
+pending evidence of a benefit.
+
+| Attempt | Elapsed | Completed rounds | Tools | Input | Output | Cached read | Diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 720.59 s | 3 | 2 | 14,153 | 5,678 | 8,787 | none |
+| 2 | 720.47 s | 6 | 6 | 7,869 | 4,153 | 43,959 | `PEN_PLAN.md` |
+| Total | 1,441.06 s | 9 | 8 | 22,022 | 9,831 | 52,746 | one draft |
+
+No completed response reached the 6,144-token cap; neither attempt exited before
+its deadline. Attempt 1 had no edit. Attempt 2 edited at about 401 seconds,
+but its draft repeated the incorrect claim that every catalog layer is
+assigned exactly once, despite its own repeated-layer example. The already
+reviewed fourth-trial section remains authoritative; no fifth-trial edit was
+integrated. This comparison does not support raising the output cap
+as a resolution to the timeout. It does not rule out a cap effect on larger
+file writes or other tasks. Interrupted final rounds and cloud usage remain
+unmeasured.
+
+The local-llm watchdog now treats a timed-out, in-scope diff that passes its
+independent checks as `REVIEW` and stops before a second attempt (`f227e60`).
+It returns a nonzero exit code and still requires orchestrator review; a
+partial OpenCode session is never labeled `PASS`. Nine offline tests and Ruff
+passed. That change would have avoided a second full attempt in the fourth
+trial, while preserving the chance to catch the accounting error in review.

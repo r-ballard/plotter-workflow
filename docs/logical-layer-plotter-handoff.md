@@ -30,6 +30,10 @@ Branch: `feat/logical-layer-plotter`
 ## Remaining work
 
 - No physical plotter or serial-port test has been performed on this branch.
+  Follow `docs/how-to/physical-logical-layer-acceptance.md` at the workstation;
+  it covers a small serial check, pocketmod orientation, and registered neutral
+  multipass proof. Linear `HAR-26` tracks that acceptance. The separate
+  twenty-surface cootie-catcher proof is Linear `HAR-14`.
 
 ## Final software validation
 

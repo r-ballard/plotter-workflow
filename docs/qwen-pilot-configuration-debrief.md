@@ -307,3 +307,35 @@ It returns a nonzero exit code and still requires orchestrator review; a
 partial OpenCode session is never labeled `PASS`. Nine offline tests and Ruff
 passed. That change would have avoided a second full attempt in the fourth
 trial, while preserving the chance to catch the accounting error in review.
+
+## Next tuning test: compaction pressure and clean completion
+
+The first low-risk pilot exited cleanly after its edit. Later behavior is more
+specific than “no output”: trial 4 edited in both attempts, and trial 5 edited
+in attempt 2, but OpenCode did not exit before the deadline. A trace audit of
+the four trial-4 and trial-5 attempts found one synthetic
+`compaction_continue` event in **each** attempt. In trial 4 attempt 2, Qwen
+also emitted a short “Done” message before OpenCode started another step.
+The earlier guide trial had five such continuations per attempt. This points
+to context/compaction overhead as a stronger next hypothesis than the reply
+cap, but the traces alone do not prove the cause of the final slow step.
+
+The tested OpenCode CLI is 1.18.32. Its
+[v1 configuration reference](https://opencode.ai/docs/config/#compaction)
+documents automatic compaction and shows a 10,000-token `reserved` buffer in
+its example; we have not measured the effective default in this installation.
+With the currently advertised 16,384-token context, a large reserve would
+leave a narrow working budget. The next controlled trial should repeat the
+same short task at 16,384 context and 3,072 output, changing only
+`compaction.reserved` to 4,096 in a temporary per-run config. Do not also
+change model, prompt, output cap, or agent-step limit in that trial. Compare
+time to first edit, compaction events, response finish reasons, clean process
+exit, and the watchdog's independent checks. Keep the original config if the
+smaller reserve causes context errors or no completion improvement.
+
+If compaction still occurs early, measure whether a 24,576 or 32,768-token
+server context fits the machine and improves a matched run before changing
+the canonical deployment. Once a clean baseline exists, test
+`max_agent_steps` separately to limit extra post-edit rounds. Do not infer
+support for the article's vLLM thinking budget from this llama.cpp endpoint;
+verify the server's accepted request fields before testing that setting.

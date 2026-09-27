@@ -53,6 +53,35 @@ class PreservedPhysicalLayoutTests(unittest.TestCase):
         self.assertIn("--landscape", command)
         self.assertIn("--absolute", command)
 
+    def test_imposed_portrait_svg_preserves_layout_without_landscape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "portrait.imposed.svg"
+            source.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="8.5in" height="11in" '
+                'data-plotter-workflow-layout="preserve" data-plotter-workflow-page-size="letter" data-plotter-workflow-orientation="portrait"/>',
+                encoding="utf-8",
+            )
+            command = converter.build_vpype_command(
+                source,
+                root / "portrait.hpgl",
+                config_path=Path("vpype.toml"),
+                device="dpx3300",
+                page_size="letter",
+                device_page_size="letter_lower_left",
+                landscape=False,
+                margin="4mm",
+                velocity=None,
+                absolute=True,
+            )
+        self.assertNotIn("layout", command)
+        self.assertNotIn("--fit-to-margins", command)
+        self.assertNotIn("--center", command)
+        self.assertNotIn("--landscape", command)
+        self.assertIn("write", command)
+        self.assertIn("letter_lower_left", command)
+        self.assertIn("--absolute", command)
+
     def test_layout_marker_detection_is_explicit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

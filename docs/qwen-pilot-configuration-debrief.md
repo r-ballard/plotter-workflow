@@ -30,3 +30,27 @@ For later trials, record the selected task, starting commit, allowed files,
 elapsed time, local usage, actual cloud usage when available, correction
 rounds, diff, and independent checks. Compare the whole workflow, including
 orchestrator review and setup, before drawing a token-efficiency conclusion.
+
+## Second trial: Task 7 resolved-pass validator
+
+The next bounded task was to add a v2 resolved-pass-to-HP-GL validator and
+three tests. The worker used an isolated `experiment/qwen-task7-sidecar`
+worktree at `c48a77c`, the same OpenCode configuration, and a healthy
+16,384-token Qwen service. Its baseline passed: 17 focused tests and Ruff.
+
+The first worker attempt was stopped after about nine minutes with no edit.
+Its trace contains five completed model rounds and 12 tool calls, including
+successful baseline checks and source reads. Those completed rounds reported
+12,163 input, 3,517 output, and 29,116 cached-read local tokens. One model
+response hit the configured 2,048 output-token limit and OpenCode compacted
+the session. A shorter continuation produced no tool call or edit before it
+was stopped after several more minutes. The trace does not provide a completed
+usage record for that interrupted continuation. The worker worktree remained
+clean. No second-trial Qwen code was integrated.
+
+This task exposed a workflow limit: reading a 48 KB module and navigating its
+existing APIs consumed substantial local generation time before editing. For
+the next trial, provide a smaller pre-extracted context and ask for a single
+file change with an explicit time limit. Keep the full diff, tests, and
+integration checks with the orchestrator. Do not infer a cloud token saving
+from this incomplete attempt.

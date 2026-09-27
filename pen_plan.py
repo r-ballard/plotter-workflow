@@ -1019,6 +1019,24 @@ def load_resolved_plot_pass(path: Path) -> dict[str, Any]:
     return _validate_resolved_plot_pass(raw)
 
 
+def validate_resolved_plot_pass_for_hpgl(
+    hpgl_path: Path, sidecar_path: Path | None = None
+) -> dict[str, Any]:
+    """Verify a v2 logical pass sidecar against its HP-GL pen selections."""
+    if sidecar_path is None:
+        sidecar_path = discover_resolved_pen_plan_path(hpgl_path)
+    if not sidecar_path.is_file():
+        raise PenPlanError(f"Resolved logical pass sidecar does not exist: {sidecar_path}")
+    payload = load_resolved_plot_pass(sidecar_path)
+    actual = physical_pens_in_hpgl(hpgl_path)
+    expected = tuple(payload["physical_slots"])
+    if actual != expected:
+        raise PenPlanError(
+            f"HP-GL physical pen order {actual} does not match resolved logical pass {expected}"
+        )
+    return payload
+
+
 def format_pen_plan(plan: ResolvedPenPlan) -> str:
     """Return a concise human-readable carriage loading/preflight table."""
     lines = [

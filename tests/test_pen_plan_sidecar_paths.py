@@ -45,6 +45,29 @@ def test_logical_sidecar_round_trip_is_strict_and_deterministic(tmp_path):
         pen_plan.load_resolved_pen_plan(path)
 
 
+def test_logical_sidecar_matches_hpgl_pen_order(tmp_path):
+    hpgl = tmp_path / "drawing.hpgl"
+    hpgl.write_text("IN;SP7;PU0,0;PD1,1;SP0;", encoding="ascii")
+    payload = valid_logical_sidecar()
+    _write_json(tmp_path / "drawing.resolved.penplan.json", payload)
+    assert pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl) == payload
+
+
+def test_logical_sidecar_rejects_wrong_hpgl_pen_order(tmp_path):
+    hpgl = tmp_path / "drawing.hpgl"
+    hpgl.write_text("IN;SP6;PU0,0;PD1,1;SP0;", encoding="ascii")
+    path = _write_json(tmp_path / "drawing.resolved.penplan.json", valid_logical_sidecar())
+    with pytest.raises(pen_plan.PenPlanError, match="does not match"):
+        pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl, path)
+
+
+def test_logical_sidecar_requires_resolved_file(tmp_path):
+    hpgl = tmp_path / "drawing.hpgl"
+    hpgl.write_text("IN;SP7;PU0,0;PD1,1;SP0;", encoding="ascii")
+    with pytest.raises(pen_plan.PenPlanError, match="does not exist"):
+        pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl)
+
+
 @pytest.mark.parametrize(
     "field,value",
     [

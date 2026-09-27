@@ -10,7 +10,6 @@ import pytest
 
 import cootie_impose as cootie
 
-
 FIXTURE_DIR = (
     Path(__file__).resolve().parent
     / "fixtures"

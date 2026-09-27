@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import re
 import tomllib
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 class PlacementValidationError(ValueError):
@@ -27,7 +27,7 @@ class Bounds:
     def height(self) -> float:
         return self.max_y - self.min_y
 
-    def contains(self, other: "Bounds", tolerance: float = 0.0) -> bool:
+    def contains(self, other: Bounds, tolerance: float = 0.0) -> bool:
         return (
             other.min_x >= self.min_x - tolerance
             and other.max_x <= self.max_x + tolerance
@@ -35,7 +35,7 @@ class Bounds:
             and other.max_y <= self.max_y + tolerance
         )
 
-    def inset(self, amount: float) -> "Bounds":
+    def inset(self, amount: float) -> Bounds:
         if amount < 0:
             raise PlacementValidationError("Margin inset cannot be negative.")
         if amount * 2 >= self.width or amount * 2 >= self.height:

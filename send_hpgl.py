@@ -11,20 +11,27 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 
 import serial
 from serial.tools import list_ports
-from job_preflight import JobPreflightError, format_job_preflight, run_job_preflight, write_preflight_report
+
+from job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+    write_preflight_report,
+)
 from pen_plan import (
     PenPlanError,
+    ResolvedPenPlan,
+    discover_resolved_pen_plan_path,
     format_pen_plan,
+    format_resolved_plot_pass,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
-    validate_resolved_pen_plan_for_hpgl,
-    discover_resolved_pen_plan_path,
+    validate_resolved_sidecar_for_hpgl,
 )
 
 LOG = logging.getLogger("dpx3300.sender")
@@ -205,8 +212,13 @@ def main() -> int:
         )
         resolved_plan = None
         if sidecar.is_file():
-            resolved_plan = validate_resolved_pen_plan_for_hpgl(args.hpgl, sidecar)
-            for line in format_pen_plan(resolved_plan).splitlines():
+            resolved_plan = validate_resolved_sidecar_for_hpgl(args.hpgl, sidecar)
+            carriage = (
+                format_pen_plan(resolved_plan)
+                if isinstance(resolved_plan, ResolvedPenPlan)
+                else format_resolved_plot_pass(resolved_plan)
+            )
+            for line in carriage.splitlines():
                 LOG.info("%s", line)
         elif len(physical_pens) > 1 and not args.allow_unplanned_multipen:
             raise PenPlanError(
@@ -216,7 +228,7 @@ def main() -> int:
             )
 
         if len(physical_pens) > 1 and resolved_plan is not None:
-            if not plan_has_documented_tools(resolved_plan):
+            if isinstance(resolved_plan, ResolvedPenPlan) and not plan_has_documented_tools(resolved_plan):
                 raise PenPlanError(
                     "Multi-pen send requires a tool or label for every used physical slot."
                 )

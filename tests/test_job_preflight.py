@@ -1,8 +1,10 @@
 import json
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
 
+import send_hpgl
 from job_preflight import JobPreflightError, format_job_preflight, run_job_preflight
 
 
@@ -87,6 +89,85 @@ def setup_job(tmp_path: Path, pens=(8, 6), documented=True):
     penplan = write_penplan(tmp_path / "drawing.penplan.json", pens=pens, documented=documented)
     placement = write_placement(tmp_path / "drawing.placement.json")
     return config, hpgl, penplan, placement
+
+
+def write_logical_pass(path: Path, pens=(8, 6)) -> Path:
+    payload = {
+        "schema_version": 2,
+        "kind": "resolved-dpx3300-logical-pass",
+        "pass_id": "warm",
+        "pass_number": 1,
+        "pass_count": 2,
+        "source_svg": "drawing.svg",
+        "source_svg_sha256": "a" * 64,
+        "source_manifest_hash": "b" * 64,
+        "assignments": [
+            {"layer_ids": [f"layer-{index}"], "physical_slot": pen}
+            for index, pen in enumerate(pens, start=1)
+        ],
+        "omitted_layers": [],
+        "repeated_layers": [],
+        "physical_slots": list(pens),
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_v2_multi_pen_preflight_shows_logical_carriage_and_requires_confirmation(tmp_path: Path):
+    config, hpgl, legacy, _ = setup_job(tmp_path)
+    legacy.unlink()
+    write_logical_pass(tmp_path / "drawing.resolved.penplan.json")
+    report, plan = run_job_preflight(hpgl, config_path=config)
+    assert report.pen_plan_status == "pass"
+    assert report.ready_to_send is False
+    assert plan["pass_id"] == "warm"
+    formatted = format_job_preflight(report, plan)
+    assert "layer-1" in formatted and "SP8" in formatted
+    with pytest.raises(JobPreflightError, match="requires --confirm-pen-plan"):
+        run_job_preflight(hpgl, config_path=config, require_operator_confirmation=True)
+    confirmed, _ = run_job_preflight(
+        hpgl, config_path=config, require_operator_confirmation=True, operator_confirmed=True
+    )
+    assert confirmed.ready_to_send is True
+
+
+def test_v2_multi_pen_preflight_rejects_wrong_pen_order(tmp_path: Path):
+    config, hpgl, legacy, _ = setup_job(tmp_path)
+    legacy.unlink()
+    write_logical_pass(tmp_path / "drawing.resolved.penplan.json", pens=(6, 8))
+    with pytest.raises(JobPreflightError, match="does not match resolved logical pass"):
+        run_job_preflight(hpgl, config_path=config)
+
+
+def test_sender_accepts_confirmed_v2_pass_without_opening_serial(tmp_path: Path, monkeypatch):
+    config, hpgl, legacy, _ = setup_job(tmp_path)
+    legacy.unlink()
+    write_logical_pass(tmp_path / "drawing.resolved.penplan.json")
+    sent = []
+    monkeypatch.setattr(send_hpgl, "parse_args", lambda: Namespace(
+        list_ports=False, port="COM_TEST", hpgl=hpgl, chunk_size=1024,
+        inter_chunk_delay=0.0, allow_unvalidated_job=False, vpype_config=config,
+        pen_plan=None, placement_report=None, confirm_pen_plan=True,
+        allow_unplanned_multipen=False, verbose=False,
+    ))
+    monkeypatch.setattr(send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path)))
+    assert send_hpgl.main() == 0
+    assert sent == [("COM_TEST", hpgl)]
+    assert (tmp_path / "drawing.preflight.json").is_file()
+
+
+def test_sender_keeps_legacy_v1_resolved_sidecar_compatibility(tmp_path: Path, monkeypatch):
+    config, hpgl, _, _ = setup_job(tmp_path)
+    sent = []
+    monkeypatch.setattr(send_hpgl, "parse_args", lambda: Namespace(
+        list_ports=False, port="COM_TEST", hpgl=hpgl, chunk_size=1024,
+        inter_chunk_delay=0.0, allow_unvalidated_job=False, vpype_config=config,
+        pen_plan=None, placement_report=None, confirm_pen_plan=True,
+        allow_unplanned_multipen=False, verbose=False,
+    ))
+    monkeypatch.setattr(send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path)))
+    assert send_hpgl.main() == 0
+    assert sent == [("COM_TEST", hpgl)]
 
 
 def test_valid_multi_pen_review_requires_operator_confirmation_for_ready_state(tmp_path: Path):

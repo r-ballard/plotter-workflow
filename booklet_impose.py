@@ -9,22 +9,34 @@ four columns and two rows. Logical pages are mapped to physical cells as::
 
 Input artwork remains vector-only. Generic SVGs are flattened to one logical
 layer. SVGs using plotter-workflow's strict ``pen-N`` contract preserve logical
-pen IDs and generation provenance through imposition.
+pen IDs and generation provenance through imposition. Neutral producer bundles
+retain their logical IDs, SVG geometry, and semantic provenance.
 """
 
 from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import io
 import json
 import re
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
+from logical_layer_contract import (
+    NEUTRAL_CONTRACT,
+    InputMode,
+    LogicalLayerContractError,
+    LogicalLayerManifest,
+    inspect_svg_contract,
+    load_logical_layer_manifest,
+    validate_surface_against_manifest,
+)
 from svg_pen_contract import PenLayerContractError, inspect_pen_layer_contract
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -320,24 +332,212 @@ def _validate_svg_source(path: Path) -> None:
 
 
 def determine_source_mode(entries: Sequence[PageEntry]) -> str:
-    contracts: list[bool] = []
+    mode, _ = _inspect_sources(entries)
+    return mode
+
+
+def _inspect_sources(
+    entries: Sequence[PageEntry],
+) -> tuple[str, LogicalLayerManifest | None]:
+    modes: set[InputMode] = set()
+    manifests: dict[Path, LogicalLayerManifest] = {}
+    authoritative_manifest: LogicalLayerManifest | None = None
     seen: set[Path] = set()
     for entry in entries:
         if entry.source in seen:
             continue
         seen.add(entry.source)
         _validate_svg_source(entry.source)
-        contract = inspect_pen_layer_contract(entry.source)
-        contracts.append(contract is not None)
+        try:
+            root = ET.parse(entry.source).getroot()
+            if root.get("data-viz-layer-contract") == NEUTRAL_CONTRACT:
+                if entry.source.parent.name != "surfaces":
+                    raise ImpositionError(
+                        f"{entry.source}: neutral sources require a design.json bundle "
+                        "with artwork in surfaces/."
+                    )
+                manifest_path = (entry.source.parent.parent / "design.json").resolve()
+                if manifest_path not in manifests:
+                    manifests[manifest_path] = load_logical_layer_manifest(manifest_path)
+                manifest = manifests[manifest_path]
+                contract = validate_surface_against_manifest(entry.source, manifest)
+                if (authoritative_manifest is not None
+                        and authoritative_manifest.raw["logical_layers"] != manifest.raw["logical_layers"]):
+                    raise ImpositionError(
+                        f"{entry.source}: incompatible logical-layer catalogs across bundles."
+                    )
+                if authoritative_manifest is not None and authoritative_manifest.path != manifest.path:
+                    raise ImpositionError(
+                        f"{entry.source}: neutral imposition requires one authoritative bundle manifest."
+                    )
+                authoritative_manifest = manifest
+            else:
+                contract = inspect_svg_contract(entry.source)
+        except LogicalLayerContractError as exc:
+            raise ImpositionError(str(exc)) from exc
+        modes.add(contract.mode)
 
-    if all(contracts):
-        return "pen-contract"
-    if not any(contracts):
-        return "generic"
-    raise ImpositionError(
-        "A booklet may not mix generic SVGs and strict pen-contract SVGs in v1. "
-        "Use all generic sources or all pen-N contract sources."
-    )
+    if len(modes) > 1:
+        raise ImpositionError(
+            "A booklet may not mix generic SVGs, strict pen-contract SVGs, "
+            "and neutral logical-layer SVGs. Use sources with one input contract."
+        )
+    if modes == {InputMode.NEUTRAL}:
+        return "neutral", authoritative_manifest
+    if modes == {InputMode.LEGACY}:
+        return "pen-contract", None
+    return "generic", None
+
+
+_LOCAL_URL = re.compile(r"url\(\s*['\"]?#([^)'\"\s]+)['\"]?\s*\)", re.IGNORECASE | re.ASCII)
+_URL_FUNCTION = re.compile(r"url\(", re.IGNORECASE | re.ASCII)
+
+
+def _namespace_neutral_fragment(root: ET.Element, prefix: str, source: Path) -> None:
+    """Keep local SVG references unambiguous when pages share producer IDs."""
+    ids: dict[str, str] = {}
+    for element in root.iter():
+        if _local_name(element.tag) == "style":
+            raise ImpositionError(f"{source}: neutral imposition requires inline SVG styles.")
+        element_id = element.get("id")
+        if element_id:
+            if element_id in ids:
+                raise ImpositionError(f"{source}: duplicate SVG element id {element_id!r}.")
+            ids[element_id] = f"{prefix}-source-{len(ids)}"
+
+    def reference(target: str) -> str:
+        if target not in ids:
+            raise ImpositionError(f"{source}: unresolved SVG reference #{target}.")
+        return ids[target]
+
+    for element in root.iter():
+        for key, value in list(element.attrib.items()):
+            if key == "data-viz-canvas-clip-id":
+                element.set(key, reference(value))
+            elif _local_name(key).lower().startswith("data-"):
+                # Semantic metadata is inert text, not an SVG/CSS reference.
+                continue
+            elif key == "id":
+                element.set(key, ids[value])
+            elif _local_name(key).lower() == "href":
+                if not value.startswith("#"):
+                    raise ImpositionError(f"{source}: external SVG references cannot be imposed.")
+                element.set(key, "#" + reference(value[1:]))
+            elif _URL_FUNCTION.search(value):
+                rewritten = _LOCAL_URL.sub(lambda m: f"url(#{reference(m.group(1))})", value)
+                if _URL_FUNCTION.search(_LOCAL_URL.sub("", value)):
+                    raise ImpositionError(f"{source}: unsupported external SVG URL reference.")
+                element.set(key, rewritten)
+
+
+def _validate_neutral_renderables(element: ET.Element, source: Path) -> None:
+    """Validate all copied XML, including non-rendering definition subtrees.
+
+    Producer bundles need static vector shapes, clip paths, and text metadata.
+    Other definition types must be explicitly supported before accepting them.
+    """
+    name = _local_name(element.tag)
+    if name not in DRAWABLE_SVG_TAGS | {"svg", "g", "defs", "metadata", "title", "desc", "clipPath"}:
+        raise ImpositionError(
+            f"{source}: unsupported neutral SVG element {name!r}; convert it to vector paths."
+        )
+    for key, value in element.attrib.items():
+        attribute = _local_name(key).lower()
+        if attribute.startswith("on"):
+            raise ImpositionError(f"{source}: SVG event-handler attribute {key!r} is unsupported.")
+        if attribute in {"src", "srcset", "base"}:
+            raise ImpositionError(f"{source}: resource-loading SVG attribute {key!r} is unsupported.")
+        if attribute == "href" and not value.startswith("#"):
+            raise ImpositionError(f"{source}: external SVG references cannot be imposed.")
+        if attribute.startswith("data-"):
+            # Browser renderers do not interpret data-* values as CSS or code.
+            continue
+        if any(token in value for token in ("\\", "/*", "@")):
+            raise ImpositionError(
+                f"{source}: escaped or indirect CSS resource syntax is unsupported."
+            )
+        if attribute.startswith("marker") or (
+            attribute == "style"
+            and re.search(r"(?:^|;)\s*marker(?:-start|-mid|-end)?\s*:", value, re.IGNORECASE | re.ASCII)
+        ):
+            raise ImpositionError(f"{source}: unsupported neutral marker attribute or style property.")
+        if _URL_FUNCTION.search(_LOCAL_URL.sub("", value)):
+            raise ImpositionError(f"{source}: unsupported external SVG URL reference.")
+    for child in element:
+        _validate_neutral_renderables(child, source)
+
+
+class _NeutralGeometry:
+    """Apply existing placement operations to both SVG and presence geometry.
+
+    The XML retains curves, source clips, and path metadata. The companion
+    vpype collection determines whether a page/layer survives rectangular
+    fitting and cropping; it is never used as the serialized artwork.
+    """
+
+    def __init__(self, svg: ET.Element, lines: Any, prefix: str):
+        self.svg = svg
+        self.lines = lines
+        self.prefix = prefix
+        self.crop_count = 0
+
+    def _wrap(self, attributes: dict[str, str]) -> None:
+        parent = ET.Element(f"{{{SVG_NS}}}g", attributes)
+        parent.append(self.svg)
+        self.svg = parent
+
+    def scale(self, sx: float, sy: float | None = None) -> None:
+        sy = sx if sy is None else sy
+        self.lines.scale(sx, sy)
+        self._wrap({"transform": f"scale({sx:.12g},{sy:.12g})"})
+
+    def translate(self, dx: float, dy: float) -> None:
+        self.lines.translate(dx, dy)
+        self._wrap({"transform": f"translate({dx:.12g},{dy:.12g})"})
+
+    def crop(self, x1: float, y1: float, x2: float, y2: float) -> None:
+        self.lines.crop(x1, y1, x2, y2)
+        clip_id = f"{self.prefix}-crop-{self.crop_count}"
+        self.crop_count += 1
+        self._wrap({"clip-path": f"url(#{clip_id})"})
+        defs = ET.SubElement(self.svg, f"{{{SVG_NS}}}defs")
+        clip = ET.SubElement(defs, f"{{{SVG_NS}}}clipPath", {"id": clip_id})
+        ET.SubElement(clip, f"{{{SVG_NS}}}rect", {
+            "x": f"{x1:.12g}", "y": f"{y1:.12g}",
+            "width": f"{x2 - x1:.12g}", "height": f"{y2 - y1:.12g}",
+        })
+
+
+def _neutral_fragments(path: Path, page: int, quantization: float):
+    source = ET.parse(path).getroot()
+    _validate_neutral_renderables(source, path)
+    for group in source:
+        layer_id = group.get("data-viz-layer-id")
+        if layer_id is None:
+            continue
+        ordinal = group.get("data-viz-layer-ordinal")
+        prefix = f"imposed-p{page}-l{ordinal}"
+        fragment = ET.Element(source.tag, dict(source.attrib))
+        fragment.attrib.pop("data-viz-layer-contract", None)
+        for child in source:
+            if child.get("data-viz-layer-id") is None:
+                fragment.append(copy.deepcopy(child))
+        layer = copy.deepcopy(group)
+        for key in ("data-viz-layer-id", "data-viz-layer-ordinal", "data-viz-layer-label"):
+            layer.attrib.pop(key, None)
+        fragment.append(layer)
+        _namespace_neutral_fragment(fragment, prefix, path)
+        text = ET.tostring(fragment, encoding="unicode")
+        lines, width, height = _require_vpype().read_svg(
+            io.StringIO(text), quantization=quantization, crop=True
+        )
+        fragment.set("width", str(width))
+        fragment.set("height", str(height))
+        geometry = _NeutralGeometry(fragment, lines, prefix)
+        # Explicit viewport crop remains valid when nested SVG overflow differs
+        # between renderers, including sources without a viewBox.
+        geometry.crop(0, 0, float(width), float(height))
+        yield layer_id, geometry, float(width), float(height)
 
 
 def _fit_collection(
@@ -551,7 +751,9 @@ def render_booklet(
     if output.exists() and not overwrite:
         raise FileExistsError(f"Output already exists: {output}. Use --overwrite to replace it.")
 
-    mode = determine_source_mode(entries)
+    mode, manifest = _inspect_sources(entries)
+    catalog = manifest.layers if manifest is not None else ()
+    manifest_hash = hashlib.sha256(manifest.path.read_bytes()).hexdigest() if manifest else None
     width_mm, height_mm = SHEET_SIZES_MM[sheet_name]
     width_px = _mm_to_px(width_mm)
     height_px = _mm_to_px(height_mm)
@@ -561,6 +763,15 @@ def render_booklet(
 
     root = _new_root(sheet_name, width_px, height_px)
     rendered_pages: list[RenderedPage] = []
+    logical_groups: dict[str, ET.Element] = {}
+    if mode == "neutral":
+        root.set("data-viz-layer-contract", NEUTRAL_CONTRACT)
+        for layer in catalog:
+            logical_groups[layer.id] = ET.Element(f"{{{SVG_NS}}}g", {
+                "data-viz-layer-id": layer.id,
+                "data-viz-layer-ordinal": str(layer.ordinal),
+                "data-viz-layer-label": layer.label,
+            })
 
     # Generic sources collapse to one logical plotter layer.
     generic_group: ET.Element | None = None
@@ -575,6 +786,16 @@ def render_booklet(
     pen_generations: dict[int, list[int]] = {}
     pen_metadata: dict[int, PenMetadata] = {}
     total_path_count = 0
+
+    def append_neutral(layer_id: str, geometry: _NeutralGeometry, entry: PageEntry, page: int):
+        nonlocal total_path_count
+        if _line_collection_empty(geometry.lines):
+            return
+        page_group = ET.SubElement(logical_groups[layer_id], f"{{{SVG_NS}}}g", {
+            "data-imposed-page": str(page), "data-source": entry.source.name,
+        })
+        page_group.append(geometry.svg)
+        total_path_count += len(geometry.lines)
 
     def append_contract_fragment(
         fragment: ContractFragment,
@@ -643,6 +864,16 @@ def render_booklet(
                     fit=entry.fit,
                 )
                 total_path_count += _append_paths(generic_group, lines)
+            elif mode == "neutral":
+                for layer_id, geometry, source_width, source_height in _neutral_fragments(
+                    entry.source, page, quantization
+                ):
+                    _render_single(
+                        geometry, source_width, source_height, page=page,
+                        cell_width=cell_width, cell_height=cell_height,
+                        margin=margin, fit=entry.fit,
+                    )
+                    append_neutral(layer_id, geometry, entry, page)
             else:
                 for fragment in _contract_fragments(entry.source):
                     lines, source_width, source_height = _read_contract_fragment(
@@ -703,6 +934,16 @@ def render_booklet(
                     fit=entry.fit,
                 )
                 total_path_count += _append_paths(generic_group, lines)
+            elif mode == "neutral":
+                for layer_id, geometry, source_width, source_height in _neutral_fragments(
+                    entry.source, page, quantization
+                ):
+                    _render_spread_half(
+                        geometry, source_width, source_height, page=page, half=half,
+                        cell_width=cell_width, cell_height=cell_height,
+                        margin=margin, gutter=gutter, fit=entry.fit,
+                    )
+                    append_neutral(layer_id, geometry, entry, page)
             else:
                 for fragment in _contract_fragments(entry.source):
                     lines, source_width, source_height = _read_contract_fragment(
@@ -752,6 +993,10 @@ def render_booklet(
                 continue
             pen_groups[pen].set("data-generations", ",".join(map(str, generations)))
             root.append(pen_groups[pen])
+    elif mode == "neutral":
+        for group in logical_groups.values():
+            if len(group):
+                root.append(group)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     tree = ET.ElementTree(root)
@@ -761,6 +1006,8 @@ def render_booklet(
     if mode == "pen-contract":
         # Assert that the artifact still satisfies the downstream contract.
         inspect_pen_layer_contract(output)
+    elif mode == "neutral":
+        inspect_svg_contract(output, catalog=catalog)
 
     audit_path = output.with_suffix(".imposition.json")
     audit_payload = {
@@ -783,6 +1030,14 @@ def render_booklet(
         },
         "pages": [asdict(page) for page in sorted(rendered_pages, key=lambda item: item.page)],
     }
+    if manifest is not None:
+        audit_payload.update({
+            "logical_layer_contract": NEUTRAL_CONTRACT,
+            "source_manifest_path": manifest.path.as_posix(),
+            "source_manifest_sha256": manifest_hash,
+            "logical_layers": manifest.raw["logical_layers"],
+            "logical_layer_ids": [layer_id for layer_id, group in logical_groups.items() if len(group)],
+        })
     audit_path.write_text(json.dumps(audit_payload, indent=2) + "\n", encoding="utf-8")
 
     guides_path: Path | None = None

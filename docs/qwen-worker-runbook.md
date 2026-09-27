@@ -1,0 +1,107 @@
+# Running the local Qwen worker for plotter tasks
+
+The canonical config, instructions, and watchdog live in the sibling
+`local-llm` repository's `local-coding-llm` worktree:
+
+- `config/opencode.qwen.json`
+- `docs/qwen-worker-guidance.md`
+- `docs/qwen-worker-watchdog.md`
+- `scripts/qwen_worker_watchdog.py`
+
+Start the Qwen server with context 16,384 and confirm `/health` is `ok`.
+Prepare an isolated, clean plotter worktree and a task spec outside that
+worktree. The spec names the OpenCode executable, the canonical model config,
+the task prompt, an exact file allowlist, independent checks, and an output
+directory outside the worktree. Follow `local-llm/docs/qwen-worker-watchdog.md`
+for the full spec and command.
+
+The watchdog waits on the worker process without model-side polling. It
+permits one corrective retry, stops immediately for an out-of-scope edit,
+enforces an elapsed deadline, and writes JSONL logs plus a benchmark summary.
+The frontier orchestrator reviews the completed diff and reruns checks before
+integrating it. The configuration and sandbox setup findings remain in
+`docs/qwen-pilot-configuration-debrief.md` in this repository.
+
+## Preparing the next bounded task
+
+The third trial spent two full attempts reading files without an edit. Give the
+worker a self-contained brief so its first useful action can be a write:
+
+1. Name one allowed output file and a concrete acceptance check. Include a
+   short destination skeleton or the exact function/section to change.
+2. Supply the required source facts or narrow excerpts in the prompt. Name
+   at most a few optional files and exact line ranges for verification. Do not
+   ask the worker to rediscover the repo, reread a long guide, or run a broad
+   baseline for a documentation-only task.
+3. Instruct it to make the first small edit after one short verification pass,
+   then run only the focused check. If a fact remains uncertain, it should
+   report the uncertainty rather than continue searching indefinitely.
+4. Keep the watchdog's asynchronous process wait and two attempts. Set a
+   task-sized elapsed deadline; do not extend the 30-minute default solely
+   because local token generation is slow. Review the trace for visible
+   progress before granting more time.
+
+Prompt shape for a single-file task:
+
+```text
+Starting commit: <sha>. Edit only <relative path>. Do not commit.
+Goal: <one reviewable change>.
+Use these verified facts: <short facts or excerpts>.
+Optional verification reads: <file:line-range>, <file:line-range>.
+Create the first draft before further repository exploration.
+Run: <one focused check>. Report changed files, result, and uncertainty.
+```
+
+Before a long trial, run a tiny direct OpenCode probe that creates a temporary
+file inside the *same worker worktree* and under the same OpenCode config.
+Inspect the file, then remove it before starting the watchdog, which requires
+a clean worktree and an in-scope diff to count an attempt as successful.
+The successful shell write probe from the orchestrator checks filesystem
+access, but does not prove OpenCode's own tool permissions. Do not reuse the
+failed documentation task as that probe.
+
+The local-llm watchdog now accepts an optional `first_edit_timeout_seconds`
+in addition to the attempt wall deadline. At that earlier deadline it checks
+the worktree once; if there is no tracked or untracked diff, it stops the
+worker tree and gives attempt two specific feedback. For a 600-second bounded
+documentation task, 480 seconds is a cautious starting point because useful
+edits in earlier trials took more than 400 seconds. This is a time guard, not
+a limit on read/search tool calls. The watchdog does the monitoring without
+model-side polling. See `local-llm/docs/qwen-worker-watchdog.md`.
+
+The local-llm watchdog also accepts `max_agent_steps` for a per-task OpenCode
+build-agent round limit and redirects OpenCode's XDG data, cache, config, and
+state paths under the run output directory. The fourth trial edited early but
+timed out after its diff check. Review its completed tool calls and diff before
+discarding a timed-out attempt. A redirected-path probe still hit the managed
+sandbox's nested `git` process restriction, so an approved launch is currently
+required. See the fourth-trial metrics in the debrief.
+
+The fifth trial repeated the same task with only `limit.output` raised from
+3,072 to 6,144. No response hit the new cap, yet both attempts timed out.
+Keep the canonical value for now. The watchdog now returns a timed-out,
+in-scope diff with passing checks as `REVIEW` and skips the automatic retry;
+the orchestrator must still inspect its content and decide whether to integrate
+it. A task without a diff or with failing checks retains the corrective loop.
+
+The sixth trial set `compaction.reserved` to 4,096 in a temporary config. It
+still compacted twice and timed out after producing a `REVIEW` diff. Mechanical
+checks passed but missed incorrect prose and filenames, so strengthen task
+checks where source contracts can be checked automatically. The reviewed
+fourth-trial section remains the version to use. Trials 7 and 8 completed
+cleanly at 24,576 and 65,536 context without compaction. The tested 65,536
+server/client context with 28 CPU FFN layers is now the local-llm default;
+keep the 3,072 output cap. The 65k run left about 1.6 GiB GPU memory free
+afterward. The earlier benchmark prompt contradicted itself about catalog IDs
+reused across passes, so correct that sentence before interpreting another
+draft's prose as a model-quality result. See the debrief for timings and the
+larger-context trial plan.
+
+Trial 9 completed at 131,072 context with 34 CPU FFN layers and no
+compaction, but left only about 651 MiB GPU memory free after the task. Keep
+65,536/28 as the default for bounded tasks and opt into 131,072/34 only when
+the task needs the larger context. Its draft got catalog accounting right
+after the prompt correction but omitted the pass ID from sidecar filenames.
+For this task family, state exact `<svg-stem>.<pass-id>.resolved.penplan.json`
+and `<svg-stem>.<pass-id>.placement.json` names in the brief and check the
+draft for them before integration.

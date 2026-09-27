@@ -331,3 +331,62 @@ backward compatibility, preflight and sending may read a legacy
 `<stem>.penplan.json` as a resolved sidecar only when its JSON `kind` is
 `resolved-dpx3300-pen-plan`. New conversions never write the legacy resolved
 filename.
+
+## Neutral logical-layer multipass plans (v2)
+
+A neutral SVG uses catalog IDs from `design.json`, not `pen-N` numeric layers.
+The converter requires an imposed SVG with preserve-layout metadata and an
+adjacent imposition audit.
+
+A user-authored v2 plan has required keys `schema_version` (2), `passes`
+(at least one), `omitted_layers`, and `repeated_layers`. Each pass has an `id`
+and 1..8 assignments. Each assignment has nonempty `layer_ids` and a
+`physical_slot` of 1..8, and may group multiple logical IDs into one physical
+slot. A pass may use each slot and each logical ID only once.
+
+Accounting rules:
+
+- Every catalog ID must be assigned in a pass or listed in `omitted_layers`.
+- A catalog ID used in more than one pass must be declared in
+  `repeated_layers`, and every listed ID must actually occur in at least two
+  passes.
+- Omitted IDs cannot also be assigned or repeated.
+
+```json
+{
+  "schema_version": 2,
+  "passes": [
+    {
+      "id": "warm",
+      "assignments": [
+        {"layer_ids": ["orbit", "accent"], "physical_slot": 1},
+        {"layer_ids": ["body-warm"], "physical_slot": 3}
+      ]
+    },
+    {
+      "id": "cool",
+      "assignments": [
+        {"layer_ids": ["body-cool"], "physical_slot": 2},
+        {"layer_ids": ["orbit"], "physical_slot": 4}
+      ]
+    }
+  ],
+  "omitted_layers": ["registration-guide"],
+  "repeated_layers": ["orbit"]
+}
+```
+
+The IDs in this example are placeholders taken from
+[`examples/penplans/logical-multipass.penplan.json`](examples/penplans/logical-multipass.penplan.json);
+adapt them to the catalog IDs in your own `design.json` — they do not fit any
+arbitrary bundle.
+
+On conversion, one HP-GL per pass is emitted in plan order, named
+`<svg-stem>.<pass-id>.hpgl`, with `<svg-stem>.<pass-id>.resolved.penplan.json`
+and `<svg-stem>.<pass-id>.placement.json` sidecars; the pass ID appears in all
+three names. Neutral conversion does not use `--send`; preflight
+and send each pass separately in plan order.
+
+The v2 JSON structure is in [`penplan.schema.json`](penplan.schema.json). The
+full Git Bash operator walkthrough is
+[`docs/how-to/neutral-logical-layer-plotting.md`](docs/how-to/neutral-logical-layer-plotting.md).

@@ -11,11 +11,11 @@ from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_place
 from pen_plan import (
     PenPlanError,
     ResolvedPenPlan,
-    format_pen_plan,
+    discover_resolved_pen_plan_path,
+    format_resolved_plot_pass,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
-    validate_resolved_pen_plan_for_hpgl,
-    discover_resolved_pen_plan_path,
+    validate_resolved_sidecar_for_hpgl,
 )
 
 
@@ -159,7 +159,7 @@ def run_job_preflight(
     placement_report_path: Path | None = None,
     require_operator_confirmation: bool = False,
     operator_confirmed: bool = False,
-) -> tuple[JobPreflightReport, ResolvedPenPlan | None]:
+) -> tuple[JobPreflightReport, ResolvedPenPlan | dict[str, Any] | None]:
     hpgl_path = Path(hpgl_path).expanduser().resolve()
     config_path = Path(config_path).expanduser().resolve()
     if not hpgl_path.is_file() or hpgl_path.stat().st_size == 0:
@@ -175,11 +175,11 @@ def run_job_preflight(
         placement_report_path = hpgl_path.with_suffix(".placement.json")
     else:
         placement_report_path = Path(placement_report_path).expanduser().resolve()
-    placement_raw, placement = _load_and_revalidate_placement(
+    _, placement = _load_and_revalidate_placement(
         hpgl_path, placement_report_path, config_path=config_path
     )
 
-    resolved_plan: ResolvedPenPlan | None = None
+    resolved_plan: ResolvedPenPlan | dict[str, Any] | None = None
     if pen_plan_path is None:
         candidate = discover_resolved_pen_plan_path(hpgl_path)
     else:
@@ -187,13 +187,17 @@ def run_job_preflight(
 
     if candidate.is_file():
         try:
-            resolved_plan = validate_resolved_pen_plan_for_hpgl(hpgl_path, candidate)
+            resolved_plan = validate_resolved_sidecar_for_hpgl(hpgl_path, candidate)
         except PenPlanError as exc:
             raise JobPreflightError(str(exc)) from exc
         pen_plan_status = "pass"
-        documented = plan_has_documented_tools(resolved_plan)
-        tool_status = "pass" if documented else "fail"
-        if len(physical_pens) > 1 and not documented:
+        documented = (
+            plan_has_documented_tools(resolved_plan)
+            if isinstance(resolved_plan, ResolvedPenPlan)
+            else False
+        )
+        tool_status = "pass" if documented else "logical-layer-map" if isinstance(resolved_plan, dict) else "fail"
+        if len(physical_pens) > 1 and isinstance(resolved_plan, ResolvedPenPlan) and not documented:
             raise JobPreflightError(
                 "Multi-pen job requires a tool or label for every used physical slot"
             )
@@ -245,7 +249,7 @@ def run_job_preflight(
 
 
 def format_job_preflight(
-    report: JobPreflightReport, plan: ResolvedPenPlan | None = None
+    report: JobPreflightReport, plan: ResolvedPenPlan | dict[str, Any] | None = None
 ) -> str:
     lines = [
         "DPX-3300 JOB PREFLIGHT",
@@ -266,7 +270,9 @@ def format_job_preflight(
         ),
         "HPGL pen order: " + " -> ".join([*(f"SP{pen}" for pen in report.physical_pen_order), "SP0"]),
     ]
-    if plan is not None:
+    if isinstance(plan, dict):
+        lines.append(format_resolved_plot_pass(plan))
+    elif plan is not None:
         lines.append("Carriage:")
         for assignment in plan.assignments:
             description = " / ".join(

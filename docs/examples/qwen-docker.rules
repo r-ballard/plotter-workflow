@@ -1,0 +1,16 @@
+# Copy to ~/.codex/rules/ only after reviewing the script at this path.
+# This example is inert while it remains under docs/examples/.
+prefix_rule(
+    pattern = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\Users\\hardcase\\Documents\\developer\\codex-repos\\local-llm\\.worktrees\\local-coding-llm\\scripts\\qwen38.ps1",
+        "-Action",
+        ["Start", "Status", "Stop"],
+    ],
+    decision = "allow",
+    justification = "Permit the trusted local Qwen service wrapper outside the sandbox.",
+)

@@ -8,10 +8,10 @@ layers. Stroke color remains preview/documentation metadata.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
+from pathlib import Path
 
 PEN_ID_RE = re.compile(r"^pen-(\d+)$")
 MAX_DPX_PENS = 8

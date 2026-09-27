@@ -470,3 +470,23 @@ repository environments now use the pinned uv/Python toolchain. The viz
 repository passed 483 tests and Ruff; plotter passed 405 tests and Ruff after
 running pytest with filesystem access for temporary fixtures. Physical
 plotter validation remains open.
+
+## Eleventh trial: end-to-end handoff note
+
+After the cross-repository neutral bundle converted and preflighted in two
+passes, the default 65k worker was given a one-file handoff note. The brief
+supplied all observed facts and a 600-second attempt deadline. Attempt 1
+timed out without an edit: its visible trace had two completed rounds, one
+tool, 9,649 input and 3,158 output tokens. The watchdog began attempt 2;
+that trace reached its first edit at about 90 seconds and had three completed
+rounds, three tools, 1,161 input and 786 output tokens when the orchestrator
+interrupted it. The second draft was in scope but 21 lines long, introduced a
+spacing error in existing prose, and had not produced a final watchdog result.
+The orchestrator wrote a shorter note from the independently verified
+artifacts instead. Interrupted-round usage and cloud usage were not measured.
+
+This trial reinforces the need for a no-edit guard: a fact-rich, one-file task
+can still spend a full deadline before making its first edit. Stopping a
+corrective attempt after a reviewable edit saved another possible full
+deadline, but it means this trial cannot be reported as a watchdog `PASS` or
+`REVIEW` outcome.

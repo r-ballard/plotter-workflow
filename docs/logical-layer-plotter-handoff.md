@@ -46,6 +46,16 @@ the 600-second deadline after editing; the watchdog returned `REVIEW`, and
 the orchestrator checked and integrated the in-scope diff. The documentation
 and benchmark are recorded in `docs/qwen-pilot-configuration-debrief.md`.
 
+A software-only cross-repository check used `viz_virtualserver`'s
+`examples/domain-jobs/orbital-per-body.json` to generate a neutral bundle with
+50 catalog IDs (one `orbits`, 36 `body-*`, 13 `accent-*`). A disposable
+eight-page manifest and two-pass v2 plan in ignored `tmp/neutral-orbital-e2e/`
+covered every ID, repeating `orbits` as declared. Imposition, converter
+`--dry-run`, and conversion produced `body` and `accent` HP-GL jobs with
+resolved and placement sidecars. Read-only preflight reported `Pen plan: PASS`
+and `Placement: PASS` for both, then `VALIDATED - OPERATOR CONFIRMATION REQUIRED`.
+No pen confirmation, serial access, or physical plotting occurred.
+
 ## Audit limits
 
 V2 preflight validates sidecar structure, HP-GL pen order, and current physical

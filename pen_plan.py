@@ -1037,6 +1037,31 @@ def validate_resolved_plot_pass_for_hpgl(
     return payload
 
 
+def validate_resolved_sidecar_for_hpgl(
+    hpgl_path: Path, sidecar_path: Path | None = None
+) -> ResolvedPenPlan | dict[str, Any]:
+    """Dispatch resolved v1 plans and v2 logical passes by their kind."""
+    if sidecar_path is None:
+        sidecar_path = discover_resolved_pen_plan_path(hpgl_path)
+    if not sidecar_path.is_file():
+        raise PenPlanError(f"Resolved pen-plan sidecar does not exist: {sidecar_path}")
+    if _json_kind(sidecar_path) == RESOLVED_PLOT_PASS_KIND:
+        return validate_resolved_plot_pass_for_hpgl(hpgl_path, sidecar_path)
+    return validate_resolved_pen_plan_for_hpgl(hpgl_path, sidecar_path)
+
+
+def format_resolved_plot_pass(payload: dict[str, Any]) -> str:
+    """Show the logical layer to carriage slot mapping for a v2 pass."""
+    lines = [
+        f"Logical pass: {payload['pass_id']} ({payload['pass_number']}/{payload['pass_count']})",
+        "Carriage (physical tools must be checked by the operator):",
+    ]
+    for assignment in payload["assignments"]:
+        layers = ", ".join(assignment["layer_ids"])
+        lines.append(f"  SP{assignment['physical_slot']}: logical {layers}")
+    return "\n".join(lines)
+
+
 def format_pen_plan(plan: ResolvedPenPlan) -> str:
     """Return a concise human-readable carriage loading/preflight table."""
     lines = [

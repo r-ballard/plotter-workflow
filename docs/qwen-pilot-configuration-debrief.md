@@ -518,3 +518,25 @@ compared it with the manifest used in the successful software-only run. The
 first-edit deadline was enabled but did not fire, so this live trial verifies
 normal completion with the guard configured, not the live early-stop path.
 The diff was reviewed and integrated. Cloud usage was not measured.
+
+## Thirteenth trial: pytest collection scope
+
+Bare `pytest --collect-only -q` in the main plotter checkout found 405 tests
+but then failed on access-denied ignored `tmp` directories. Explicit
+`pytest tests -q` avoided those directories. The project had `pythonpath`
+configured but no pytest collection root; `.gitignore` does not control
+pytest's default recursion. Qwen was given the one-line `pyproject.toml`
+change `testpaths = ["tests"]`, a 600-second wall deadline, and a 300-second
+first-edit deadline.
+
+| Outcome | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| PASS, attempt 1 | 128.01 s | ~26 s | 4 | 3 | 8,821 | 449 | 26,675 | 0 |
+
+The worker exited cleanly and independent checks confirmed the TOML value
+and 405 collected tests. After integration, the original main checkout also
+collected 405 tests without traversing `tmp`; bare pytest passed 405 tests
+with fixture-write access, and Ruff passed. The managed sandbox can still
+deny pytest's temporary fixture writes; collection scope does not grant that
+permission. The first-edit guard was enabled but did not fire. Cloud usage
+was not measured.

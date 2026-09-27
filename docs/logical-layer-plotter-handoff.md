@@ -39,9 +39,11 @@ After the operator cloned the sibling `viz_virtualserver` repository, the
 a separate run of `scripts/verify-environment.sh` passed. The viz repository
 passed 483 tests and Ruff. The plotter repository passed 405 tests and Ruff;
 its pytest run needed an approved shell because the managed sandbox denied
-temporary fixture writes. A broad `pytest -q` also tried to collect an
-inaccessible ignored `tmp/pytest-of-hardcase` directory, so the final suite
-was run explicitly as `pytest tests -q`.
+temporary fixture writes. Broad pytest collection also entered ignored `tmp`
+directories. The project now sets pytest `testpaths = ["tests"]`, so bare
+`pytest --collect-only -q` collects all 405 tests without entering `tmp`.
+Bare `pytest -q` passes all 405 when temporary fixtures have filesystem
+access; that sandbox write boundary remains separate from collection scope.
 
 Qwen's 65,536-context documentation task corrected the exact per-pass
 sidecar names in `PEN_PLAN.md` and the operator guide. Its attempt reached

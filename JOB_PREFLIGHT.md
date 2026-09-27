@@ -8,9 +8,17 @@ The final pre-send check combines three independently useful artifacts:
 <stem>.placement.json
 ```
 
-`job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL.
+`job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL. It accepts legacy v1 resolved plans and v2 resolved logical-pass sidecars by their `kind` field.
 
 This catches a common unsafe workflow: generating valid sidecars and then editing or replacing the HP-GL file afterward.
+
+For a v2 logical pass, the printed carriage table maps logical layer IDs to
+physical `SP` slots and shows the pass ID and pass number. The v2 sidecar does
+not contain pen tool or color labels; the operator must identify the actual
+tools and confirm their loading before a multi-pen send. The recorded source
+SVG and manifest hashes are audit references. Preflight cannot recompute them
+from the HP-GL job alone, so preserve the source bundle and imposition audit
+with the job records.
 
 ## Review a job
 
@@ -95,7 +103,9 @@ A validated multi-pen job requires:
 
 - current HP-GL is non-empty and contains physical `SP1`–`SP8` selections;
 - HP-GL physical pen order exactly matches the resolved pen plan;
-- every used physical slot has a `tool` or `label` documented;
+- for a v1 plan, every used physical slot has a `tool` or `label` documented;
+- for a v2 pass, every used slot is mapped to one or more logical layer IDs,
+  and the operator checks the actual pen/tool loaded in that slot;
 - placement sidecar has `status: pass` and names the same HP-GL file;
 - current HP-GL still fits the sidecar's device/page/margin configuration;
 - current drawing/addressed bounds match the stored placement bounds;

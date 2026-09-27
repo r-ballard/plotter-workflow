@@ -11,20 +11,25 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 
 import serial
 from serial.tools import list_ports
-from job_preflight import JobPreflightError, format_job_preflight, run_job_preflight, write_preflight_report
+
+from job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+    write_preflight_report,
+)
 from pen_plan import (
     PenPlanError,
+    discover_resolved_pen_plan_path,
     format_pen_plan,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_pen_plan_for_hpgl,
-    discover_resolved_pen_plan_path,
 )
 
 LOG = logging.getLogger("dpx3300.sender")

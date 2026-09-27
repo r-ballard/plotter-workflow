@@ -9,7 +9,6 @@ from pathlib import Path
 
 import dpx3300_convert as converter
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "vpype.toml"
 

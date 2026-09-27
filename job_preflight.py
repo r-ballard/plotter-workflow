@@ -11,11 +11,10 @@ from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_place
 from pen_plan import (
     PenPlanError,
     ResolvedPenPlan,
-    format_pen_plan,
+    discover_resolved_pen_plan_path,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_pen_plan_for_hpgl,
-    discover_resolved_pen_plan_path,
 )
 
 
@@ -175,7 +174,7 @@ def run_job_preflight(
         placement_report_path = hpgl_path.with_suffix(".placement.json")
     else:
         placement_report_path = Path(placement_report_path).expanduser().resolve()
-    placement_raw, placement = _load_and_revalidate_placement(
+    _, placement = _load_and_revalidate_placement(
         hpgl_path, placement_report_path, config_path=config_path
     )
 

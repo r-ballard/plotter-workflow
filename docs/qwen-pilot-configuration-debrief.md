@@ -229,4 +229,48 @@ The approved outside-sandbox launch succeeded. This is a launcher log-path
 permission issue, separate from worker worktree writes. Use the approved
 launch path until OpenCode's state and log directories are placed in a writable
 location and verified with an unapproved probe; a shell write probe alone does
-not check this boundary.
+not check this boundary. A later unapproved OpenCode probe with redirected
+`XDG_*` paths passed the log-path barrier but failed at
+`EPERM: operation not permitted, uv_spawn 'git'`. The managed sandbox still
+requires an approved launch for OpenCode's nested Git process.
+
+## Fourth trial: v2 pen-plan documentation
+
+The next brief supplied all schema and resolver facts up front and asked for
+one section in `PEN_PLAN.md`, with an early first edit and no broad search.
+Qwen edited the allowed file about 306 seconds into attempt 1 and ran
+`git diff --check` about 630 seconds in. The watchdog nevertheless timed out
+at the 720-second deadline. Attempt 2 made a further in-scope edit and ran the
+same check, then also timed out. Neither attempt returned a clean completed
+session, so the watchdog correctly reported failure and ran no independent
+checks. The orchestrator reviewed the diff, corrected one accounting sentence,
+and verified that the embedded JSON matches the checked-in v2 example.
+
+| Attempt | Elapsed | Completed rounds | Tools | Input | Output | Cached read | Diff |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 720.48 s | 4 | 3 | 19,874 | 5,851 | 16,917 | `PEN_PLAN.md` |
+| 2 | 720.47 s | 8 | 6 | 11,393 | 5,906 | 70,542 | `PEN_PLAN.md` |
+| Total | 1,440.95 s | 12 | 9 | 31,267 | 11,757 | 87,459 | one usable section |
+
+The first attempt proves that a smaller, fact-rich brief can prompt an edit.
+The timeout after edit and checks remains a separate termination problem.
+One completed model round ended with reason `length` at exactly the configured
+3,072 output-token limit. That is evidence to test the cap, not proof that it
+caused both hangs: the edit and check completed, and several other rounds
+ended normally. Local usage excludes interrupted final rounds; cloud usage
+was not measured.
+
+The [local-agent tuning study](https://doug.sh/posts/tuning-a-local-coding-agent-oh-my-pi/)
+reports that reply limits covering reasoning and file-write text can truncate
+tool calls in Oh My Pi, while oversized tool output and cache misses slow
+prefill. Its 32,768 reply limit and 262,144 context were measured on a
+different server and agent. Our OpenCode config currently advertises 16,384
+context and 3,072 output; test a moderate output increase only with a matching
+server context and inspect response finish reasons, completed edits, and time
+to first token before adopting it.
+
+The canonical `local-llm` watchdog now redirects OpenCode state and logs to
+the run output directory and accepts an optional `max_agent_steps` setting
+for OpenCode's build agent (`133801a`). Eight offline tests and Ruff pass.
+An agent-step limit bounds completed agent rounds, but a wall-clock deadline
+is still needed for a single slow reply. There is no no-edit-round guard yet.

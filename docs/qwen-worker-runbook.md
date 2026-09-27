@@ -67,3 +67,11 @@ watchdog revision should stop an attempt after a configurable number of
 successful read/search tool calls without an in-scope diff, then pass that
 specific feedback to attempt two. The watchdog, rather than the orchestrator
 model, should do this monitoring.
+
+The local-llm watchdog also accepts `max_agent_steps` for a per-task OpenCode
+build-agent round limit and redirects OpenCode's XDG data, cache, config, and
+state paths under the run output directory. The fourth trial edited early but
+timed out after its diff check. Review its completed tool calls and diff before
+discarding a timed-out attempt. A redirected-path probe still hit the managed
+sandbox's nested `git` process restriction, so an approved launch is currently
+required. See the fourth-trial metrics in the debrief.

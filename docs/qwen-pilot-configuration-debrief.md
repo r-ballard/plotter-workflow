@@ -273,7 +273,8 @@ The canonical `local-llm` watchdog now redirects OpenCode state and logs to
 the run output directory and accepts an optional `max_agent_steps` setting
 for OpenCode's build agent (`133801a`). Eight offline tests and Ruff pass.
 An agent-step limit bounds completed agent rounds, but a wall-clock deadline
-is still needed for a single slow reply. There is no no-edit-round guard yet.
+is still needed for a single slow reply. At that trial there was no no-edit
+guard; a later watchdog revision adds an optional first-edit deadline.
 
 ## Fifth trial: output-limit comparison
 
@@ -490,3 +491,12 @@ can still spend a full deadline before making its first edit. Stopping a
 corrective attempt after a reviewable edit saved another possible full
 deadline, but it means this trial cannot be reported as a watchdog `PASS` or
 `REVIEW` outcome.
+
+The `local-llm` watchdog now implements an optional
+`first_edit_timeout_seconds` setting (`f123115`). It waits until that
+deadline without model calls, checks for a tracked or untracked diff, and
+stops a no-edit attempt with specific feedback for the second attempt. It
+preserves the full wall deadline after an early edit. Twelve offline tests
+and Ruff passed. The change has not yet been exercised in a live Qwen task;
+480 seconds is the provisional first-edit limit for a 600-second documentation
+task, based on the observed successful first-edit times above.

@@ -60,13 +60,14 @@ The successful shell write probe from the orchestrator checks filesystem
 access, but does not prove OpenCode's own tool permissions. Do not reuse the
 failed documentation task as that probe.
 
-The current watchdog has an elapsed deadline, not a no-edit or tool-round
-deadline. Until that guard is implemented, use a shorter first-attempt timeout
-for small tasks and inspect its completed trace once after it exits. A future
-watchdog revision should stop an attempt after a configurable number of
-successful read/search tool calls without an in-scope diff, then pass that
-specific feedback to attempt two. The watchdog, rather than the orchestrator
-model, should do this monitoring.
+The local-llm watchdog now accepts an optional `first_edit_timeout_seconds`
+in addition to the attempt wall deadline. At that earlier deadline it checks
+the worktree once; if there is no tracked or untracked diff, it stops the
+worker tree and gives attempt two specific feedback. For a 600-second bounded
+documentation task, 480 seconds is a cautious starting point because useful
+edits in earlier trials took more than 400 seconds. This is a time guard, not
+a limit on read/search tool calls. The watchdog does the monitoring without
+model-side polling. See `local-llm/docs/qwen-worker-watchdog.md`.
 
 The local-llm watchdog also accepts `max_agent_steps` for a per-task OpenCode
 build-agent round limit and redirects OpenCode's XDG data, cache, config, and

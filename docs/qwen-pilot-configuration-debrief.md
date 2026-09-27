@@ -11,12 +11,12 @@ captured, so this trial does not establish a cost saving.
 
 | Setting or access | Pilot evidence | How to configure and verify |
 | --- | --- | --- |
-| Qwen context: 16,384 tokens | The 8,192-token server context was exhausted after the coding CLI supplied roughly 7,700 tokens of instructions. The edit completed after a restart at 16,384. | In `local-llm`, start `scripts/qwen38.ps1` with `-Action Start -Context 16384 -CpuFfn 20`; use `-Action Status` and verify the endpoint health before launching the worker. Set the coding CLI model context to the same value. Recheck actual GPU/CPU memory and throughput before increasing it again. |
+| Qwen context: 65,536-token tested default | The 8,192-token pilot exhausted context; later 16,384-token runs compacted or timed out. Trials at 24,576 and 65,536 completed without compaction. | In `local-llm`, `scripts/qwen38.ps1 -Action Start` now defaults to `-Context 65536 -CpuFfn 28`, and `config/opencode.qwen.json` advertises 65,536. Keep server and client limits aligned; verify `/health` and GPU headroom. See the trial data below before increasing it again. |
 | One worker slot | The deployment has one server slot. | Run one local coding session at a time. Queue bounded tasks; do not launch parallel local workers against this endpoint. |
 | Worker worktree and temp writes | The worker successfully edited an isolated worktree, but Python temp writes were denied by the managed sandbox until an approved escalation. | Follow [Worktree and temp writes](#worktree-and-temp-writes) below; set exact writable paths, direct `TEMP` and `TMP` to the dedicated temp directory, then run the write probe without escalation. |
 | Loopback model access | OpenCode reached the Qwen API at `127.0.0.1:8080/v1`. | Allow loopback traffic to that address and port for the worker CLI. Verify `/health`, then a read-only CLI tool call before assigning an edit. |
 | Docker control | The managed sandbox denied Docker named-pipe access. An approved escalation was needed to restart the server. | Follow [Docker control](#docker-control) below. A writable-root rule does not grant Windows named-pipe access. The simplest path is to start the service from a normal terminal and give the worker only the loopback API. |
-| Coding CLI tool policy | Nested Codex CLI reached the model but denied shell calls; OpenCode completed file and shell tool calls. | Keep OpenCode as the demonstrated worker CLI for now. Configure its OpenAI-compatible provider with base URL `http://127.0.0.1:8080/v1`, the pinned model ID, and context 16,384. Probe a read-only shell call before each new policy or CLI change. Treat Codex CLI as unproven until its nested command policy is diagnosed and an edit plus checks complete. |
+| Coding CLI tool policy | Nested Codex CLI reached the model but denied shell calls; OpenCode completed file and shell tool calls. | Keep OpenCode as the demonstrated worker CLI for now. Configure its OpenAI-compatible provider with base URL `http://127.0.0.1:8080/v1`, the pinned model ID, and context 65,536. Probe a read-only shell call before each new policy or CLI change. Treat Codex CLI as unproven until its nested command policy is diagnosed and an edit plus checks complete. |
 | Git and hardware access | The worker needed neither commits nor serial-port access. | Let the worker produce a diff and test results only. The orchestrator reviews, commits, and handles physical plotting after preflight and operator confirmation. Do not grant Docker, `.git` write, or serial access to the worker merely to remove prompts. |
 
 ## Worktree and temp writes
@@ -371,9 +371,73 @@ that `REVIEW` means only an in-scope, mechanically checked diff; for document
 tasks, add an independent check of parsed examples and exact artifact names
 when available, then still review the prose against the implementation.
 
-The next capacity test is a matched run with a larger **server and client**
-context, leaving the canonical 3,072 output cap and default compaction config
-unchanged. Start at 24,576 only after checking the local server's memory and
-throughput; compare compaction count, first-edit time, clean exit, and review
-quality. Keep the watchdog's reviewable-timeout path so a useful partial diff
-does not spend a second full attempt automatically.
+## Seventh and eighth trials: more context
+
+The same v2 documentation task from `68a9099` was replayed in fresh
+worktrees with matching server and client context. Output stayed at 3,072,
+the default compaction settings were used, and each attempt had a 720-second
+deadline. These trials changed both context and CPU FFN offload to fit GPU
+memory, so elapsed time does not isolate context size.
+
+| Trial | Context | CPU FFN | Result | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 7 | 24,576 | 20 | PASS, attempt 1 | 205.95 s | ~148 s | 4 | 3 | 12,489 | 1,806 | 36,923 | 0 |
+| 8 | 65,536 | 28 | PASS, attempt 1 | 354.81 s | ~267 s | 6 | 5 | 10,347 | 2,575 | 53,909 | 0 |
+
+Trial 7 had about 610 MiB GPU memory free after loading. Trial 8 had about
+1,918 MiB free after loading and 1,596 MiB after the task. Its server log
+reported roughly 8–9 generated tokens/second across completed rounds. Both
+workers edited and exited cleanly without compaction. The 65k run was slower
+end to end, but had more completed model output and tool activity, plus more
+weights offloaded to CPU. It is not a controlled tokens/second comparison.
+
+Both drafts were benchmark artifacts: the reviewed section from trial 4 was
+already integrated. The 65k draft repeated an incorrect statement that every
+catalog ID must be assigned exactly once. Inspection found that the benchmark
+prompt itself said “assigned once” and then allowed cross-pass reuse. That
+contradiction can contaminate quality comparisons. The next prompt must say
+that an assigned ID appears in one pass **unless** it is listed in
+`repeated_layers`, in which case it appears in at least two passes.
+
+The [16 GB Qwen guide](https://www.reddit.com/r/LocalLLM/comments/1vq5oyu/guide_for_running_dense_models_on_16_gb_vram_qwen/)
+uses a 140,000-token runtime context with different offload, operating-system,
+and GPU conditions. The [model card](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF)
+states a larger native context. Neither number proves that 140k fits this
+Windows setup. Configured context reserves KV memory, while the cost of
+generation also depends on how much of that context is actually filled.
+
+The tested 65,536 context / 28 CPU FFN pair is now the default in the
+`local-llm` server script and OpenCode config (`0a47996`). The 3,072 output
+limit stays unchanged. The next trial tested 131,072 context as a per-task
+override and recorded service health, GPU headroom, compaction, first edit,
+completion, and review quality.
+
+## Ninth trial: 131,072 context
+
+A fresh worktree at `68a9099` used matching 131,072 server/client context,
+34 CPU FFN layers, the same 3,072 output cap, default compaction settings,
+and a corrected version of the v2 task prompt. The corrected prompt states
+that an assigned catalog ID appears in one pass unless declared in
+`repeated_layers`. This is a new prompt variable, so the run is a capacity
+and workflow check, not a strict speed comparison with trials 7 and 8.
+
+| Result | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| PASS, attempt 1 | 514.72 s | ~401 s | 6 | 5 | 11,327 | 3,469 | 59,136 | 0 |
+
+The model loaded with about 1,413 MiB GPU memory free; after the task it
+had only 651 MiB free. Completed server rounds reported roughly 5–8 generated
+tokens/second. The worker exited cleanly and its accounting prose was correct.
+However, its generated output named generic `<svg-stem>.resolved.penplan.json`
+and `<svg-stem>.placement.json` sidecars. The implementation derives each
+sidecar from the **per-pass HP-GL path**, so the pass ID belongs in those
+filenames. The watchdog's broad text check did not catch this error, and the
+draft was not integrated. The task prompt also described the sidecars only as
+“adjacent”; future briefs should give exact per-pass names and include an
+independent check for them.
+
+The 131k setting is feasible for this run, but its smaller GPU margin and
+slower observed generation do not justify replacing the successful 65k
+default for short tasks. Use 131k as a per-task override when the prompt and
+expected trace need it; measure memory again after changing display load or
+model settings. The 65k service was restored after the benchmark.

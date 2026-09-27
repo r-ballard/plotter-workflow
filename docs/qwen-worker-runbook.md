@@ -87,5 +87,20 @@ The sixth trial set `compaction.reserved` to 4,096 in a temporary config. It
 still compacted twice and timed out after producing a `REVIEW` diff. Mechanical
 checks passed but missed incorrect prose and filenames, so strengthen task
 checks where source contracts can be checked automatically. The reviewed
-fourth-trial section remains the version to use. See the sixth-trial debrief
-before choosing a larger server context for the next capacity test.
+fourth-trial section remains the version to use. Trials 7 and 8 completed
+cleanly at 24,576 and 65,536 context without compaction. The tested 65,536
+server/client context with 28 CPU FFN layers is now the local-llm default;
+keep the 3,072 output cap. The 65k run left about 1.6 GiB GPU memory free
+afterward. The earlier benchmark prompt contradicted itself about catalog IDs
+reused across passes, so correct that sentence before interpreting another
+draft's prose as a model-quality result. See the debrief for timings and the
+larger-context trial plan.
+
+Trial 9 completed at 131,072 context with 34 CPU FFN layers and no
+compaction, but left only about 651 MiB GPU memory free after the task. Keep
+65,536/28 as the default for bounded tasks and opt into 131,072/34 only when
+the task needs the larger context. Its draft got catalog accounting right
+after the prompt correction but omitted the pass ID from sidecar filenames.
+For this task family, state exact `<svg-stem>.<pass-id>.resolved.penplan.json`
+and `<svg-stem>.<pass-id>.placement.json` names in the brief and check the
+draft for them before integration.

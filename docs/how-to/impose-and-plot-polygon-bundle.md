@@ -443,12 +443,62 @@ On Windows, use Docker only for non-hardware processing and run serial sending
 on the host. Docker Desktop does not expose Windows COM ports through the
 ordinary Compose workflow.
 
-The image includes conversion and preflight code. Imposition code remains in
-the checkout and is mounted read-only when a job needs it; see the tested
-PowerShell example in `README.md`. This guide's Git Bash `uv` commands remain
-the primary procedure until the Docker alternative is validated end to end in
-HAR-9. See `playbook.md` for the separately documented native-Linux serial
-device passthrough constraints.
+The Git Bash `uv` procedure above remains the primary route. For a Docker
+alternative through software preflight, open PowerShell at the
+`plotter-workflow` repository root. Build the local image, replace the bundle
+path with the completed 20-surface bundle containing `cootie.json`, and create
+a writable output directory:
+
+```powershell
+docker compose build converter
+$repo = (Resolve-Path .).Path
+$bundle = (Resolve-Path 'C:\path\to\completed-cootie-bundle').Path
+$out = Join-Path $repo 'output\cootie-production-docker'
+New-Item -ItemType Directory -Force -Path $out | Out-Null
+```
+
+The image contains conversion and preflight code. Mount the checkout read-only
+to supply `cootie_impose.py` and its `imposition/` package only for this job:
+
+```powershell
+docker run --rm --network none `
+  -v "${repo}:/workspace:ro" `
+  -v "${bundle}:/app/input:ro" `
+  -v "${out}:/app/output" `
+  dpx3300-plotter:local `
+  /workspace/cootie_impose.py /app/input --manifest cootie.json `
+  --sheet-size letter --square-position left --panel-margin-mm 3 --guides `
+  --output /app/output/cootie.imposed.svg
+```
+
+Inspect `cootie.imposed.svg`, `cootie.imposed.guides.svg`, and
+`cootie.imposed.imposition.json` in `$out` before conversion. These Docker
+examples use the shorter `cootie.imposed` stem; the native procedure above
+uses `cootie-artwork.imposed`.
+
+```powershell
+docker run --rm --network none -v "${out}:/app/output" `
+  dpx3300-plotter:local dpx3300_convert.py `
+  --input-dir /app/output --output-dir /app/output --file cootie.imposed.svg `
+  --page-size letter --landscape --paper-position lower-left `
+  --margin 3mm --absolute --overwrite
+```
+
+Check that conversion reports placement validated and writes
+`cootie.imposed.hpgl` and `cootie.imposed.placement.json` in `$out`. Inspect the
+HP-GL as data, then run software preflight:
+
+```powershell
+docker run --rm --network none -v "${out}:/app/output" `
+  dpx3300-plotter:local job_preflight.py `
+  /app/output/cootie.imposed.hpgl --write-report
+```
+
+Require `Placement: PASS` and `READY TO SEND`, and retain
+`cootie.imposed.preflight.json`. These are software checkpoints only. Follow
+the host serial-send procedure and supervised physical acceptance gates above
+separately; this Docker alternative does not send to a Windows COM port. See
+`playbook.md` for native-Linux serial device passthrough constraints.
 
 ## Supervised acceptance procedure
 

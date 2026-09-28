@@ -23,7 +23,7 @@ function Invoke-SmokeScript {
     param([string]$ScriptName)
 
     Write-Host "== $ScriptName =="
-    docker run --rm --network none $Image $ScriptName "--help"
+    docker run --rm --network none $Image $ScriptName "--help" | Out-Host
     $code = $LASTEXITCODE
     if ($code -eq 0) {
         Write-Host "PASS: $ScriptName (exit 0)"

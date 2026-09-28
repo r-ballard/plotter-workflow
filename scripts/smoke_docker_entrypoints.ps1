@@ -5,10 +5,10 @@
 
 .DESCRIPTION
     Inspects the image, then invokes its ENTRYPOINT (uv run --no-sync python)
-    with --help for the non-hardware scripts: dpx3300_convert.py,
-    cootie_impose.py, job_preflight.py. Runs each with --network none.
-    Never runs send_hpgl.py, mounts paths, passes a serial device, or
-    transmits HP-GL. Exits nonzero if any check fails.
+    with --help for the built-in non-hardware scripts: dpx3300_convert.py
+    and job_preflight.py. Imposition scripts are supplied at run time.
+    Runs each with --network none. Never runs send_hpgl.py, mounts paths,
+    passes a serial device, or transmits HP-GL. Exits nonzero if any check fails.
 #>
 [CmdletBinding()]
 param(
@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$scripts = @("dpx3300_convert.py", "cootie_impose.py", "job_preflight.py")
+$scripts = @("dpx3300_convert.py", "job_preflight.py")
 
 function Invoke-SmokeScript {
     param([string]$ScriptName)

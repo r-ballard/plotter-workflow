@@ -194,6 +194,38 @@ HP-GL is written through the `/app/output` bind mount into the host `output/`
 directory. These job files are intentionally ignored by Git, while `.gitkeep`
 files preserve the empty directory structure.
 
+The image includes conversion and preflight code. Imposition scripts and the
+`imposition/` package stay in the checkout and can be mounted read-only for a
+specific job. From the repository root in PowerShell, set `$bundle` to a bundle
+with `cootie.json` and its source SVGs:
+
+```powershell
+$repo = (Resolve-Path .).Path
+$bundle = (Resolve-Path 'C:\path\to\bundle').Path
+$out = (Resolve-Path output).Path
+docker run --rm --network none `
+  -v "${repo}:/workspace:ro" `
+  -v "${bundle}:/app/input:ro" `
+  -v "${out}:/app/output" `
+  dpx3300-plotter:local `
+  /workspace/cootie_impose.py /app/input --manifest cootie.json `
+  --sheet-size letter --square-position left --panel-margin-mm 3 --guides `
+  --output /app/output/cootie.imposed.svg
+```
+
+The same read-only checkout mount can supply `booklet_impose.py` for booklet
+jobs. Review the imposed SVG and audit before conversion; neither command
+opens a serial device. Convert an approved result using the built-in converter
+and the same output directory:
+
+```powershell
+docker run --rm --network none -v "${out}:/app/output" `
+  dpx3300-plotter:local dpx3300_convert.py `
+  --input-dir /app/output --output-dir /app/output --file cootie.imposed.svg `
+  --page-size letter --landscape --paper-position lower-left `
+  --margin 3mm --absolute --overwrite
+```
+
 ### Sending from a container
 
 On native Linux, pass the serial device into the container:

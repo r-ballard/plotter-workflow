@@ -16,8 +16,7 @@ COPY pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
 
-COPY dpx3300_convert.py send_hpgl.py job_preflight.py cootie_impose.py booklet_impose.py hpgl_placement.py logical_layer_contract.py pen_plan.py svg_pen_contract.py vpype.toml README.md playbook.md ./
-COPY imposition/ /app/imposition/
+COPY dpx3300_convert.py send_hpgl.py job_preflight.py hpgl_placement.py logical_layer_contract.py pen_plan.py svg_pen_contract.py vpype.toml README.md playbook.md ./
 RUN mkdir -p /app/input /app/output
 
 # The default container behavior is conversion. Override the command to run

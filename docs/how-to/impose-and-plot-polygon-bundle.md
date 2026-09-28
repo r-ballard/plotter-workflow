@@ -443,13 +443,12 @@ On Windows, use Docker only for non-hardware processing and run serial sending
 on the host. Docker Desktop does not expose Windows COM ports through the
 ordinary Compose workflow.
 
-The current container image is not a supported substitute for this guide. A
-clean image build succeeds, but runtime validation currently fails because the
-converter's local imported modules and `cootie_impose.py` are absent from the
-image. This is tracked as HAR-9. Until that issue is fixed and its commands are
-revalidated, use native `uv` for imposition, conversion, and preflight. See
-`playbook.md` only for the separately documented native-Linux serial device
-passthrough constraints.
+The image includes conversion and preflight code. Imposition code remains in
+the checkout and is mounted read-only when a job needs it; see the tested
+PowerShell example in `README.md`. This guide's Git Bash `uv` commands remain
+the primary procedure until the Docker alternative is validated end to end in
+HAR-9. See `playbook.md` for the separately documented native-Linux serial
+device passthrough constraints.
 
 ## Supervised acceptance procedure
 

@@ -27,8 +27,8 @@ job must still pass current pen-plan and placement validation.
 For [HAR-26](https://linear.app/hardcase/issue/HAR-26/physically-validate-neutral-logical-layer-multipass-plotting),
 the operator reported that the physical object looked consistent with the
 design, apart from one interruption: the plotting computer went to sleep
-mid-plot, after which the carriage began drawing outside the intended plot
-area. The active pass, exact timing relative to wake, and mechanism have not
+during `booklet.imposed.body.hpgl`, and the carriage began drawing outside the
+intended plot area. The exact timing relative to wake and mechanism have not
 yet been established. This is a qualified result, not evidence that all motion
 stayed within the validated area.
 
@@ -38,7 +38,7 @@ motion. Do not resume or resend an interrupted job without inspecting the
 media and rerunning preflight on the exact HP-GL. Investigation and durable
 recovery guidance are tracked in [HAR-32](https://linear.app/hardcase/issue/HAR-32/investigate-out-of-area-dpx-3300-motion-after-plotting-host-sleeps).
 
-The run date, active job/pass, COM port, physical pen identities, HP-GL hashes,
+The run date, COM port, physical pen identities, HP-GL hashes,
 preflight reports, and photos/scans remain to be attached to this record when
 available. The original 2026-08-08 commissioning result above is unchanged.
 

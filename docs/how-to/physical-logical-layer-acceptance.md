@@ -15,12 +15,18 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
 
 - Use sacrificial Letter paper and pens whose marks are easy to distinguish.
   Keep a hand near pause and be ready to power off if motion is unsafe.
-- Prevent the plotting computer from sleeping for the entire send and until
-  physical motion has stopped. Stay at the plotter. If the host sleeps or the
-  carriage moves outside the reviewed area, pause or power off as needed,
-  inspect the media, and treat the job as interrupted. Do not simply resume or
-  resend it; rerun preflight on the exact HP-GL before any new send. See
-  [HAR-32](https://linear.app/hardcase/issue/HAR-32/investigate-out-of-area-dpx-3300-motion-after-plotting-host-sleeps).
+- Keep the computer awake through transmission and until all physical plotting
+  has stopped, including both passes. Temporarily prevent system sleep and
+  hibernation for the run; do not rely on a fixed timeout for longer jobs.
+  Restore your normal power settings afterward. `Transmission complete` reports
+  host-side sending, not completion of plotter movement.
+  A 2026-09-30 run moved outside the sheet after computer sleep; the operator
+  reported a good repeat after extending sleep to 25 minutes. Sleep is a
+  suspected contributor, not a confirmed cause; see the
+  [incident record](../HARDWARE_VALIDATION.md#2026-09-30-neutral-two-pass-acceptance-incident-unresolved).
+  If sleep occurs or motion leaves the reviewed area, pause or power off as
+  needed and inspect the media. Treat the job as interrupted; do not resume it
+  or resend without fresh preflight on the exact HP-GL.
 - Use the documented USB-to-RS-232 adapter and null-modem cable to `SERIAL IN`.
   Do not connect the parallel adapter for this procedure.
 - With power **off**, set the full serial switch table in `playbook.md`:
@@ -39,12 +45,20 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
   export VIZ_REPO="$ROOT/viz_virtualserver"
   export UV="$ROOT/.tools/uv.exe"
   cd "$PLOTTER_REPO"
-  bash "$ROOT/generative-viz-workspace/scripts/verify-environment.sh"
+  (
+    cd "$ROOT/generative-viz-workspace" &&
+    bash scripts/verify-environment.sh
+  )
   "$UV" run --frozen python send_hpgl.py --list-ports
   export PORT=COM3 # replace with the detected port
   ```
 
   If the workspace path or COM port differs, change it before continuing.
+  Run verification from the tooling directory as shown: when run from an
+  application repository, the verifier can mistake its local `.venv` for the
+  shared Python and report `viz virtual environment uses the shared Python`.
+  The subshell keeps your working directory at `"$PLOTTER_REPO"` afterward.
+  Continue only after verification reports `SUCCESS`.
   The verifier checks software only; it does not authorize a send.
 
 ## 1. Small serial-motion check
@@ -137,15 +151,29 @@ plan declares `orbits` in `repeated_layers`. This is a test fixture, not a
 finished artwork layout. If the directory is missing, use the regeneration
 recipe below before touching the plotter.
 
+The regeneration recipe sets `JOB_DIR` to a timestamped run's `jobs` directory.
+Keep that value when returning here; the default below applies only when
+`JOB_DIR` is unset or empty. In a new shell, select the intended existing run
+explicitly with `export JOB_DIR="tmp/neutral-orbital-e2e-YYYYMMDD-HHMMSS/jobs"`,
+replacing the timestamp with your actual run. Do not select a run solely
+because it is the newest. These generated files are ignored by Git and may
+not exist in another checkout.
+
 ```bash
-export JOB_DIR=tmp/neutral-orbital-e2e/jobs
+export JOB_DIR="${JOB_DIR:-tmp/neutral-orbital-e2e/jobs}"
 export BODY="$JOB_DIR/booklet.imposed.body.hpgl"
 export ACCENT="$JOB_DIR/booklet.imposed.accent.hpgl"
-test -f "$JOB_DIR/booklet.imposed.imposition.json"
-test -f "$JOB_DIR/booklet.imposed.penplan.json"
-"$UV" run --frozen python job_preflight.py "$BODY"
+printf 'Selected job directory: %s\n' "$JOB_DIR"
+test -f "$JOB_DIR/booklet.imposed.imposition.json" &&
+test -f "$JOB_DIR/booklet.imposed.penplan.json" &&
+test -f "$BODY" &&
+test -f "$ACCENT" &&
+"$UV" run --frozen python job_preflight.py "$BODY" &&
 "$UV" run --frozen python job_preflight.py "$ACCENT"
 ```
+
+If no preflight output appears, a required file is missing. Check the selected
+`JOB_DIR`; use the regeneration recipe if no complete fixture exists.
 
 Both must show `Pen plan: PASS` and `Placement: PASS`. The body pass must
 show `SP1 -> SP2 -> SP0`, the accent pass `SP1 -> SP3 -> SP0`; each must
@@ -256,8 +284,10 @@ export BODY="$JOB_DIR/booklet.imposed.body.hpgl"
 export ACCENT="$JOB_DIR/booklet.imposed.accent.hpgl"
 ```
 
-Then return to the two unconfirmed `job_preflight.py` commands above. Do not
-use `--overwrite` on prior acceptance evidence.
+Then return to section 3's file checks and unconfirmed preflight commands in
+the same shell, preserving the timestamped `JOB_DIR` set by this recipe. Do
+not reset it to `tmp/neutral-orbital-e2e/jobs` or use `--overwrite` on prior
+acceptance evidence.
 
 ## Record and close the acceptance
 
@@ -271,3 +301,8 @@ preflight if any job or sidecar changes. Add the result to
 Linear acceptance issue. Open a narrow defect for any failure, with the
 specific job and observed step. Keep production plotting blocked until the
 physical result is reviewed.
+
+Also record the computer's sleep setting, any sleep/resume during the run,
+whether `Transmission complete` appeared before or after that event, and
+separate physical results for the body and accent passes. A successful repeat
+of one pass does not establish two-pass registration acceptance.

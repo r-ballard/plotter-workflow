@@ -15,6 +15,12 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
 
 - Use sacrificial Letter paper and pens whose marks are easy to distinguish.
   Keep a hand near pause and be ready to power off if motion is unsafe.
+- Prevent the plotting computer from sleeping for the entire send and until
+  physical motion has stopped. Stay at the plotter. If the host sleeps or the
+  carriage moves outside the reviewed area, pause or power off as needed,
+  inspect the media, and treat the job as interrupted. Do not simply resume or
+  resend it; rerun preflight on the exact HP-GL before any new send. See
+  [HAR-32](https://linear.app/hardcase/issue/HAR-32/investigate-out-of-area-dpx-3300-motion-after-plotting-host-sleeps).
 - Use the documented USB-to-RS-232 adapter and null-modem cable to `SERIAL IN`.
   Do not connect the parallel adapter for this procedure.
 - With power **off**, set the full serial switch table in `playbook.md`:

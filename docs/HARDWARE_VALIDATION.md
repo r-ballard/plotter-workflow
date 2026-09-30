@@ -34,9 +34,12 @@ was:
   --confirm-pen-plan "$BODY"
 ```
 
-Full two-pass physical acceptance remains **unconfirmed**. Do not resume the
-original paused job. Preserve the sheet,
-terminal output, job files, and sidecars rather than regenerating over them.
+Full two-pass physical acceptance remains **unconfirmed** in this record. The
+operator subsequently marked [HAR-26](https://linear.app/hardcase/issue/HAR-26/physically-validate-neutral-logical-layer-multipass-plotting)
+complete and described the physical object as consistent with the design, but
+separate body and accent pass outcomes have not been supplied. Do not resume
+the original paused job. Preserve the sheet, terminal output, job files, and
+sidecars rather than regenerating over them.
 
 The operator supplied the sender's final output:
 
@@ -86,6 +89,8 @@ orientation controls and SW-2 switch 5 being ON at power-up; that response is
 recorded as confirmation of both. Transport, command interpretation, and
 hardware causes remain unconfirmed despite the reported good repeat with
 sleep delayed.
+[HAR-32](https://linear.app/hardcase/issue/HAR-32/investigate-out-of-area-dpx-3300-motion-after-plotting-host-sleeps)
+tracks investigation if the out-of-area motion recurs or new evidence appears.
 
 ## Golden fixture policy
 

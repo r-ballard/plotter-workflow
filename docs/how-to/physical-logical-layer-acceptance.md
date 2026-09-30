@@ -24,6 +24,9 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
   reported a good repeat after extending sleep to 25 minutes. Sleep is a
   suspected contributor, not a confirmed cause; see the
   [incident record](../HARDWARE_VALIDATION.md#2026-09-30-neutral-two-pass-acceptance-incident-unresolved).
+  If sleep occurs or motion leaves the reviewed area, pause or power off as
+  needed and inspect the media. Treat the job as interrupted; do not resume it
+  or resend without fresh preflight on the exact HP-GL.
 - Use the documented USB-to-RS-232 adapter and null-modem cable to `SERIAL IN`.
   Do not connect the parallel adapter for this procedure.
 - With power **off**, set the full serial switch table in `playbook.md`:

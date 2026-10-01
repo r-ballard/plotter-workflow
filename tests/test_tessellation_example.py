@@ -42,6 +42,10 @@ def test_seeded_generator_is_reproducible_and_matches_pen_contract(tmp_path: Pat
     manifest = json.loads((first / "tessellation.json").read_text())
     assert manifest["seed"] == 17
     assert manifest["depth"] == 3
+    assert manifest["algorithm"] == "seeded-delaunay-triangulation"
+    assert manifest["point_count"] == 200
+    assert manifest["edge_count"] > 300
+    assert "M 100.000 100.000" not in svg.read_text()
     assert len(manifest["svg_sha256"]) == 64
 
 
@@ -52,3 +56,20 @@ def test_generator_preserves_existing_files_without_overwrite(tmp_path: Path):
     result = run_generator(tmp_path, seed=22)
     assert result.returncode != 0
     assert svg.read_bytes() == before
+
+
+def test_point_count_controls_density_without_a_fixed_center(tmp_path: Path):
+    sparse = tmp_path / "sparse"
+    dense = tmp_path / "dense"
+    assert run_generator(sparse, 17, 3, "--points", "80").returncode != 0
+    for output_dir, count in ((sparse, 80), (dense, 200)):
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--output-dir", str(output_dir),
+             "--seed", "17", "--points", str(count)],
+            capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stderr
+    sparse_manifest = json.loads((sparse / "tessellation.json").read_text())
+    dense_manifest = json.loads((dense / "tessellation.json").read_text())
+    assert sparse_manifest["point_count"] == 80
+    assert dense_manifest["edge_count"] > sparse_manifest["edge_count"]

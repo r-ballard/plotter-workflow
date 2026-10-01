@@ -1,10 +1,15 @@
 # From an algorithm to a reviewed plotter job
 
-This example makes a seeded triangle subdivision drawing, gives it a physical
+This example makes a seeded Delaunay triangulation drawing, gives it a physical
 pen assignment, converts it to DPX-3300 HP-GL, and previews the exact converted
 motion. Everything through preflight is software only. The drawing is an
 original line study; it does not reproduce an artist's work or another
-plotter project's code.
+plotter project's code. It follows the distributed-point geometry described in
+[Matt DesLauriers's triangulation article](https://mattdesl.svbtle.com/pen-plotter-1),
+not the centered fan used in this example's first draft. Matt describes
+[canvas-sketch](https://github.com/mattdesl/canvas-sketch) as the successor to
+his original `penplot` development environment. This example stays in Python
+to feed the existing SVG-to-HP-GL workflow directly.
 
 Run these commands from the `plotter-workflow` repository root in Windows Git
 Bash. First install the pinned environment with `uv sync --frozen`. If `uv` is
@@ -15,16 +20,18 @@ not on your PATH, substitute the full path to your `uv.exe`.
 ```bash
 mkdir -p output/first-plot
 uv run --frozen python examples/tessellation/generate.py \
-  --output-dir output/first-plot --seed 17 --depth 3
+  --output-dir output/first-plot --seed 17 --points 200
 ```
 
 The generator writes `tessellation.svg`, `tessellation.penplan.json`, and
-`tessellation.json` in that directory. The manifest records the seed, depth,
-edge count, and SVG hash. The same seed and depth produce identical bytes.
-Change `--seed` for another composition or `--depth` (0 through 5) for a
-different line count. The generator refuses to replace outputs unless you add
-`--overwrite` deliberately. At depth 3, the default produces 492 distinct
-edges before the converter optimizes paths.
+`tessellation.json` in that directory. The manifest records the seed, site
+count, edge count, and SVG hash. The same seed and point count produce identical
+bytes. Change `--seed` for another composition or `--points` (20 through 1000)
+for a different density. The former `--depth 3` call remains supported as a
+density shortcut equivalent to `--points 200`; it no longer causes recursive
+subdivision. The generator refuses to replace outputs unless you add
+`--overwrite` deliberately. Sites are scattered across the disk and the
+outline; there is no required center vertex.
 
 Open the SVG and inspect its density, margins, and line endings. The top-level
 `pen-1` group and adjacent v1 pen plan satisfy the

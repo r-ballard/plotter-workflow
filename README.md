@@ -15,6 +15,10 @@ uv sync
 
 ## Convert
 
+For a complete example from a seeded drawing algorithm through offline HP-GL
+preview, path metrics, and preflight, see
+[`docs/how-to/first-algorithm-to-plot.md`](docs/how-to/first-algorithm-to-plot.md).
+
 The repository includes `vpype.toml`, a DPX-3300-specific device profile with
 two physical paper-placement modes:
 
@@ -139,6 +143,8 @@ connection. Do not use `--allow-unvalidated-job` for normal plotter operation.
 ## Project files
 
 - `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
+- `examples/tessellation/generate.py` — seeded strict SVG and pen-plan example.
+- `scripts/preview_hpgl.py` — offline HP-GL motion preview and path metrics.
 - `booklet_impose.py` — physical imposition for one-sheet eight-page mini-books.
 - `BOOKLET_IMPOSITION.md` — booklet layout, spread, guide, and conversion contract.
 - `cootie_impose.py` — physical imposition for one-sheet cootie-catcher fortune tellers.

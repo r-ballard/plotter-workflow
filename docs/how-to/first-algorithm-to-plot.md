@@ -1,0 +1,102 @@
+# From an algorithm to a reviewed plotter job
+
+This example makes a seeded triangle subdivision drawing, gives it a physical
+pen assignment, converts it to DPX-3300 HP-GL, and previews the exact converted
+motion. Everything through preflight is software only. The drawing is an
+original line study; it does not reproduce an artist's work or another
+plotter project's code.
+
+Run these commands from the `plotter-workflow` repository root in Windows Git
+Bash. First install the pinned environment with `uv sync --frozen`. If `uv` is
+not on your PATH, substitute the full path to your `uv.exe`.
+
+## 1. Generate an SVG and pen plan
+
+```bash
+mkdir -p output/first-plot
+uv run --frozen python examples/tessellation/generate.py \
+  --output-dir output/first-plot --seed 17 --depth 3
+```
+
+The generator writes `tessellation.svg`, `tessellation.penplan.json`, and
+`tessellation.json` in that directory. The manifest records the seed, depth,
+edge count, and SVG hash. The same seed and depth produce identical bytes.
+Change `--seed` for another composition or `--depth` (0 through 5) for a
+different line count. The generator refuses to replace outputs unless you add
+`--overwrite` deliberately. At depth 3, the default produces 492 distinct
+edges before the converter optimizes paths.
+
+Open the SVG and inspect its density, margins, and line endings. The top-level
+`pen-1` group and adjacent v1 pen plan satisfy the
+[SVG pen contract](../../SVG_PEN_CONTRACT.md) and
+[pen-plan contract](../../PEN_PLAN.md). Change the pen-plan slot description to
+match the installed pen before physical use. For your own algorithm, emit a
+strict pen-layer SVG and an adjacent `<stem>.penplan.json`.
+
+## 2. Convert and review without sending
+
+Preview the converter command first:
+
+```bash
+uv run --frozen python dpx3300_convert.py \
+  --input-dir output/first-plot --output-dir output/first-plot \
+  --file tessellation.svg --page-size letter --landscape \
+  --paper-position lower-left --margin 4mm --absolute --dry-run
+```
+
+Then create the HP-GL and its resolved pen-plan and placement sidecars:
+
+```bash
+uv run --frozen python dpx3300_convert.py \
+  --input-dir output/first-plot --output-dir output/first-plot \
+  --file tessellation.svg --page-size letter --landscape \
+  --paper-position lower-left --margin 4mm --absolute
+```
+
+The lower-left Letter profile requires the corresponding ANSI-D switch and
+sheet placement described in the [playbook](../../playbook.md). A different
+sheet or placement needs its own reviewed converter settings. Repeated
+conversion requires `--overwrite`; run the preview and preflight again after
+any change.
+
+## 3. Preview actual pen motion and inspect path metrics
+
+```bash
+uv run --frozen python scripts/preview_hpgl.py \
+  --hpgl output/first-plot/tessellation.hpgl \
+  --preview output/first-plot/tessellation.preview.svg \
+  --metrics output/first-plot/tessellation.metrics.json
+```
+
+Open `tessellation.preview.svg` in a browser or SVG viewer. Colored solid lines
+are pen-down drawing by physical slot; gray dashed lines show pen-up travel.
+The paper outline comes from the converter's placement sidecar. Inspect
+`tessellation.metrics.json` for measured pen-down and pen-up distance, segment
+counts, stroke count, pen selection order, and the HP-GL hash. Distances use the
+placement sidecar's plotter-unit scale. These are geometric measurements, not
+time estimates. The preview understands the basic PA/PR/PU/PD and pen-selection
+commands produced by this conversion; it fails on unsupported commands rather
+than silently omitting motion. It reads the HP-GL without modifying it.
+
+The preview is a review aid, not a safety gate. Validate the current HP-GL and
+sidecars with the repository's preflight:
+
+```bash
+uv run --frozen python job_preflight.py output/first-plot/tessellation.hpgl
+```
+
+For this default single-pen example, expect pen plan PASS, placement PASS,
+`SP1 -> SP0`, and `READY TO SEND`. Inspect the resolved pen slot, physical
+bounds, and page profile. If any value differs from the media and carriage you
+intend to use, correct the source or conversion settings, then rerun the
+preview and preflight on the new HP-GL.
+
+## 4. Optional physical plot
+
+After visual review and fresh preflight, follow the [serial playbook](../../playbook.md)
+and [job preflight guide](../../JOB_PREFLIGHT.md) for hardware setup and the
+normal `send_hpgl.py` command. Keep the plotting computer awake throughout
+transmission and all machine motion. A prior interrupted plot was associated
+with host sleep; the [hardware acceptance guide](physical-logical-layer-acceptance.md)
+records the incident and operator response. The commands above do not open a
+serial port or move the plotter.

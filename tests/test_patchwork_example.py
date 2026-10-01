@@ -63,3 +63,13 @@ def test_recursion_adds_local_polygons_and_path_limit_prevents_outputs(tmp_path:
     before = (deep / "patchwork.svg").read_bytes()
     assert generate(deep, *options, "--depth", "1").returncode != 0
     assert (deep / "patchwork.svg").read_bytes() == before
+
+
+def test_default_creates_a_dense_recursive_study(tmp_path: Path):
+    result = generate(tmp_path / "default")
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads((tmp_path / "default" / "patchwork.json").read_text())
+    assert manifest["point_count"] == 2000
+    assert manifest["depth"] == 2
+    assert 1000 <= manifest["polygon_count"] <= manifest["max_polygons"]
+    assert manifest["pen_down_mm"] <= manifest["max_path_mm"]

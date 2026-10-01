@@ -98,7 +98,7 @@ def patchwork(seed: int, count: int, clusters: int, depth: int) -> list[Polygon]
             region_points = [point for index, point in enumerate(region_points)
                              if index not in selected]
             if remaining:
-                children = sample_inside(hull, min(48, max(12, len(chosen))), rng)
+                children = sample_inside(hull, min(250, max(100, len(chosen))), rng)
                 fracture(children, remaining - 1)
 
     fracture(points, depth)
@@ -131,23 +131,23 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=17)
-    parser.add_argument("--points", type=int, default=600)
+    parser.add_argument("--points", type=int, default=2000)
     parser.add_argument("--clusters", type=int, default=3)
     parser.add_argument("--depth", type=int, default=2)
     parser.add_argument("--max-path-mm", type=float, default=20000)
-    parser.add_argument("--max-polygons", type=int, default=500)
+    parser.add_argument("--max-polygons", type=int, default=2500)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
-    if not 50 <= args.points <= 600:
-        parser.error("--points must be between 50 and 600")
+    if not 50 <= args.points <= 5000:
+        parser.error("--points must be between 50 and 5000")
     if not 2 <= args.clusters <= 8:
         parser.error("--clusters must be between 2 and 8")
     if not 0 <= args.depth <= 2:
         parser.error("--depth must be between 0 and 2")
     if not math.isfinite(args.max_path_mm) or args.max_path_mm <= 0:
         parser.error("--max-path-mm must be positive and finite")
-    if not 1 <= args.max_polygons <= 2000:
-        parser.error("--max-polygons must be between 1 and 2000")
+    if not 1 <= args.max_polygons <= 5000:
+        parser.error("--max-polygons must be between 1 and 5000")
 
     names = ("patchwork.svg", "patchwork.penplan.json", "patchwork.json")
     destinations = [args.output_dir / name for name in names]

@@ -49,8 +49,13 @@ def test_seeded_voronoi_is_reproducible_and_plotter_compatible(tmp_path: Path):
     assert manifest["cell_count"] == 81
     assert manifest["edge_count"] > 50
     assert manifest["area_error_mm2"] < 1e-5
-    assert manifest["source_pen_down_mm"] <= manifest["max_path_mm"]
-    assert len(root.findall(f".//{SVG_NS}path")) == manifest["edge_count"] + 1
+    assert manifest["source_pen_down_upper_bound_mm"] <= manifest["max_path_mm"]
+    assert manifest["inset_mm"] > 0
+    assert manifest["corner_radius_mm"] > 0
+    assert 0 < manifest["drawn_cell_count"] <= manifest["cell_count"]
+    paths = root.findall(f".//{SVG_NS}path")
+    assert len(paths) == manifest["drawn_cell_count"]
+    assert all(" Q " in path.get("d", "") for path in paths)
 
 
 def test_limits_reject_output_without_overwriting(tmp_path: Path):
@@ -62,3 +67,13 @@ def test_limits_reject_output_without_overwriting(tmp_path: Path):
     before = (output / "voronoi.svg").read_bytes()
     assert generate(output, "--depth", "4").returncode != 0
     assert (output / "voronoi.svg").read_bytes() == before
+
+
+def test_zero_inset_and_radius_produce_tight_straight_cells(tmp_path: Path):
+    output = tmp_path / "tight"
+    result = generate(output, "--depth", "3", "--inset-mm", "0", "--corner-radius-mm", "0")
+    assert result.returncode == 0, result.stderr
+    root = ET.parse(output / "voronoi.svg").getroot()
+    assert all(" Q " not in path.get("d", "") for path in root.findall(f".//{SVG_NS}path"))
+    manifest = json.loads((output / "voronoi.json").read_text())
+    assert manifest["drawn_cell_count"] == manifest["cell_count"]

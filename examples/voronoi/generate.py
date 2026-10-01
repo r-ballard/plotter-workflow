@@ -113,10 +113,43 @@ def diagram(seed: int, branch: int, depth: int) -> tuple[list[Edge], list[Polygo
     return sorted(edges), leaves
 
 
-def svg_text(edges: list[Edge]) -> str:
-    paths = ['      <path d="M 10.000 10.000 L 190.000 10.000 L 190.000 190.000 L 10.000 190.000 Z"/>']
-    paths.extend(f'      <path d="M {a[0]:.3f} {a[1]:.3f} L {b[0]:.3f} {b[1]:.3f}"/>'
-                 for a, b in edges)
+def inset_polygon(polygon: Polygon, distance: float) -> Polygon:
+    if distance == 0:
+        return polygon
+    inset = polygon[:]
+    for start, end in zip(polygon, polygon[1:] + polygon[:1]):
+        dx, dy = end[0] - start[0], end[1] - start[1]
+        threshold = dy * start[0] - dx * start[1] - distance * math.hypot(dx, dy)
+        inset = clip_halfplane(inset, dy, -dx, threshold)
+        if len(inset) < 3:
+            return []
+    return inset
+
+
+def rounded_path(polygon: Polygon, radius: float) -> str:
+    def point_text(point: Point) -> str:
+        return f"{point[0]:.3f} {point[1]:.3f}"
+
+    if radius == 0:
+        return "M " + " L ".join(point_text(point) for point in polygon) + " Z"
+    bends = []
+    for index, vertex in enumerate(polygon):
+        before, after = polygon[index - 1], polygon[(index + 1) % len(polygon)]
+        before_length, after_length = math.dist(before, vertex), math.dist(after, vertex)
+        trim = min(radius, before_length / 3, after_length / 3)
+        incoming = (vertex[0] + trim * (before[0] - vertex[0]) / before_length,
+                    vertex[1] + trim * (before[1] - vertex[1]) / before_length)
+        outgoing = (vertex[0] + trim * (after[0] - vertex[0]) / after_length,
+                    vertex[1] + trim * (after[1] - vertex[1]) / after_length)
+        bends.append((incoming, vertex, outgoing))
+    commands = ["M " + point_text(bends[0][2])]
+    for incoming, vertex, outgoing in bends[1:] + bends[:1]:
+        commands.append(f"L {point_text(incoming)} Q {point_text(vertex)} {point_text(outgoing)}")
+    return " ".join(commands) + " Z"
+
+
+def svg_text(polygons: list[Polygon], radius: float) -> str:
+    paths = [f'      <path d="{rounded_path(polygon, radius)}"/>' for polygon in polygons]
     return "\n".join([
         '<svg xmlns="http://www.w3.org/2000/svg" width="200mm" height="200mm" viewBox="0 0 200 200">',
         '  <g id="pen-1" data-pen="1" data-generations="0" fill="none" stroke="#202020" stroke-width="0.25">',
@@ -135,6 +168,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--branch", type=int, default=3)
     parser.add_argument("--depth", type=int, default=5)
+    parser.add_argument("--inset-mm", type=float, default=0.7)
+    parser.add_argument("--corner-radius-mm", type=float, default=1.3)
     parser.add_argument("--max-path-mm", type=float, default=20000)
     parser.add_argument("--max-cells", type=int, default=2000)
     parser.add_argument("--overwrite", action="store_true")
@@ -147,6 +182,10 @@ def main() -> int:
         parser.error("requested recursion exceeds --max-cells (1-5000)")
     if not math.isfinite(args.max_path_mm) or args.max_path_mm <= 0:
         parser.error("--max-path-mm must be positive and finite")
+    if not math.isfinite(args.inset_mm) or not 0 <= args.inset_mm <= 5:
+        parser.error("--inset-mm must be between 0 and 5")
+    if not math.isfinite(args.corner_radius_mm) or not 0 <= args.corner_radius_mm <= 10:
+        parser.error("--corner-radius-mm must be between 0 and 10")
 
     names = ("voronoi.svg", "voronoi.penplan.json", "voronoi.json")
     destinations = [args.output_dir / name for name in names]
@@ -158,10 +197,17 @@ def main() -> int:
     area_error = abs(sum(area(cell) for cell in leaves) - area(ROOT))
     if area_error > 1e-5:
         parser.error(f"Voronoi cells do not cover the drawing area: {area_error:.6f} mm2 error")
-    length = 720.0 + sum(math.dist(a, b) for a, b in edges)
-    if length > args.max_path_mm:
-        parser.error(f"source pen-down path {length:.1f} mm exceeds --max-path-mm")
-    svg = svg_text(edges)
+    drawing = [inset_polygon(cell, args.inset_mm) for cell in leaves]
+    drawing = [cell for cell in drawing if len(cell) >= 3 and area(cell) > 1e-6]
+    if not drawing:
+        parser.error("inset removed every cell; reduce --inset-mm")
+    length_upper_bound = sum(
+        sum(math.dist(a, b) for a, b in zip(cell, cell[1:] + cell[:1]))
+        for cell in drawing
+    )
+    if length_upper_bound > args.max_path_mm:
+        parser.error(f"source pen-down upper bound {length_upper_bound:.1f} mm exceeds --max-path-mm")
+    svg = svg_text(drawing, args.corner_radius_mm)
     plan = {
         "schema_version": 1,
         "policy": "preserve",
@@ -174,10 +220,14 @@ def main() -> int:
         "branch": args.branch,
         "depth": args.depth,
         "cell_count": len(leaves),
+        "drawn_cell_count": len(drawing),
+        "omitted_cell_count": len(leaves) - len(drawing),
         "edge_count": len(edges),
+        "inset_mm": args.inset_mm,
+        "corner_radius_mm": args.corner_radius_mm,
         "drawing_area_mm2": area(ROOT),
         "area_error_mm2": round(area_error, 9),
-        "source_pen_down_mm": round(length, 3),
+        "source_pen_down_upper_bound_mm": round(length_upper_bound, 3),
         "max_path_mm": args.max_path_mm,
         "svg_sha256": hashlib.sha256(svg.encode("utf-8")).hexdigest(),
     }
@@ -185,7 +235,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for path, content in zip(destinations, contents):
         path.write_text(content, encoding="utf-8", newline="\n")
-    print(f"Generated {len(leaves)} cells, {len(edges)} internal edges in {args.output_dir}")
+    print(f"Generated {len(drawing)} inset cells from {len(leaves)} Voronoi regions in {args.output_dir}")
     return 0
 
 

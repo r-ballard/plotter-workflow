@@ -66,7 +66,7 @@ orientation.
 ## 2. Impose the diagnostic job
 
 ```bash
-uv run python cootie_impose.py \
+uv run python scripts/cootie_impose.py \
   output/cootie_orientation_validation \
   --manifest cootie.json \
   --sheet-size letter \

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import dpx3300_convert as converter
+import scripts.dpx3300_convert as converter
 
 
 class PreservedPhysicalLayoutTests(unittest.TestCase):

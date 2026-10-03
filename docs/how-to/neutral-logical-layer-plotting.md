@@ -23,7 +23,7 @@ test -f "$BUNDLE_DIR/design.json"
 ```
 
 A neutral bundle generated in `viz_virtualserver` with
-`scripts/generate_domain_bundle.py` from
+`viz-domain-bundle` from
 `examples/domain-jobs/orbital-per-body.json` does not include `booklet.json`.
 If it is missing, save this software-only eight-page manifest example as
 `$BUNDLE_DIR/booklet.json` before continuing. The example is a software
@@ -58,7 +58,7 @@ layer catalog are validated again during imposition; stop on any mismatch.
 
 ```bash
 mkdir -p output/neutral-booklet
-uv run python booklet_impose.py "$BUNDLE_DIR" \
+uv run python scripts/booklet_impose.py "$BUNDLE_DIR" \
   --manifest booklet.json \
   --sheet-size letter \
   --guides \
@@ -99,7 +99,7 @@ For Letter landscape paper at the lower-left ANSI-D position, preview the
 commands and planned artifacts first:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir output/neutral-booklet \
   --output-dir output/neutral-booklet \
   --file booklet.imposed.svg \
@@ -115,7 +115,7 @@ profile, and intended physical slots. Stop if any differs from the plan.
 Run the same command without `--dry-run` to create the jobs:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir output/neutral-booklet \
   --output-dir output/neutral-booklet \
   --file booklet.imposed.svg \
@@ -131,7 +131,7 @@ three names. For pass ID `warm` on `booklet.imposed.svg`, expect
 and `booklet.imposed.warm.placement.json`. Inspect the generated
 filenames and resolved carriage table. Do not execute an `.hpgl` file as a
 shell command. The converter does not send neutral jobs directly; send each
-validated pass in plan order with `send_hpgl.py`.
+validated pass in plan order with `scripts/send_hpgl.py`.
 
 ## 4. Preflight each pass
 
@@ -140,7 +140,7 @@ Set `PASS_ID` to the first ID in the plan; repeat this section for each pass:
 ```bash
 export PASS_ID=warm
 export JOB="output/neutral-booklet/booklet.imposed.${PASS_ID}.hpgl"
-uv run python job_preflight.py "$JOB"
+uv run python scripts/job_preflight.py "$JOB"
 ```
 
 Read the reported logical layers, physical carriage slots, actual HP-GL pen
@@ -151,7 +151,7 @@ than one physical pen requires operator confirmation. After checking the
 loaded slots against the displayed mapping, record the review:
 
 ```bash
-uv run python job_preflight.py "$JOB" --confirm-pen-plan --write-report
+uv run python scripts/job_preflight.py "$JOB" --confirm-pen-plan --write-report
 ```
 
 For a single-pen pass, `--confirm-pen-plan` may be omitted. Proceed only when
@@ -168,7 +168,7 @@ listed by the resolved carriage plan. Load a sacrificial Letter sheet at the
 lower-left ANSI-D position and engage PAPER HOLD. Check the detected port:
 
 ```bash
-uv run python send_hpgl.py --list-ports
+uv run python scripts/send_hpgl.py --list-ports
 ```
 
 Replace `COM3` and `PASS_ID` with the actual port and the first pass ID:
@@ -176,7 +176,7 @@ Replace `COM3` and `PASS_ID` with the actual port and the first pass ID:
 ```bash
 export PASS_ID=warm
 export JOB="output/neutral-booklet/booklet.imposed.${PASS_ID}.hpgl"
-uv run python send_hpgl.py --port COM3 --confirm-pen-plan "$JOB"
+uv run python scripts/send_hpgl.py --port COM3 --confirm-pen-plan "$JOB"
 ```
 
 The sender runs a fresh preflight before opening the port. It requires

@@ -25,7 +25,7 @@ uv run python -m pytest -v
 Generate a Letter validation sheet and separate construction guide with:
 
 ```bash
-uv run python cootie_impose.py \
+uv run python scripts/cootie_impose.py \
   tests/fixtures/imposition/cootie_catcher \
   --manifest cootie.json \
   --sheet-size letter \

@@ -28,6 +28,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from logical_layer_contract import (
     NEUTRAL_CONTRACT,
     InputMode,
@@ -136,7 +140,7 @@ def _require_vpype():
     except ImportError as exc:  # pragma: no cover - project dependency
         raise ImpositionError(
             "vpype is required. Run this script through the project environment: "
-            "uv run python booklet_impose.py ..."
+            "uv run python scripts/booklet_impose.py ..."
         ) from exc
     return vpype
 
@@ -151,7 +155,7 @@ def resolve_input_dir(value: str) -> Path:
     if candidate.is_dir():
         return candidate.resolve()
 
-    repo_candidate = Path(__file__).resolve().parent / "input" / candidate
+    repo_candidate = REPO_ROOT / "input" / candidate
     if repo_candidate.is_dir():
         return repo_candidate.resolve()
 
@@ -1193,7 +1197,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         output = args.output
         if output is None:
-            output = Path(__file__).resolve().parent / "output" / f"{input_dir.name}.imposed.svg"
+            output = REPO_ROOT / "output" / f"{input_dir.name}.imposed.svg"
         else:
             output = output.expanduser()
             if not output.is_absolute():

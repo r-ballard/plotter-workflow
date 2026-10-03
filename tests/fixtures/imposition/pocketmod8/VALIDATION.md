@@ -17,7 +17,7 @@ uv run python -m pytest -v
 Generate the validation sheet with:
 
 ```bash
-uv run python booklet_impose.py \
+uv run python scripts/booklet_impose.py \
   tests/fixtures/imposition/pocketmod8/validation_pages \
   --sheet-size letter \
   --page-margin-mm 6 \
@@ -30,7 +30,7 @@ Convert the imposed artwork with the normal DPX-3300 workflow, then run unified
 preflight on the resulting HP-GL:
 
 ```bash
-uv run python job_preflight.py output/pocketmod8_validation.imposed.hpgl
+uv run python scripts/job_preflight.py output/pocketmod8_validation.imposed.hpgl
 ```
 
 Plot the guide SVG separately if desired and preflight that job independently.

@@ -1,6 +1,6 @@
 # Cootie-catcher fortune-teller imposition
 
-`cootie_impose.py` prepares plotter-ready SVG artwork for a one-sheet origami
+`scripts/cootie_impose.py` prepares plotter-ready SVG artwork for a one-sheet origami
 fortune teller / cootie catcher. Imposition belongs in `plotter-workflow`
 because it maps logical artwork onto physical media; it does not generate the
 artwork itself.
@@ -10,7 +10,7 @@ teller described by resources such as the WikiHow construction guide:
 
 <https://www.wikihow.com/Make-a-Cootie-Catcher-(Origami-Fortune-Teller)>
 
-The v1 implementation intentionally stands beside `booklet_impose.py` rather
+The v1 implementation intentionally stands beside `scripts/booklet_impose.py` rather
 than refactoring both algorithms into a shared framework. The PocketMod path is
 already physically validated; a second implementation gives us evidence about
 which imposition concepts are genuinely reusable before we extract common code.
@@ -275,7 +275,7 @@ By default the square is the largest square that fits the sheet height and is
 aligned left:
 
 ```bash
-uv run python cootie_impose.py input/my_catcher \
+uv run python scripts/cootie_impose.py input/my_catcher \
   --sheet-size letter \
   --square-position left \
   --guides
@@ -320,7 +320,7 @@ data-imposition-square-position="left"
 data-imposition-orientation-validation="provisional"
 ```
 
-`dpx3300_convert.py` therefore does not need a new cootie-catcher-specific code
+`scripts/dpx3300_convert.py` therefore does not need a new cootie-catcher-specific code
 path. Its existing preserved-layout behavior keeps the established physical
 coordinates instead of fitting and centering the imposed SVG again.
 
@@ -379,7 +379,7 @@ selector/reveal pairings.
 Generate it with:
 
 ```bash
-uv run python cootie_impose.py \
+uv run python scripts/cootie_impose.py \
   tests/fixtures/imposition/cootie_catcher \
   --manifest cootie.json \
   --sheet-size letter \
@@ -400,13 +400,13 @@ After the orientation table has been physically validated, a normal production
 job follows the same downstream path as PocketMod:
 
 ```bash
-uv run python cootie_impose.py input/my_catcher \
+uv run python scripts/cootie_impose.py input/my_catcher \
   --sheet-size letter \
   --square-position left \
   --guides \
   --overwrite
 
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./output \
   --output-dir ./output \
   --file my_catcher.imposed.svg \
@@ -417,7 +417,7 @@ uv run python dpx3300_convert.py \
   --absolute \
   --overwrite
 
-uv run python job_preflight.py output/my_catcher.imposed.hpgl
+uv run python scripts/job_preflight.py output/my_catcher.imposed.hpgl
 ```
 
 For a multi-pen job, physically verify the carriage against the resolved pen

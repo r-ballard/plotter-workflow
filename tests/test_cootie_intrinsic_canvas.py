@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import cootie_impose as cootie
+import scripts.cootie_impose as cootie
 
 
 def _write_svg(path: Path, *, canvas_attributes: str = "") -> Path:

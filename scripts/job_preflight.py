@@ -3,9 +3,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_placement
 from pen_plan import (
@@ -317,7 +322,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--vpype-config",
         type=_existing_file,
-        default=Path(__file__).resolve().with_name("vpype.toml"),
+        default=REPO_ROOT / "vpype.toml",
     )
     parser.add_argument("--pen-plan", type=_existing_file)
     parser.add_argument("--placement-report", type=_existing_file)

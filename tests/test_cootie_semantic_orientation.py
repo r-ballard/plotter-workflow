@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import cootie_impose as cootie
+import scripts.cootie_impose as cootie
 
 
 def _generic_svg() -> str:

@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-TARGET = Path(__file__).resolve().parents[1] / "cootie_impose.py"
+TARGET = Path(__file__).resolve().parent / "cootie_impose.py"
 
 
 def _replace_once(text: str, old: str, new: str, *, description: str) -> str:

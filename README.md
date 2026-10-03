@@ -36,7 +36,7 @@ placement option changes where that sheet sits on the machine bed.
 For US Letter paper placed at the lower-left of the ANSI-D plotting area:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file drawing.svg \
@@ -54,7 +54,7 @@ For A4/A3 lower-left placement, set **SW-1 switch 7 OFF** for ISO-A1.
 To return to the previously verified centered placement:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file drawing.svg \
@@ -100,14 +100,14 @@ Conversion produces the HP-GL plus resolved pen-plan and placement sidecars.
 Before transmitting a job, review all three together:
 
 ```bash
-uv run python job_preflight.py output/drawing.hpgl
+uv run python scripts/job_preflight.py output/drawing.hpgl
 ```
 
 For a multi-pen job, physically verify the carriage against the printed plan,
 then record that confirmation and write the audit report:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/drawing.hpgl \
   --confirm-pen-plan \
   --write-report
@@ -120,13 +120,13 @@ See [`JOB_PREFLIGHT.md`](JOB_PREFLIGHT.md) for the complete validation contract.
 ## Find the serial port
 
 ```bash
-uv run python send_hpgl.py --list-ports
+uv run python scripts/send_hpgl.py --list-ports
 ```
 
 ## Send
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   --port /dev/cu.usbserial-XXXXXXXX \
   --confirm-pen-plan \
   output/drawing.hpgl
@@ -135,31 +135,36 @@ uv run python send_hpgl.py \
 Windows example:
 
 ```powershell
-uv run python send_hpgl.py `
+uv run python scripts/send_hpgl.py `
   --port COM3 `
   --confirm-pen-plan `
   output/drawing.hpgl
 ```
 
-`send_hpgl.py` re-runs unified preflight immediately before opening the serial
+`scripts/send_hpgl.py` re-runs unified preflight immediately before opening the serial
 connection. Do not use `--allow-unvalidated-job` for normal plotter operation.
 
 ## Project files
 
-- `dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
+Run human-operated commands from `scripts/` at the repository root. Shared
+geometry, pen-plan, placement, and SVG contract modules remain importable from
+the root; `examples/` contains drawing generators, and `docs/` contains operator
+guides. The former root command paths have been removed.
+
+- `scripts/dpx3300_convert.py` — SVG-to-HP-GL conversion with vpype.
 - `examples/tessellation/generate.py` — seeded strict SVG and pen-plan example.
 - `examples/patchwork/generate.py` — seeded cluster-and-hull SVG and pen-plan example.
 - `examples/voronoi/generate.py` — bounded space-filling Voronoi SVG and pen-plan example.
 - `scripts/preview_hpgl.py` — offline HP-GL motion preview and path metrics.
-- `booklet_impose.py` — physical imposition for one-sheet eight-page mini-books.
+- `scripts/booklet_impose.py` — physical imposition for one-sheet eight-page mini-books.
 - `BOOKLET_IMPOSITION.md` — booklet layout, spread, guide, and conversion contract.
-- `cootie_impose.py` — physical imposition for one-sheet cootie-catcher fortune tellers.
+- `scripts/cootie_impose.py` — physical imposition for one-sheet cootie-catcher fortune tellers.
 - `COOTIE_CATCHER_IMPOSITION.md` — cootie-catcher geometry, guide, and validation contract.
 - `docs/how-to/impose-and-plot-polygon-bundle.md` — end-to-end Git Bash operator guide from a 20-surface polygon bundle through physical plotting.
 - `docs/how-to/neutral-logical-layer-plotting.md` — Git Bash guide for neutral logical-layer booklet imposition, multipass conversion, preflight, and sending.
 - `vpype.toml` — centered and lower-left DPX-3300 paper/coordinate profiles.
-- `job_preflight.py` — unified HP-GL, pen-plan, and placement validation.
-- `send_hpgl.py` — preflight-gated pySerial sender using 9600 8N1 and XON/XOFF.
+- `scripts/job_preflight.py` — unified HP-GL, pen-plan, and placement validation.
+- `scripts/send_hpgl.py` — preflight-gated pySerial sender using 9600 8N1 and XON/XOFF.
 - `JOB_PREFLIGHT.md` — pre-send validation and operator-confirmation contract.
 - `playbook.md` — selected hardware, switch settings, operating procedure, and troubleshooting.
 - `docs/HARDWARE_VALIDATION.md` — known-good physical commissioning record and golden-fixture policy.
@@ -190,7 +195,7 @@ Convert one SVG and override the Compose service command:
 
 ```bash
 docker compose run --rm converter \
-  dpx3300_convert.py \
+  scripts/dpx3300_convert.py \
   --input-dir /app/input \
   --output-dir /app/output \
   --file drawing.svg \
@@ -216,7 +221,7 @@ docker run --rm \
   --group-add "$(stat -c '%g' /dev/ttyUSB0)" \
   --mount type=bind,src="$(pwd)/output",dst=/app/output,readonly \
   dpx3300-plotter:local \
-  send_hpgl.py --port /dev/ttyUSB0 --confirm-pen-plan /app/output/drawing.hpgl
+  scripts/send_hpgl.py --port /dev/ttyUSB0 --confirm-pen-plan /app/output/drawing.hpgl
 ```
 
 The optional `sender` service in `compose.yaml` demonstrates the same pattern.
@@ -229,7 +234,7 @@ docker compose --profile serial-linux run --rm sender
 On macOS or Windows Docker Desktop, the USB serial device is normally attached
 to the host rather than directly exposed inside ordinary containers. The
 recommended workflow is therefore to run conversion in Docker and run
-`send_hpgl.py` on the host with `uv`. Docker Desktop has a USB/IP mechanism,
+`scripts/send_hpgl.py` on the host with `uv`. Docker Desktop has a USB/IP mechanism,
 but it is substantially more complex and requires privileged setup; it is not
 the baseline workflow for this project.
 
@@ -243,4 +248,3 @@ HP-GL output and prints the carriage loading plan before conversion.
 
 See [`PEN_PLAN.md`](PEN_PLAN.md) and [`penplan.schema.json`](penplan.schema.json)
 for the full user-authored format, examples, and preflight rules.
-

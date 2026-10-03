@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dpx3300_convert import validate_hpgl
+from scripts.dpx3300_convert import validate_hpgl
 from svg_pen_contract import inspect_pen_layer_contract
 
 

@@ -37,6 +37,10 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from imposition.geometry import rotated_rectangle_size
 from imposition.model import IntrinsicCanvas, ObjectPlacement, SheetSpec
 from imposition.objects.cootie_catcher import COOTIE_CATCHER, CootieCatcherError
@@ -219,7 +223,7 @@ def _require_vpype():
     except ImportError as exc:  # pragma: no cover - project dependency
         raise ImpositionError(
             "vpype is required. Run this script through the project environment: "
-            "uv run python cootie_impose.py ..."
+            "uv run python scripts/cootie_impose.py ..."
         ) from exc
     return vpype
 
@@ -230,7 +234,7 @@ def resolve_input_dir(value: str) -> Path:
     if candidate.is_dir():
         return candidate.resolve()
 
-    repo_candidate = Path(__file__).resolve().parent / "input" / candidate
+    repo_candidate = REPO_ROOT / "input" / candidate
     if repo_candidate.is_dir():
         return repo_candidate.resolve()
 
@@ -1119,7 +1123,7 @@ def build_audit_payload(
 
 
 def default_output_path(input_dir: Path) -> Path:
-    return Path(__file__).resolve().parent / "output" / f"{input_dir.name}.imposed.svg"
+    return REPO_ROOT / "output" / f"{input_dir.name}.imposed.svg"
 
 
 def related_output_paths(output: Path) -> tuple[Path, Path]:

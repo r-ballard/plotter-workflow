@@ -54,7 +54,7 @@ strict pen-layer SVG and an adjacent `<stem>.penplan.json`.
 Preview the converter command first:
 
 ```bash
-uv run --frozen python dpx3300_convert.py \
+uv run --frozen python scripts/dpx3300_convert.py \
   --input-dir output/first-plot --output-dir output/first-plot \
   --file tessellation.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute --dry-run
@@ -63,7 +63,7 @@ uv run --frozen python dpx3300_convert.py \
 Then create the HP-GL and its resolved pen-plan and placement sidecars:
 
 ```bash
-uv run --frozen python dpx3300_convert.py \
+uv run --frozen python scripts/dpx3300_convert.py \
   --input-dir output/first-plot --output-dir output/first-plot \
   --file tessellation.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute
@@ -98,7 +98,7 @@ The preview is a review aid, not a safety gate. Validate the current HP-GL and
 sidecars with the repository's preflight:
 
 ```bash
-uv run --frozen python job_preflight.py output/first-plot/tessellation.hpgl
+uv run --frozen python scripts/job_preflight.py output/first-plot/tessellation.hpgl
 ```
 
 For this default single-pen example, expect pen plan PASS, placement PASS,
@@ -111,7 +111,7 @@ preview and preflight on the new HP-GL.
 
 After visual review and fresh preflight, follow the [serial playbook](../../playbook.md)
 and [job preflight guide](../../JOB_PREFLIGHT.md) for hardware setup and the
-normal `send_hpgl.py` command. Keep the plotting computer awake throughout
+normal `scripts/send_hpgl.py` command. Keep the plotting computer awake throughout
 transmission and all machine motion. A prior interrupted plot was associated
 with host sleep; the [hardware acceptance guide](physical-logical-layer-acceptance.md)
 records the incident and operator response. The commands above do not open a

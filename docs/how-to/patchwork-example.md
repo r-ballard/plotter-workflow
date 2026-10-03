@@ -42,7 +42,7 @@ distance. These geometric lengths are not time estimates.
 Convert and inspect without opening a serial port:
 
 ```bash
-uv run --frozen python dpx3300_convert.py \
+uv run --frozen python scripts/dpx3300_convert.py \
   --input-dir output/patchwork --output-dir output/patchwork \
   --file patchwork.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute
@@ -50,7 +50,7 @@ uv run --frozen python scripts/preview_hpgl.py \
   --hpgl output/patchwork/patchwork.hpgl \
   --preview output/patchwork/patchwork.preview.svg \
   --metrics output/patchwork/patchwork.metrics.json
-uv run --frozen python job_preflight.py output/patchwork/patchwork.hpgl
+uv run --frozen python scripts/job_preflight.py output/patchwork/patchwork.hpgl
 ```
 
 Open `patchwork.preview.svg` and inspect `patchwork.metrics.json` alongside the

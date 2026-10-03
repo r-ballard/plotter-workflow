@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-import booklet_impose as booklet
+import scripts.booklet_impose as booklet
 from logical_layer_contract import (
     InputMode,
     LogicalLayerContractError,

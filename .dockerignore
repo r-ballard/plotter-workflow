@@ -1,4 +1,5 @@
 .git
+.worktrees
 .gitignore
 .venv
 __pycache__

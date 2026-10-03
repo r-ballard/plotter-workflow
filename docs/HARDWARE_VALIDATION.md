@@ -30,7 +30,7 @@ lowering the pen. The operator paused the plotter. The reported send command
 was:
 
 ```bash
-"$UV" run --frozen python send_hpgl.py --port "$PORT" \
+"$UV" run --frozen python scripts/send_hpgl.py --port "$PORT" \
   --confirm-pen-plan "$BODY"
 ```
 
@@ -123,10 +123,10 @@ operator to choose the actual pens for a test run.
 
 3. Convert using the intended paper profile and an appropriately conservative
    margin.
-4. Run `job_preflight.py` without confirmation and review the printed mapping.
+4. Run `scripts/job_preflight.py` without confirmation and review the printed mapping.
 5. Physically load and verify the three required carriage slots.
-6. Run `job_preflight.py --confirm-pen-plan --write-report`.
-7. Send the exact reviewed HP-GL. For serial, use `send_hpgl.py` with
+6. Run `scripts/job_preflight.py --confirm-pen-plan --write-report`.
+7. Send the exact reviewed HP-GL. For serial, use `scripts/send_hpgl.py` with
    `--confirm-pen-plan`; for raw parallel transport, do not modify the HP-GL
    after standalone preflight.
 8. Record any material hardware or configuration change here rather than

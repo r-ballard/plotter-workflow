@@ -47,7 +47,7 @@ distances are not time estimates.
 Convert, preview, and preflight the exact generated job:
 
 ```bash
-uv run --frozen python dpx3300_convert.py \
+uv run --frozen python scripts/dpx3300_convert.py \
   --input-dir output/voronoi --output-dir output/voronoi \
   --file voronoi.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute
@@ -55,7 +55,7 @@ uv run --frozen python scripts/preview_hpgl.py \
   --hpgl output/voronoi/voronoi.hpgl \
   --preview output/voronoi/voronoi.preview.svg \
   --metrics output/voronoi/voronoi.metrics.json
-uv run --frozen python job_preflight.py output/voronoi/voronoi.hpgl
+uv run --frozen python scripts/job_preflight.py output/voronoi/voronoi.hpgl
 ```
 
 Inspect the preview, metrics, resolved pen plan, and placement sidecar. The

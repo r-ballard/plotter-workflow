@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import cootie_impose as cootie
+import scripts.cootie_impose as cootie
 from imposition.source import inspect_svg_source
 
 GENERATOR = (

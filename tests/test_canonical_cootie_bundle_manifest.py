@@ -1,7 +1,12 @@
 import shutil
 from pathlib import Path
 
-from cootie_impose import EXPECTED_SLOTS, impose, load_manifest, square_placement
+from scripts.cootie_impose import (
+    EXPECTED_SLOTS,
+    impose,
+    load_manifest,
+    square_placement,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_MANIFEST = REPO_ROOT / "examples" / "cootie-bundle" / "cootie.json"

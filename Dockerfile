@@ -16,10 +16,12 @@ COPY pyproject.toml ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
 
-COPY dpx3300_convert.py send_hpgl.py vpype.toml README.md playbook.md ./
+COPY hpgl_placement.py logical_layer_contract.py pen_plan.py svg_pen_contract.py ./
+COPY penplan.schema.json vpype.toml README.md playbook.md ./
+COPY scripts/__init__.py scripts/booklet_impose.py scripts/dpx3300_convert.py scripts/job_preflight.py scripts/send_hpgl.py ./scripts/
 RUN mkdir -p /app/input /app/output
 
 # The default container behavior is conversion. Override the command to run
 # send_hpgl.py when using a Linux serial device passed through with --device.
 ENTRYPOINT ["uv", "run", "--no-sync", "python"]
-CMD ["dpx3300_convert.py", "--help"]
+CMD ["scripts/dpx3300_convert.py", "--help"]

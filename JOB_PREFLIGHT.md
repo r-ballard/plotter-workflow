@@ -8,7 +8,7 @@ The final pre-send check combines three independently useful artifacts:
 <stem>.placement.json
 ```
 
-`job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL. It accepts legacy v1 resolved plans and v2 resolved logical-pass sidecars by their `kind` field.
+`scripts/job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL. It accepts legacy v1 resolved plans and v2 resolved logical-pass sidecars by their `kind` field.
 
 This catches a common unsafe workflow: generating valid sidecars and then editing or replacing the HP-GL file afterward.
 
@@ -23,7 +23,7 @@ with the job records.
 ## Review a job
 
 ```bash
-uv run python job_preflight.py output/plant_test_drawing.hpgl
+uv run python scripts/job_preflight.py output/plant_test_drawing.hpgl
 ```
 
 For a multi-pen job this validates the job but deliberately reports:
@@ -37,7 +37,7 @@ because software cannot sense what is physically loaded in the DPX-3300 carriage
 After physically checking the carriage against the printed plan, the same standalone command may record the confirmation state and write an audit report:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/plant_test_drawing.hpgl \
   --confirm-pen-plan \
   --write-report
@@ -53,10 +53,10 @@ The report includes a SHA-256 digest of the exact HP-GL bytes reviewed.
 
 ## Sender integration
 
-`send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission requires `--confirm-pen-plan`. No separate integration step is required in a normal checkout.
+`scripts/send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission requires `--confirm-pen-plan`. No separate integration step is required in a normal checkout.
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   output/plant_test_drawing.hpgl \
   --port COM3 \
   --confirm-pen-plan
@@ -76,11 +76,11 @@ output/plant_test_drawing.placement.json
 ## Raw parallel transmission
 
 Raw parallel paths such as `/dev/usb/lp0`, `lp -o raw`, or Windows `copy /b`
-bypass `send_hpgl.py`. They therefore **must** be preceded by the standalone
+bypass `scripts/send_hpgl.py`. They therefore **must** be preceded by the standalone
 preflight after the operator physically verifies the carriage:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/drawing.hpgl \
   --confirm-pen-plan \
   --write-report

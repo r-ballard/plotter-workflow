@@ -34,13 +34,13 @@ Examples
 --------
 Convert every SVG in ./input to ./output:
 
-    python3 dpx3300_convert.py \
+    python3 scripts/dpx3300_convert.py \
         --input-dir ./input \
         --output-dir ./output
 
 Convert one file for US Letter paper placed at the lower-left of the bed:
 
-    python3 dpx3300_convert.py \
+    python3 scripts/dpx3300_convert.py \
         --input-dir ./input \
         --output-dir ./output \
         --file drawing.svg \
@@ -55,7 +55,7 @@ paper placement.
 
 Convert and immediately send each result with Chiplotle3:
 
-    python3 dpx3300_convert.py \
+    python3 scripts/dpx3300_convert.py \
         --input-dir ./input \
         --output-dir ./output \
         --send
@@ -75,10 +75,15 @@ import math
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Sequence
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from hpgl_placement import validate_hpgl_placement, write_placement_report
 from logical_layer_contract import (
@@ -106,7 +111,7 @@ from pen_plan import (
 from svg_pen_contract import inspect_pen_layer_contract
 
 LOG = logging.getLogger("dpx3300")
-DEFAULT_VPYPE_CONFIG = Path(__file__).resolve().with_name("vpype.toml")
+DEFAULT_VPYPE_CONFIG = REPO_ROOT / "vpype.toml"
 
 PAPER_POSITION_CENTER = "center"
 PAPER_POSITION_LOWER_LEFT = "lower-left"
@@ -494,7 +499,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
     import vpype
     from shapely.geometry import LineString, Polygon
 
-    from booklet_impose import _validate_neutral_renderables
+    from scripts.booklet_impose import _validate_neutral_renderables
 
     root = ET.parse(source).getroot()
     _validate_neutral_renderables(root, source)
@@ -1126,7 +1131,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_VPYPE_CONFIG,
         help=(
             "vpype TOML configuration file. Default: the repository's "
-            "vpype.toml next to this script."
+            "vpype.toml at the repository root."
         ),
     )
     parser.add_argument(

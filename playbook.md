@@ -130,7 +130,7 @@ Place the plot-ready SVG in `input/`.
 Example:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file test.svg \
@@ -160,7 +160,7 @@ before this step.
 ## 6. Find and use the USB-parallel adapter
 
 The adapter normally appears as a printer device, not as a serial port. Do not
-use `send_hpgl.py` for the parallel connection.
+use `scripts/send_hpgl.py` for the parallel connection.
 
 ### Linux: direct printer-device method
 
@@ -258,7 +258,7 @@ The `/b` option is required. It prevents text-mode translation of the file.
 5. Generate a very small test job using the intended paper placement.
 6. Inspect the HP-GL for `IN;`, `SP`, `PU`, and `PD`.
 7. Physically verify the carriage against the resolved pen plan.
-8. Run `job_preflight.py --confirm-pen-plan --write-report`.
+8. Run `scripts/job_preflight.py --confirm-pen-plan --write-report`.
 9. Confirm that preflight reports `READY TO SEND`.
 10. Send the same HP-GL bytes through a raw queue or direct printer device.
 11. Remain ready to pause or power off the plotter.
@@ -435,7 +435,7 @@ Stop bits:   1
 Flow control: XON/XOFF
 ```
 
-The project's `send_hpgl.py` uses these pySerial values:
+The project's `scripts/send_hpgl.py` uses these pySerial values:
 
 ```python
 baudrate = 9600
@@ -478,7 +478,7 @@ Place the plot-ready SVG in `input/`.
 Example:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file test.svg \
@@ -496,7 +496,7 @@ Confirm that it contains expected commands such as `IN;`, `SP`, `PU`, and `PD`
 before sending it to the plotter. Then review unified preflight:
 
 ```bash
-uv run python job_preflight.py output/test.hpgl
+uv run python scripts/job_preflight.py output/test.hpgl
 ```
 
 For a multi-pen job, physically verify the carriage against the printed plan
@@ -534,7 +534,7 @@ port, such as `COM3`.
 The project can also ask pySerial to list detected ports:
 
 ```bash
-uv run python send_hpgl.py --list-ports
+uv run python scripts/send_hpgl.py --list-ports
 ```
 
 ## 8. Send HP-GL over serial
@@ -542,7 +542,7 @@ uv run python send_hpgl.py --list-ports
 ### macOS
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   --port /dev/cu.usbserial-XXXXXXXX \
   --confirm-pen-plan \
   output/test.hpgl
@@ -551,7 +551,7 @@ uv run python send_hpgl.py \
 ### Linux
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   --port /dev/ttyUSB0 \
   --confirm-pen-plan \
   output/test.hpgl
@@ -560,7 +560,7 @@ uv run python send_hpgl.py \
 ### Windows PowerShell
 
 ```powershell
-uv run python send_hpgl.py `
+uv run python scripts/send_hpgl.py `
   --port COM3 `
   --confirm-pen-plan `
   output/test.hpgl
@@ -626,7 +626,7 @@ docker compose build
 docker compose run --rm converter
 ```
 
-On macOS and Windows, run `send_hpgl.py` on the host because Docker Desktop does
+On macOS and Windows, run `scripts/send_hpgl.py` on the host because Docker Desktop does
 not expose host serial ports as simply as native Linux.
 
 On native Linux, the serial device may be passed explicitly:
@@ -636,7 +636,7 @@ docker run --rm \
   --device=/dev/ttyUSB0:/dev/ttyUSB0 \
   --mount type=bind,src="$(pwd)/output",dst=/app/output,readonly \
   dpx3300-plotter:local \
-  send_hpgl.py \
+  scripts/send_hpgl.py \
   --port /dev/ttyUSB0 \
   --confirm-pen-plan \
   /app/output/test.hpgl

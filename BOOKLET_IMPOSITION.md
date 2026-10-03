@@ -1,6 +1,6 @@
 # One-sheet booklet imposition
 
-`booklet_impose.py` prepares plotter-ready SVG artwork for the single-sheet,
+`scripts/booklet_impose.py` prepares plotter-ready SVG artwork for the single-sheet,
 eight-page mini-book / PocketMod-style fold. Imposition belongs in
 `plotter-workflow` because it maps logical artwork onto physical media; it does
 not generate the artwork itself.
@@ -37,7 +37,7 @@ uv run python -m pytest -v
 
 Use `python -m pytest` rather than invoking the `pytest` console script directly.
 The repository currently uses top-level Python modules such as
-`dpx3300_convert.py` and `booklet_impose.py`; module invocation keeps the
+`scripts/dpx3300_convert.py` and `scripts/booklet_impose.py`; module invocation keeps the
 repository root on the Python import path consistently across platforms.
 
 ## Simple eight-file input
@@ -60,7 +60,7 @@ input/my_book/
 Run:
 
 ```bash
-uv run python booklet_impose.py input/my_book \
+uv run python scripts/booklet_impose.py input/my_book \
   --sheet-size letter \
   --guides
 ```
@@ -138,7 +138,7 @@ data-plotter-workflow-page-size="letter"
 data-plotter-workflow-orientation="landscape"
 ```
 
-`dpx3300_convert.py` recognizes that marker, verifies that `--page-size` and
+`scripts/dpx3300_convert.py` recognizes that marker, verifies that `--page-size` and
 `--landscape` agree with the imposed sheet metadata, and skips its normal vpype
 `layout` fit/centering and HP-GL writer centering. Those operations are correct for a
 normal drawing, but they would destroy the already-established fold-cell
@@ -148,7 +148,7 @@ The conversion workflow is otherwise unchanged. For a Letter sheet at the
 lower-left ANSI-D position:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./output \
   --output-dir ./output \
   --file my_book.imposed.svg \
@@ -175,7 +175,7 @@ transmission as separate reviewable stages.
 1. Impose the logical pages onto the physical sheet:
 
    ```bash
-   uv run python booklet_impose.py input/my_book \
+   uv run python scripts/booklet_impose.py input/my_book \
      --sheet-size letter \
      --page-margin-mm 6 \
      --output output/my_book.imposed.svg \
@@ -192,7 +192,7 @@ transmission as separate reviewable stages.
    coordinates:
 
    ```bash
-   uv run python dpx3300_convert.py \
+   uv run python scripts/dpx3300_convert.py \
      --input-dir ./output \
      --output-dir ./output \
      --file my_book.imposed.svg \
@@ -210,7 +210,7 @@ transmission as separate reviewable stages.
 4. Run unified preflight before any hardware send:
 
    ```bash
-   uv run python job_preflight.py output/my_book.imposed.hpgl
+   uv run python scripts/job_preflight.py output/my_book.imposed.hpgl
    ```
 
    Review the reported placement and pen mapping. For a multi-pen booklet,
@@ -218,7 +218,7 @@ transmission as separate reviewable stages.
    write the audit report:
 
    ```bash
-   uv run python job_preflight.py \
+   uv run python scripts/job_preflight.py \
      output/my_book.imposed.hpgl \
      --confirm-pen-plan \
      --write-report
@@ -228,13 +228,13 @@ transmission as separate reviewable stages.
    serial multi-pen job on Windows uses:
 
    ```powershell
-   uv run python send_hpgl.py `
+   uv run python scripts/send_hpgl.py `
      --port COM3 `
      --confirm-pen-plan `
      output/my_book.imposed.hpgl
    ```
 
-   Replace `COM3` with the actual serial port. `send_hpgl.py` re-runs unified
+   Replace `COM3` with the actual serial port. `scripts/send_hpgl.py` re-runs unified
    preflight before opening the serial connection. For raw parallel transport,
    run standalone preflight with `--confirm-pen-plan --write-report` first and
    transmit the same HP-GL bytes without modifying them afterward.

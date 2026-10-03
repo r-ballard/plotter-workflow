@@ -246,7 +246,7 @@ installed in a physical DPX slot**.
 
 ## Sending safety
 
-For a contract SVG using more than one physical pen, `dpx3300_convert.py --send`
+For a contract SVG using more than one physical pen, `scripts/dpx3300_convert.py --send`
 requires:
 
 1. every used physical slot to have a `tool` or `label` in the pen-plan JSON;
@@ -259,7 +259,7 @@ proceed without an explicit carriage plan.
 Example:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir ./input \
   --output-dir ./output \
   --file plant_test_drawing.svg \

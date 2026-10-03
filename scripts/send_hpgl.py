@@ -11,18 +11,17 @@ from __future__ import annotations
 
 import argparse
 import logging
+import sys
 import time
 from pathlib import Path
 
 import serial
 from serial.tools import list_ports
 
-from job_preflight import (
-    JobPreflightError,
-    format_job_preflight,
-    run_job_preflight,
-    write_preflight_report,
-)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from pen_plan import (
     PenPlanError,
     ResolvedPenPlan,
@@ -32,6 +31,12 @@ from pen_plan import (
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
+)
+from scripts.job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+    write_preflight_report,
 )
 
 LOG = logging.getLogger("dpx3300.sender")
@@ -152,7 +157,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--vpype-config",
         type=Path,
-        default=Path(__file__).resolve().with_name("vpype.toml"),
+        default=REPO_ROOT / "vpype.toml",
         help="vpype TOML configuration used to revalidate physical placement.",
     )
     parser.add_argument(

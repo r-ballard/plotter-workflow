@@ -8,7 +8,7 @@ services:
       - ./input:/app/input:ro
       - ./output:/app/output
     command:
-      - dpx3300_convert.py
+      - scripts/dpx3300_convert.py
       - --input-dir
       - /app/input
       - --output-dir
@@ -35,7 +35,7 @@ services:
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0
     command:
-      - send_hpgl.py
+      - scripts/send_hpgl.py
       - --port
       - /dev/ttyUSB0
       - /app/output/test.hpgl

@@ -4,8 +4,12 @@ from pathlib import Path
 
 import pytest
 
-import send_hpgl
-from job_preflight import JobPreflightError, format_job_preflight, run_job_preflight
+from scripts import send_hpgl
+from scripts.job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+)
 
 
 def write_config(path: Path) -> Path:

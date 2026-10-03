@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import cootie_impose as cootie
+import scripts.cootie_impose as cootie
 from imposition.objects.cootie_catcher import (
     COOTIE_CATCHER,
     EXPECTED_SLOTS,

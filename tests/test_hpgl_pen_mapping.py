@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-import dpx3300_convert as converter
-from dpx3300_convert import ConversionError, validate_hpgl
-from job_preflight import run_job_preflight
+import scripts.dpx3300_convert as converter
 from pen_plan import LogicalAssignment, LogicalPenPlanSpec, PassSpec, PenPlanError
+from scripts.dpx3300_convert import ConversionError, validate_hpgl
+from scripts.job_preflight import run_job_preflight
 
 
 def neutral_job(tmp_path, count=2, geometry=None, definitions="", imposed=True):
@@ -426,7 +426,7 @@ def test_neutral_real_imposition_and_vpype_pipeline(tmp_path, monkeypatch):
     from click.testing import CliRunner
     from vpype_cli import cli
 
-    from booklet_impose import PageEntry, render_booklet
+    from scripts.booklet_impose import PageEntry, render_booklet
 
     surface_dir = tmp_path / "surfaces"
     surface_dir.mkdir()

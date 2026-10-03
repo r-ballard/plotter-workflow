@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-TARGET = Path(__file__).resolve().parents[1] / "cootie_impose.py"
+TARGET = Path(__file__).resolve().parent / "cootie_impose.py"
 
 
 def replace_function(

@@ -101,7 +101,7 @@ guide:
 ```bash
 mkdir -p output/cootie-production
 
-uv run python cootie_impose.py "$BUNDLE_DIR" \
+uv run python scripts/cootie_impose.py "$BUNDLE_DIR" \
   --manifest cootie.json \
   --sheet-size letter \
   --square-position left \
@@ -184,7 +184,7 @@ at power-up.
 Convert the artwork:
 
 ```bash
-uv run python dpx3300_convert.py \
+uv run python scripts/dpx3300_convert.py \
   --input-dir output/cootie-production \
   --output-dir output/cootie-production \
   --file cootie-artwork.imposed.svg \
@@ -238,7 +238,7 @@ not use PowerShell backticks in Git Bash.
 Run preflight without claiming that the carriage has been checked:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl
 ```
 
@@ -254,7 +254,7 @@ After physically checking every used carriage slot, write the audit report.
 For the single-pen example:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl \
   --write-report
 ```
@@ -263,7 +263,7 @@ For a multi-pen job, add `--confirm-pen-plan` only after loading and checking
 the printed carriage plan:
 
 ```bash
-uv run python job_preflight.py \
+uv run python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl \
   --confirm-pen-plan \
   --write-report
@@ -301,7 +301,7 @@ near PAUSE and be ready to power off if motion leaves the expected area.
 List serial ports from Git Bash:
 
 ```bash
-uv run python send_hpgl.py --list-ports
+uv run python scripts/send_hpgl.py --list-ports
 ```
 
 On Windows the result is typically `COM3` or another `COMN` name. Close any
@@ -312,7 +312,7 @@ other program holding that port.
 Replace `COM3` with the detected port. For the current single-pen example:
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   --port COM3 \
   output/cootie-production/cootie-artwork.imposed.hpgl
 ```
@@ -320,7 +320,7 @@ uv run python send_hpgl.py \
 For a multi-pen job, the sender requires the same physical confirmation:
 
 ```bash
-uv run python send_hpgl.py \
+uv run python scripts/send_hpgl.py \
   --port COM3 \
   --confirm-pen-plan \
   output/cootie-production/cootie-artwork.imposed.hpgl
@@ -349,7 +349,7 @@ send of the same preflighted HP-GL file.
    and confirm that its indicator is on and the sheet is held flat.
 3. Check that the required pen is fully seated in its stock position and that
    the carriage is not in an error state.
-4. Rerun the same `send_hpgl.py` command. Do not execute the `.hpgl` file.
+4. Rerun the same `scripts/send_hpgl.py` command. Do not execute the `.hpgl` file.
 5. Watch the first pickup and initial motion before letting the repeat continue.
 
 Previously observed behavior: after one successful job, using PAUSE and BUFFER
@@ -398,7 +398,7 @@ imposition audit and drawing bounds first.
 
 ### Preflight says a sidecar is missing or stale
 
-Rerun `dpx3300_convert.py`, then preflight the newly generated HP-GL and its
+Rerun `scripts/dpx3300_convert.py`, then preflight the newly generated HP-GL and its
 adjacent sidecars. Do not copy an old sidecar onto a new file.
 
 ### No serial ports detected
@@ -445,7 +445,7 @@ ordinary Compose workflow.
 
 The current container image is not a supported substitute for this guide. A
 clean image build succeeds, but runtime validation currently fails because the
-converter's local imported modules and `cootie_impose.py` are absent from the
+converter's local imported modules and `scripts/cootie_impose.py` are absent from the
 image. This is tracked as HAR-9. Until that issue is fixed and its commands are
 revalidated, use native `uv` for imposition, conversion, and preflight. See
 `playbook.md` only for the separately documented native-Linux serial device

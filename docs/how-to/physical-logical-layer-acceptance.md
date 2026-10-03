@@ -49,7 +49,7 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
     cd "$ROOT/generative-viz-workspace" &&
     bash scripts/verify-environment.sh
   )
-  "$UV" run --frozen python send_hpgl.py --list-ports
+  "$UV" run --frozen python scripts/send_hpgl.py --list-ports
   export PORT=COM3 # replace with the detected port
   ```
 
@@ -72,7 +72,7 @@ generate it without `--overwrite`:
 
 ```bash
 mkdir -p output/hardware-acceptance
-"$UV" run --frozen python dpx3300_convert.py \
+"$UV" run --frozen python scripts/dpx3300_convert.py \
   --input-dir tests/fixtures/hardware_validation \
   --output-dir output/hardware-acceptance \
   --file serial-smoke.svg --page-size letter --landscape \
@@ -81,7 +81,7 @@ mkdir -p output/hardware-acceptance
 
 ```bash
 export SMOKE=output/hardware-acceptance/serial-smoke.hpgl
-"$UV" run --frozen python job_preflight.py "$SMOKE"
+"$UV" run --frozen python scripts/job_preflight.py "$SMOKE"
 ```
 
 Expect `SP1 -> SP0`, `Placement: PASS`, `READY TO SEND`, and drawing bounds
@@ -91,7 +91,7 @@ tested pen in SP1, check the sheet position, then send the exact preflighted
 job while watching first motion:
 
 ```bash
-"$UV" run --frozen python send_hpgl.py --port "$PORT" "$SMOKE"
+"$UV" run --frozen python scripts/send_hpgl.py --port "$PORT" "$SMOKE"
 ```
 
 Confirm a small centered square and normal pen return. Stop here if the
@@ -106,11 +106,11 @@ checked-in vector fixture:
 
 ```bash
 mkdir -p output/hardware-acceptance
-"$UV" run --frozen python booklet_impose.py \
+"$UV" run --frozen python scripts/booklet_impose.py \
   tests/fixtures/imposition/pocketmod8/validation_pages \
   --sheet-size letter --page-margin-mm 6 --guides \
   --output output/hardware-acceptance/pocketmod8_validation.imposed.svg
-"$UV" run --frozen python dpx3300_convert.py \
+"$UV" run --frozen python scripts/dpx3300_convert.py \
   --input-dir output/hardware-acceptance \
   --output-dir output/hardware-acceptance \
   --file pocketmod8_validation.imposed.svg \
@@ -122,7 +122,7 @@ Set the job and preflight its **current bytes** immediately before sending:
 
 ```bash
 export CONTROL=output/hardware-acceptance/pocketmod8_validation.imposed.hpgl
-"$UV" run --frozen python job_preflight.py "$CONTROL"
+"$UV" run --frozen python scripts/job_preflight.py "$CONTROL"
 ```
 
 Expect `letter_lower_left`, `SP1 -> SP0`, `Placement: PASS`, and
@@ -131,7 +131,7 @@ guides before drawing; the guides are a separate job and are **not** sent
 here. Load a single tested pen in SP1, recheck the paper position, then send:
 
 ```bash
-"$UV" run --frozen python send_hpgl.py --port "$PORT" "$CONTROL"
+"$UV" run --frozen python scripts/send_hpgl.py --port "$PORT" "$CONTROL"
 ```
 
 Observe the first movement and stop for unexpected travel. After motion has
@@ -168,8 +168,8 @@ test -f "$JOB_DIR/booklet.imposed.imposition.json" &&
 test -f "$JOB_DIR/booklet.imposed.penplan.json" &&
 test -f "$BODY" &&
 test -f "$ACCENT" &&
-"$UV" run --frozen python job_preflight.py "$BODY" &&
-"$UV" run --frozen python job_preflight.py "$ACCENT"
+"$UV" run --frozen python scripts/job_preflight.py "$BODY" &&
+"$UV" run --frozen python scripts/job_preflight.py "$ACCENT"
 ```
 
 If no preflight output appears, a required file is missing. Check the selected
@@ -189,10 +189,10 @@ engaged** between passes. Only after the carriage and media checks, record
 operator confirmation for the first job and send it:
 
 ```bash
-"$UV" run --frozen python job_preflight.py "$BODY" \
+"$UV" run --frozen python scripts/job_preflight.py "$BODY" \
   --confirm-pen-plan --write-report
 # Continue only if the exact job now reports READY TO SEND.
-"$UV" run --frozen python send_hpgl.py --port "$PORT" \
+"$UV" run --frozen python scripts/send_hpgl.py --port "$PORT" \
   --confirm-pen-plan "$BODY"
 ```
 
@@ -200,10 +200,10 @@ Wait for physical movement to stop. Do not release PAPER HOLD or move the
 sheet. Recheck loaded SP1 and SP3, preflight the second job, then send it:
 
 ```bash
-"$UV" run --frozen python job_preflight.py "$ACCENT" \
+"$UV" run --frozen python scripts/job_preflight.py "$ACCENT" \
   --confirm-pen-plan --write-report
 # Continue only if the exact job now reports READY TO SEND.
-"$UV" run --frozen python send_hpgl.py --port "$PORT" \
+"$UV" run --frozen python scripts/send_hpgl.py --port "$PORT" \
   --confirm-pen-plan "$ACCENT"
 ```
 
@@ -244,7 +244,7 @@ manifest = {"schema_version": 1, "layout": "pocketmod8",
 (bundle / "booklet.json").write_text(json.dumps(manifest, indent=2) + "\n")
 PY
 
-"$UV" run --frozen python booklet_impose.py "$BUNDLE_DIR" \
+"$UV" run --frozen python scripts/booklet_impose.py "$BUNDLE_DIR" \
   --manifest booklet.json --sheet-size letter --guides \
   --output "$JOB_DIR/booklet.imposed.svg"
 
@@ -272,11 +272,11 @@ plan = {
 (root / "jobs/booklet.imposed.penplan.json").write_text(json.dumps(plan, indent=2) + "\n")
 PY
 
-"$UV" run --frozen python dpx3300_convert.py \
+"$UV" run --frozen python scripts/dpx3300_convert.py \
   --input-dir "$JOB_DIR" --output-dir "$JOB_DIR" \
   --file booklet.imposed.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute --dry-run
-"$UV" run --frozen python dpx3300_convert.py \
+"$UV" run --frozen python scripts/dpx3300_convert.py \
   --input-dir "$JOB_DIR" --output-dir "$JOB_DIR" \
   --file booklet.imposed.svg --page-size letter --landscape \
   --paper-position lower-left --margin 4mm --absolute

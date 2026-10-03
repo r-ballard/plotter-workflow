@@ -23,7 +23,7 @@ test -f "$BUNDLE_DIR/design.json"
 ```
 
 A neutral bundle generated in `viz_virtualserver` with
-`scripts/generate_domain_bundle.py` from
+`viz-domain-bundle` from
 `examples/domain-jobs/orbital-per-body.json` does not include `booklet.json`.
 If it is missing, save this software-only eight-page manifest example as
 `$BUNDLE_DIR/booklet.json` before continuing. The example is a software

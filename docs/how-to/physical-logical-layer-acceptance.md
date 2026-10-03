@@ -225,8 +225,7 @@ export RUN_DIR="tmp/neutral-orbital-e2e-$(date +%Y%m%d-%H%M%S)"
 export BUNDLE_DIR="$RUN_DIR/bundle"
 export JOB_DIR="$RUN_DIR/jobs"
 mkdir -p "$RUN_DIR" "$JOB_DIR"
-"$VIZ_REPO/.venv/Scripts/python.exe" \
-  "$VIZ_REPO/scripts/generate_domain_bundle.py" \
+"$VIZ_REPO/.venv/Scripts/viz-domain-bundle.exe" \
   "$VIZ_REPO/examples/domain-jobs/orbital-per-body.json" \
   --output-dir "$BUNDLE_DIR"
 

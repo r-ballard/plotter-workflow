@@ -132,5 +132,5 @@ operator to choose the actual pens for a test run.
 8. Record any material hardware or configuration change here rather than
    silently replacing the original commissioning result.
 
-See `JOB_PREFLIGHT.md` for validation semantics and `playbook.md` for physical
+See `docs/reference/job-preflight.md` for validation semantics and `docs/how-to/plotter-playbook.md` for physical
 interface and switch configuration.

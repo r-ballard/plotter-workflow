@@ -161,7 +161,7 @@ output/cootie-production/cootie-artwork.imposed.penplan.json
 Use `policy: "preserve"` to keep logical layer 1 on physical slot 1, layer 2
 on slot 2, and so forth. Use `compact` to pack only active layers into the
 lowest slots, or `explicit` for a deliberate mapping. Document a `label` or
-`tool` for every physical slot used by a multi-pen job. See `PEN_PLAN.md` and
+`tool` for every physical slot used by a multi-pen job. See `docs/reference/pen-plan.md` and
 `penplan.schema.json` for the complete schema.
 
 An adjacent `.penplan.json` is automatically authoritative. Do not combine it
@@ -282,7 +282,7 @@ loaded, seated, tested, and matches the displayed plan.
 
 The established serial configuration is 9600 baud, 8 data bits, no parity,
 one stop bit, and XON/XOFF flow control. Before power-up, verify the complete
-switch table in `playbook.md`. Key settings include:
+switch table in `docs/how-to/plotter-playbook.md`. Key settings include:
 
 - cable connected to `SERIAL IN`;
 - SW-1 switch 5 ON for serial;
@@ -434,7 +434,7 @@ After the job completes:
 5. power off before changing any DIP switch, baud dial, cable configuration,
    pen adapter, or other hardware setting that requires access to moving parts.
 
-Use `playbook.md` as the authoritative hardware reference whenever it is more
+Use `docs/how-to/plotter-playbook.md` as the authoritative hardware reference whenever it is more
 specific than this walkthrough.
 
 ## Docker boundary
@@ -448,7 +448,7 @@ clean image build succeeds, but runtime validation currently fails because the
 converter's local imported modules and `scripts/cootie_impose.py` are absent from the
 image. This is tracked as HAR-9. Until that issue is fixed and its commands are
 revalidated, use native `uv` for imposition, conversion, and preflight. See
-`playbook.md` only for the separately documented native-Linux serial device
+`docs/how-to/plotter-playbook.md` only for the separately documented native-Linux serial device
 passthrough constraints.
 
 ## Supervised acceptance procedure

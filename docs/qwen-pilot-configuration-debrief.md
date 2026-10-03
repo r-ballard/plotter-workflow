@@ -237,7 +237,7 @@ requires an approved launch for OpenCode's nested Git process.
 ## Fourth trial: v2 pen-plan documentation
 
 The next brief supplied all schema and resolver facts up front and asked for
-one section in `PEN_PLAN.md`, with an early first edit and no broad search.
+one section in `docs/reference/pen-plan.md`, with an early first edit and no broad search.
 Qwen edited the allowed file about 306 seconds into attempt 1 and ran
 `git diff --check` about 630 seconds in. The watchdog nevertheless timed out
 at the 720-second deadline. Attempt 2 made a further in-scope edit and ran the
@@ -248,8 +248,8 @@ and verified that the embedded JSON matches the checked-in v2 example.
 
 | Attempt | Elapsed | Completed rounds | Tools | Input | Output | Cached read | Diff |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| 1 | 720.48 s | 4 | 3 | 19,874 | 5,851 | 16,917 | `PEN_PLAN.md` |
-| 2 | 720.47 s | 8 | 6 | 11,393 | 5,906 | 70,542 | `PEN_PLAN.md` |
+| 1 | 720.48 s | 4 | 3 | 19,874 | 5,851 | 16,917 | `docs/reference/pen-plan.md` |
+| 2 | 720.47 s | 8 | 6 | 11,393 | 5,906 | 70,542 | `docs/reference/pen-plan.md` |
 | Total | 1,440.95 s | 12 | 9 | 31,267 | 11,757 | 87,459 | one usable section |
 
 The first attempt proves that a smaller, fact-rich brief can prompt an edit.
@@ -289,7 +289,7 @@ pending evidence of a benefit.
 | Attempt | Elapsed | Completed rounds | Tools | Input | Output | Cached read | Diff |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | 1 | 720.59 s | 3 | 2 | 14,153 | 5,678 | 8,787 | none |
-| 2 | 720.47 s | 6 | 6 | 7,869 | 4,153 | 43,959 | `PEN_PLAN.md` |
+| 2 | 720.47 s | 6 | 6 | 7,869 | 4,153 | 43,959 | `docs/reference/pen-plan.md` |
 | Total | 1,441.06 s | 9 | 8 | 22,022 | 9,831 | 52,746 | one draft |
 
 No completed response reached the 6,144-token cap; neither attempt exited before
@@ -448,7 +448,7 @@ model settings. The 65k service was restored after the benchmark.
 With the tested 65,536 server/client context and 3,072 output cap, Qwen was
 assigned a narrow correction to two existing plotter documents. The brief
 gave the converter's exact per-pass sidecar naming rule and allowed edits only
-to `PEN_PLAN.md` and the neutral logical-layer operator guide. The watchdog
+to `docs/reference/pen-plan.md` and the neutral logical-layer operator guide. The watchdog
 used a 600-second deadline and checked whitespace plus exact filename examples.
 
 | Outcome | Elapsed | First edit | Rounds | Tools | Input | Output | Cached read | Compactions |

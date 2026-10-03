@@ -156,12 +156,12 @@ uv run python scripts/job_preflight.py "$JOB" --confirm-pen-plan --write-report
 
 For a single-pen pass, `--confirm-pen-plan` may be omitted. Proceed only when
 the exact job reports `READY TO SEND` and placement `PASS`. If HP-GL or any
-sidecar is regenerated, run preflight again. See `JOB_PREFLIGHT.md` for the
+sidecar is regenerated, run preflight again. See `docs/reference/job-preflight.md` for the
 report and confirmation rules.
 
 ## 5. Send registered passes
 
-Follow `playbook.md` to configure the DPX-3300 serial interface and paper
+Follow `docs/how-to/plotter-playbook.md` to configure the DPX-3300 serial interface and paper
 position before power-up. The established serial settings are 9600 baud,
 8 data bits, no parity, one stop bit, and XON/XOFF. Load and test the pens
 listed by the resolved carriage plan. Load a sacrificial Letter sheet at the

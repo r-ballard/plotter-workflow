@@ -59,6 +59,6 @@ preflight should report `SP1 -> SP0`, pen plan PASS, placement PASS, and
 `READY TO SEND`. The seed-17 dense sample measures roughly 16.3 m pen-down
 and 5.3 m pen-up after conversion, so review its actual workload before
 considering a physical plot. Any parameter change requires regeneration,
-conversion, preview, and preflight on the new HP-GL. Follow the [playbook](../../playbook.md)
+conversion, preview, and preflight on the new HP-GL. Follow the [playbook](plotter-playbook.md)
 for switch settings, physical media, keep-awake precautions, and normal sending
 only after operator review. The commands above do not send a job.

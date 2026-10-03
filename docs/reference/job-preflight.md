@@ -95,7 +95,7 @@ modified afterward, run preflight again.
 The repository keeps semantic commissioning invariants under
 `tests/fixtures/hardware_validation/`. The fixture records stable behavior such
 as pen order and assignment policy rather than machine-specific absolute paths
-or a permanent HP-GL SHA-256. See `docs/HARDWARE_VALIDATION.md`.
+or a permanent HP-GL SHA-256. See `docs/validation/hardware-validation.md`.
 
 ## What must agree
 

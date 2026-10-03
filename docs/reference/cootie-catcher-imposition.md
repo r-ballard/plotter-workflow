@@ -368,13 +368,13 @@ The fixture is under:
 tests/fixtures/imposition/cootie_catcher/
   cootie.json
   expected.json
-  VALIDATION.md
   validation_panels/
 ```
 
 Each validation panel is vector-only and deliberately asymmetric. Use it to
 check slot assignment, folded orientation, reflection, and all eight
-selector/reveal pairings.
+selector/reveal pairings. Follow the [fixture validation](../validation/cootie-catcher-fixture.md)
+for the physical check.
 
 Generate it with:
 

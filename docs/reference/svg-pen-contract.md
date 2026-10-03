@@ -66,4 +66,4 @@ applies the resolved physical pen plan, and verifies the resulting physical
 `SPN;` selections again. Declared layers with no drawable geometry are retained
 as provenance but do not consume a physical slot. SVGs without `pen-N` groups
 bypass these contract-specific checks and retain the existing generic SVG
-workflow. See `PEN_PLAN.md` for physical assignment and carriage preflight.
+workflow. See `docs/reference/pen-plan.md` for physical assignment and carriage preflight.

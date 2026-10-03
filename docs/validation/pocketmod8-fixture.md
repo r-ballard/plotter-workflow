@@ -1,6 +1,7 @@
 # Pocketmod8 physical validation fixture
 
-`validation_pages/` contains eight generic, vector-only SVG pages for checking
+`tests/fixtures/imposition/pocketmod8/validation_pages/` contains eight generic,
+vector-only SVG pages for checking
 one-sheet imposition on real paper. Each page has:
 
 - a rectangular page frame;

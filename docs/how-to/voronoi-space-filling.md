@@ -61,6 +61,6 @@ uv run --frozen python scripts/job_preflight.py output/voronoi/voronoi.hpgl
 Inspect the preview, metrics, resolved pen plan, and placement sidecar. The
 default seed-17 conversion measures about 10.8 m pen-down and 3.21 m pen-up.
 For the single-pen job, expect `SP1 -> SP0`, pen plan PASS, placement PASS,
-and `READY TO SEND`. Follow the [playbook](../../playbook.md) for hardware
+and `READY TO SEND`. Follow the [playbook](plotter-playbook.md) for hardware
 setup and keep-awake precautions before any physical plot. The commands above
 do not open a serial port.

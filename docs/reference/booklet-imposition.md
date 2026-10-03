@@ -267,5 +267,5 @@ This is the right level for a golden regression fixture: page mapping and
 orientation should remain stable even if vpype's path serialization changes.
 
 A physical validation source set is checked in under
-`tests/fixtures/imposition/pocketmod8/validation_pages/`. See the adjacent
-`VALIDATION.md` for the sacrificial-paper plot, cut, fold, and page-order check.
+`tests/fixtures/imposition/pocketmod8/validation_pages/`. See the
+[`pocketmod8 fixture`](../validation/pocketmod8-fixture.md) for the sacrificial-paper plot, cut, fold, and page-order check.

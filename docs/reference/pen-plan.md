@@ -50,7 +50,7 @@ simpler for a person to prepare.
 
 ## Input schema
 
-The formal JSON Schema is [`penplan.schema.json`](penplan.schema.json).
+The formal JSON Schema is [`penplan.schema.json`](../../penplan.schema.json).
 
 A user-authored plan has this general shape:
 
@@ -377,7 +377,7 @@ Accounting rules:
 ```
 
 The IDs in this example are placeholders taken from
-[`examples/penplans/logical-multipass.penplan.json`](examples/penplans/logical-multipass.penplan.json);
+[`examples/penplans/logical-multipass.penplan.json`](../../examples/penplans/logical-multipass.penplan.json);
 adapt them to the catalog IDs in your own `design.json` — they do not fit any
 arbitrary bundle.
 
@@ -387,6 +387,6 @@ and `<svg-stem>.<pass-id>.placement.json` sidecars; the pass ID appears in all
 three names. Neutral conversion does not use `--send`; preflight
 and send each pass separately in plan order.
 
-The v2 JSON structure is in [`penplan.schema.json`](penplan.schema.json). The
+The v2 JSON structure is in [`penplan.schema.json`](../../penplan.schema.json). The
 full Git Bash operator walkthrough is
-[`docs/how-to/neutral-logical-layer-plotting.md`](docs/how-to/neutral-logical-layer-plotting.md).
+[`docs/how-to/neutral-logical-layer-plotting.md`](../how-to/neutral-logical-layer-plotting.md).

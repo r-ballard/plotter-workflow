@@ -1,7 +1,7 @@
 # Hilbert hardware-validation fixture
 
 This fixture records stable invariants from the successful three-pen DPX-3300
-commissioning plot documented in `docs/HARDWARE_VALIDATION.md`.
+commissioning plot documented in `docs/validation/hardware-validation.md`.
 
 `golden.penplan.json` is intentionally semantic: it fixes compact assignment to
 physical slots 1-3 and gives every used slot an operator-visible label, but it

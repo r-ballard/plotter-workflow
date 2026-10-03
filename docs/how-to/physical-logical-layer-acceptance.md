@@ -5,7 +5,7 @@ validation for `feat/logical-layer-plotter`: a single-pen orientation control,
 then two registered passes from the neutral orbital software fixture. The
 [Linear acceptance ticket](https://linear.app/hardcase/issue/HAR-26/physically-validate-neutral-logical-layer-multipass-plotting)
 tracks the result. The
-existing [serial playbook](../../playbook.md), [job preflight guide](../../JOB_PREFLIGHT.md),
+existing [serial playbook](plotter-playbook.md), [job preflight guide](../reference/job-preflight.md),
 and [neutral workflow](neutral-logical-layer-plotting.md) remain the authority
 for switch settings, preflight semantics, and normal jobs. The separate
 twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
@@ -23,13 +23,13 @@ twenty-surface cootie-catcher proof is tracked by Linear `HAR-14` and uses
   A 2026-09-30 run moved outside the sheet after computer sleep; the operator
   reported a good repeat after extending sleep to 25 minutes. Sleep is a
   suspected contributor, not a confirmed cause; see the
-  [incident record](../HARDWARE_VALIDATION.md#2026-09-30-neutral-two-pass-acceptance-incident-unresolved).
+  [incident record](../validation/hardware-validation.md#2026-09-30-neutral-two-pass-acceptance-incident-unresolved).
   If sleep occurs or motion leaves the reviewed area, pause or power off as
   needed and inspect the media. Treat the job as interrupted; do not resume it
   or resend without fresh preflight on the exact HP-GL.
 - Use the documented USB-to-RS-232 adapter and null-modem cable to `SERIAL IN`.
   Do not connect the parallel adapter for this procedure.
-- With power **off**, set the full serial switch table in `playbook.md`:
+- With power **off**, set the full serial switch table in `docs/how-to/plotter-playbook.md`:
   SW-1 switch 5 ON (serial), switch 6 OFF (direct), switch 7 ON (ANSI-D),
   SW-2 switch 5 ON (XON/XOFF), and baud dial 14 (9600). Keep the other switches
   at the table's settings. Power on and check for a **green** interface light.
@@ -138,7 +138,7 @@ Observe the first movement and stop for unexpected travel. After motion has
 stopped, inspect the sheet. The fixture has page numbers 1–8, a top arrow,
 and a bottom `V` on each page. Cut and fold only after the plot finishes;
 record page order, arrow direction, scale, clipping, and paper position. See
-the [fixture instructions](../../tests/fixtures/imposition/pocketmod8/VALIDATION.md).
+the [fixture instructions](../validation/pocketmod8-fixture.md).
 Do not proceed to multipass if this control fails.
 
 ## 3. Neutral two-pass registration proof
@@ -296,7 +296,7 @@ Record the date, machine, COM port, paper, physical pens in SP1/SP2/SP3,
 preflight SHA-256 values, photos/scans before and after folding, and any
 pauses or resets. A report for each job is tied to its HP-GL SHA-256; repeat
 preflight if any job or sidecar changes. Add the result to
-[`docs/HARDWARE_VALIDATION.md`](../HARDWARE_VALIDATION.md) and the linked
+[`docs/validation/hardware-validation.md`](../validation/hardware-validation.md) and the linked
 Linear acceptance issue. Open a narrow defect for any failure, with the
 specific job and observed step. Keep production plotting blocked until the
 physical result is reviewed.

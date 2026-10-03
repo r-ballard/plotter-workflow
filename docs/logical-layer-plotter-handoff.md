@@ -50,7 +50,7 @@ Bare `pytest -q` passes all 405 when temporary fixtures have filesystem
 access; that sandbox write boundary remains separate from collection scope.
 
 Qwen's 65,536-context documentation task corrected the exact per-pass
-sidecar names in `PEN_PLAN.md` and the operator guide. Its attempt reached
+sidecar names in `docs/reference/pen-plan.md` and the operator guide. Its attempt reached
 the 600-second deadline after editing; the watchdog returned `REVIEW`, and
 the orchestrator checked and integrated the in-scope diff. The documentation
 and benchmark are recorded in `docs/qwen-pilot-configuration-debrief.md`.
@@ -70,4 +70,4 @@ No pen confirmation, serial access, or physical plotting occurred.
 V2 preflight validates sidecar structure, HP-GL pen order, and current physical
 placement. It cannot recompute the recorded source SVG or manifest hashes from
 the HP-GL job alone; retain the source bundle and imposition audit with job
-records. `JOB_PREFLIGHT.md` describes the operator confirmation boundary.
+records. `docs/reference/job-preflight.md` describes the operator confirmation boundary.

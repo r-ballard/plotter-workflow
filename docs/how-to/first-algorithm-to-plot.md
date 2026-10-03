@@ -44,8 +44,8 @@ outline; there is no required center vertex.
 
 Open the SVG and inspect its density, margins, and line endings. The top-level
 `pen-1` group and adjacent v1 pen plan satisfy the
-[SVG pen contract](../../SVG_PEN_CONTRACT.md) and
-[pen-plan contract](../../PEN_PLAN.md). Change the pen-plan slot description to
+[SVG pen contract](../reference/svg-pen-contract.md) and
+[pen-plan contract](../reference/pen-plan.md). Change the pen-plan slot description to
 match the installed pen before physical use. For your own algorithm, emit a
 strict pen-layer SVG and an adjacent `<stem>.penplan.json`.
 
@@ -70,7 +70,7 @@ uv run --frozen python scripts/dpx3300_convert.py \
 ```
 
 The lower-left Letter profile requires the corresponding ANSI-D switch and
-sheet placement described in the [playbook](../../playbook.md). A different
+sheet placement described in the [playbook](plotter-playbook.md). A different
 sheet or placement needs its own reviewed converter settings. Repeated
 conversion requires `--overwrite`; run the preview and preflight again after
 any change.
@@ -109,8 +109,8 @@ preview and preflight on the new HP-GL.
 
 ## 4. Optional physical plot
 
-After visual review and fresh preflight, follow the [serial playbook](../../playbook.md)
-and [job preflight guide](../../JOB_PREFLIGHT.md) for hardware setup and the
+After visual review and fresh preflight, follow the [serial playbook](plotter-playbook.md)
+and [job preflight guide](../reference/job-preflight.md) for hardware setup and the
 normal `scripts/send_hpgl.py` command. Keep the plotting computer awake throughout
 transmission and all machine motion. A prior interrupted plot was associated
 with host sleep; the [hardware acceptance guide](physical-logical-layer-acceptance.md)

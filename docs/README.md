@@ -5,6 +5,7 @@ Start with the repository [README](../README.md) for deployment and the
 
 ## Operator guides
 
+- [Adding text before conversion](how-to/plotter-playbook.md#adding-text-before-conversion)
 - [First algorithm to plot](how-to/first-algorithm-to-plot.md)
 - [Patchwork example](how-to/patchwork-example.md)
 - [Voronoi space filling](how-to/voronoi-space-filling.md)

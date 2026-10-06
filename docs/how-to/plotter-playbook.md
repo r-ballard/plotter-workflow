@@ -11,6 +11,102 @@ not combine the DIP-switch settings or host commands from the two methods.
 The DPX-3300 reads its DIP switches and baud-rate dial only when it is powered
 on. Always turn the plotter off before changing a switch, then power it back on.
 
+## Adding text before conversion
+
+Use Inkscape for one-off typography after imposition and before SVG-to-HP-GL
+conversion. Repeated or data-driven lettering is a candidate for later automation.
+Choose placement according to what the text belongs to:
+
+| Text purpose | Placement |
+| --- | --- |
+| Words integrated into a polygon's artwork | Prefer design-space generation before imposition; for manual finishing, keep the text with its panel |
+| Sheet title, edition number, caption or registration label | Add after imposition, anchored to the sheet |
+| One-off artistic lettering | Adjust in Inkscape on a copy of the imposed composition |
+
+### Keep an editable master and a plotting copy
+
+1. Copy the imposed artwork into a separate working directory. Keep the generated
+   source bundle and its `design.json` unchanged. For a neutral job, copy the
+   matching `.imposition.json` audit too, keep its SVG basename, and confirm that
+   its source-manifest reference still resolves.
+2. Save an editable text master, for example `drawing.text-master.svg`. Add the
+   words and choose the font, size, spacing and alignment there. Put panel-bound
+   text with that panel; keep sheet captions outside panel transforms and clips.
+3. Preserve the imposed page size, `viewBox`, physical-layout metadata, margins
+   and artwork transforms. Do not resize the page to the drawing or refit the
+   imposed artwork. Keep fold and trim guides in their separate guide SVG.
+4. Save a separate plotting copy. For a neutral job, use the original imposed
+   SVG basename beside its matching imposition audit in the working directory.
+   Convert text to drawable paths in this copy; retain editable text in the master.
+5. Inspect the copy at the final physical size, including the orientation after
+   folding. Check letter spacing, small counters, clearance from folds, polygon
+   borders and the converter's drawing margin. Record the font/version, size,
+   manual edits and intended pen in job notes.
+
+### Choose outlines or pen strokes
+
+Ordinary fonts describe letter outlines. In Inkscape, select the text and use
+**Path > Object to Path** in the plotting copy. For hollow lettering, set fill
+to **None** and apply a visible stroke. A solid SVG fill does not create plotted
+hatching: solid-looking letters need explicit vector fill strokes. Automated
+text-to-region filling is future work, even though the artwork generator has a
+shared fill-effects library.
+
+For small labels or efficient handwriting-style text, use a stroke font through
+[Hershey Text](https://www.evilmadscientist.com/2019/hershey-text-v30/), installing
+its extension if it is unavailable in Inkscape. It produces pen paths rather
+than ordinary glyph contours. Monospaced and handwriting fonts are not
+necessarily single-stroke fonts, and **Object to Path** does not turn outlines
+into centreline lettering. Leave no live text or font-dependent glyph references
+in the plotting copy; the imposition tools reject live text.
+
+Font sources for outline lettering include:
+
+- [Geist](https://github.com/vercel/geist-font): Sans and Mono families.
+- [Inter](https://github.com/rsms/inter): conventional readable typography.
+- [Space Grotesk](https://github.com/floriankarsten/space-grotesk): distinctive proportional lettering.
+- [XXIIVV font collection](https://github.com/XXIIVV/font-collection): custom display styles.
+
+### Preserve the plotting layer contract
+
+An Inkscape layer name alone does not assign a physical pen. For a generic
+single-pen SVG, text paths can share the artwork's pen. For a legacy `pen-N`
+SVG, keep the paths inside the intended pen group and review its pen plan.
+
+For a neutral `viz-logical-layers/v1` job, place the new text paths inside an
+existing declared logical group whose pen mapping is appropriate. Preserve its
+`data-viz-layer-*` attributes and the root contract. Do not create an undeclared
+logical text layer or mix neutral groups with `pen-N` groups. A new logical
+channel requires coordinated producer/catalogue and imposition support; ordinary
+Inkscape editing does not create that contract. See the
+[neutral plotting guide](neutral-logical-layer-plotting.md).
+
+Text conversion can leave font-related CSS on path groups. The neutral converter
+accepts basic fill/stroke styling, not font CSS or live references. If it rejects
+an unsupported style, remove the leftover text-only styling from the plotting
+copy after layout is final, retaining the drawable paths and fill/stroke values.
+Preserve contract and physical-layout attributes while cleaning editor output.
+SVG stroke width is preview styling; the selected pen determines the physical
+mark's width.
+
+Editing a generated source surface invalidates its manifest hash. Work on the
+imposed copy for this manual procedure; do not alter hashes or remove contract
+metadata to bypass validation. The retained imposition audit describes the
+original layout, while job notes document the manual text additions.
+
+### Convert and preflight the edited copy
+
+Run the normal converter on the final path-only SVG, using the same sheet,
+orientation, paper position and margins as the original imposed job. Use the
+correct adjacent pen plan for that basename. Inspect the converted HP-GL or
+its preview and confirm that every intended character is present.
+
+Regenerate placement and resolved pen-plan sidecars, then run job preflight
+again on the newly generated HP-GL. Previous conversion outputs and preflight
+reports do not certify the edited artwork. Check the resolved pen assignment
+and bounds, and confirm the actual carriage before any hardware send. A small
+text sample on sacrificial paper establishes legibility for the selected pen.
+
 ## General safety rules
 
 - Use inexpensive paper and a sacrificial pen for the first test.

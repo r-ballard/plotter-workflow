@@ -141,6 +141,15 @@ orientation or asymmetric design, plan a sacrificial plot-and-fold test.
 If you intentionally regenerate the outputs, add `--overwrite` to the
 imposition command. Without it, existing generated files are protected.
 
+### Optional: add text before conversion
+
+For captions or one-off lettering, follow [Adding text before conversion in the
+operating playbook](plotter-playbook.md#adding-text-before-conversion). Keep an
+editable master and a path-only plotting copy, preserve the imposed page and
+layer contract, then convert and preflight the edited copy. Polygon-integrated
+text belongs with its artwork; sheet titles and edition numbers belong to the
+final sheet composition.
+
 ## 3. Understand layers before assigning pens
 
 Logical artwork layers belong to the SVG. Physical pens are DPX-3300 carriage

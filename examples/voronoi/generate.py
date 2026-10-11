@@ -209,7 +209,7 @@ def main() -> int:
         parser.error(f"source pen-down upper bound {length_upper_bound:.1f} mm exceeds --max-path-mm")
     svg = svg_text(drawing, args.corner_radius_mm)
     plan = {
-        "schema_version": 1,
+        "schema_version": 3,
         "policy": "preserve",
         "slots": [{"slot": 1, "label": "black fine", "tool": "technical pen", "color": "black"}],
     }

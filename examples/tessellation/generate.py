@@ -107,7 +107,7 @@ def main() -> int:
     edges = mesh(args.seed, point_count)
     svg = svg_text(edges)
     plan = {
-        "schema_version": 1,
+        "schema_version": 3,
         "policy": "preserve",
         "slots": [{"slot": 1, "label": "black fine", "tool": "technical pen", "color": "black"}],
     }

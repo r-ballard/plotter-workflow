@@ -63,6 +63,8 @@ Convert and immediately send each result with Chiplotle3:
 Use --dry-run to print commands without executing them.
 """
 
+# Direct-script sys.path bootstrap intentionally precedes project imports.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -79,36 +81,38 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from hpgl_force import apply_force
 from hpgl_placement import validate_hpgl_placement, write_placement_report
 from logical_layer_contract import (
     NEUTRAL_CONTRACT,
+    InputMode,
     inspect_svg_contract,
     load_logical_layer_manifest,
 )
+from pen_force import effective_force, force_code
 from pen_plan import (
     PEN_POLICIES,
-    LogicalPenPlanSpec,
     PenPlanError,
-    ResolvedAssignment,
-    ResolvedPenPlan,
     default_resolved_pen_plan_path,
-    discover_pen_plan,
-    format_pen_plan,
-    load_pen_plan,
+    format_resolved_plot_pass,
+    inspect_plan_layers,
+    make_resolved_pass,
+    physical_pens_in_hpgl,
     plan_has_documented_tools,
     remap_hpgl_pen_selections,
-    resolve_logical_pen_plan,
-    resolve_pen_plan,
-    write_resolved_pen_plan,
+    source_plan,
+    validate_resolved_sidecar_for_hpgl,
     write_resolved_plot_pass,
 )
-from svg_pen_contract import inspect_pen_layer_contract
+from pen_plan_models import PenPlanSpec
+from pen_plan_resolution import resolve_plot_passes
 
 LOG = logging.getLogger("dpx3300")
 DEFAULT_VPYPE_CONFIG = REPO_ROOT / "vpype.toml"
@@ -249,8 +253,7 @@ def discover_svg_files(input_dir: Path, filename: str | None) -> list[Path]:
         return [candidate]
 
     files = sorted(
-        path for path in input_dir.iterdir()
-        if path.is_file() and path.suffix.lower() == ".svg"
+        path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() == ".svg"
     )
     if not files:
         raise FileNotFoundError(f"No SVG files found in {input_dir}")
@@ -300,8 +303,7 @@ def build_vpype_command(
         expected_page_size, expected_orientation = physical_layout
         if expected_page_size.lower() != page_size.lower():
             raise ConversionError(
-                "Preserved-layout SVG expects page size "
-                f"{expected_page_size!r}, not {page_size!r}."
+                f"Preserved-layout SVG expects page size {expected_page_size!r}, not {page_size!r}."
             )
         if (expected_orientation == "landscape") != landscape:
             raise ConversionError(
@@ -376,9 +378,7 @@ def run_command(command: Sequence[str], dry_run: bool = False) -> None:
         ) from exc
 
 
-def validate_hpgl(
-    path: Path, expected_pens: tuple[int, ...] | None = None
-) -> None:
+def validate_hpgl(path: Path, expected_pens: tuple[int, ...] | None = None) -> None:
     """
     Perform lightweight safety checks on a generated HP-GL file.
 
@@ -391,10 +391,7 @@ def validate_hpgl(
     text = path.read_text(encoding="ascii", errors="ignore").upper()
     expected_tokens = ("IN;", "PU", "PD", "PA", "PR")
     if not any(token in text for token in expected_tokens):
-        raise ConversionError(
-            f"{path} does not appear to contain ordinary HP-GL instructions."
-        )
-
+        raise ConversionError(f"{path} does not appear to contain ordinary HP-GL instructions.")
 
     if expected_pens:
         missing = [pen for pen in expected_pens if f"SP{pen};" not in text]
@@ -463,9 +460,7 @@ def _neutral_context(source: Path):
         manifest = load_logical_layer_manifest(manifest_path)
         manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
     except (OSError, ValueError) as exc:
-        raise ConversionError(
-            f"Invalid source manifest in imposition audit: {exc}"
-        ) from exc
+        raise ConversionError(f"Invalid source manifest in imposition audit: {exc}") from exc
     if audit.get("source_manifest_sha256") != manifest_hash:
         raise ConversionError("Imposition audit source manifest SHA-256 mismatch")
     if json.dumps(audit.get("logical_layers"), sort_keys=True) != json.dumps(
@@ -477,16 +472,18 @@ def _neutral_context(source: Path):
         raise ConversionError("SVG logical inventory differs from imposition audit")
     physical = preserved_physical_layout_metadata(source)
     if physical is None:
-        raise ConversionError(
-            "Neutral conversion requires an imposed preserve-layout SVG"
-        )
+        raise ConversionError("Neutral conversion requires an imposed preserve-layout SVG")
     sheet = audit.get("sheet", {})
-    if (
-        not isinstance(sheet, dict)
-        or (sheet.get("name"), sheet.get("orientation")) != physical
-    ):
+    if not isinstance(sheet, dict) or (sheet.get("name"), sheet.get("orientation")) != physical:
         raise ConversionError("SVG physical layout differs from imposition audit")
-    return contract, manifest_hash
+    return replace(contract, layers=manifest.layers), manifest_hash
+
+
+def _planning_context(source):
+    declaration = ET.parse(source).getroot().get("data-viz-layer-contract")
+    if declaration == NEUTRAL_CONTRACT:
+        return _neutral_context(source)
+    return inspect_svg_contract(source), None
 
 
 def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
@@ -505,7 +502,10 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
     _validate_neutral_renderables(root, source)
     svg_ns = "{http://www.w3.org/2000/svg}"
     drawable = {"path", "line", "polyline", "polygon", "rect", "circle", "ellipse"}
-    local = lambda node: node.tag.rsplit("}", 1)[-1]
+
+    def local(node):
+        return node.tag.rsplit("}", 1)[-1]
+
     ids = {}
     for node in root.iter():
         if node.get("id"):
@@ -537,9 +537,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
                         }
                         or "url(" in val.lower()
                     ):
-                        raise ConversionError(
-                            f"Unsupported SVG style/clip property: {prop}"
-                        )
+                        raise ConversionError(f"Unsupported SVG style/clip property: {prop}")
             elif "url(" in value.lower() and key != "clip-path":
                 raise ConversionError(f"Unsupported SVG reference attribute {key}")
     # Normalize only the reader's outer viewport so its results stay in the
@@ -588,8 +586,8 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
                     if index < 0:
                         raise ConversionError("Unsupported root SVG percentage viewport")
                     try:
-                        extent = float(raw[:-1]) / 100 * viewport_extent(
-                            parent_svg_index(index), axis
+                        extent = (
+                            float(raw[:-1]) / 100 * viewport_extent(parent_svg_index(index), axis)
                         )
                     except ValueError as exc:
                         raise ConversionError("Invalid nested SVG viewport size") from exc
@@ -607,9 +605,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
             if not value.endswith("%"):
                 return value
             try:
-                result = float(value[:-1]) / 100 * viewport_extent(
-                    parent_svg_index(index), axis
-                )
+                result = float(value[:-1]) / 100 * viewport_extent(parent_svg_index(index), axis)
             except ValueError as exc:
                 raise ConversionError("Invalid nested SVG percentage offset") from exc
             if not math.isfinite(result):
@@ -618,9 +614,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
 
         for index, ancestor in enumerate(chain):
             attributes = dict(ancestor.attrib)
-            nested_without_viewbox = (
-                local(ancestor) == "svg" and ancestor.get("viewBox") is None
-            )
+            nested_without_viewbox = local(ancestor) == "svg" and ancestor.get("viewBox") is None
             if nested_without_viewbox:
                 # vpype omits x/y when reading a nested SVG without viewBox.
                 # Materialize that viewport translation for geometry; its crop
@@ -635,9 +629,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
             wrapper.attrib.pop("clip-path", None)
             parent = wrapper
             if nested_without_viewbox:
-                parent = ET.SubElement(
-                    parent, svg_ns + "g", {"transform": f"translate({x},{y})"}
-                )
+                parent = ET.SubElement(parent, svg_ns + "g", {"transform": f"translate({x},{y})"})
         element = copy.deepcopy(leaf)
         element.attrib.pop("clip-path", None)
         parent.append(element)
@@ -647,8 +639,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
             crop=False,
         )
         return [
-            [(float(p.real) + offset_x, float(p.imag) + offset_y) for p in line]
-            for line in lines
+            [(float(p.real) + offset_x, float(p.imag) + offset_y) for p in line] for line in lines
         ]
 
     def clip_polygon(raw, chain):
@@ -661,9 +652,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
             or len(clip) != 1
             or clip.get("clip-path")
         ):
-            raise ConversionError(
-                "Unsupported clip units, nesting, or multiple clip shapes"
-            )
+            raise ConversionError("Unsupported clip units, nesting, or multiple clip shapes")
         shape = clip[0]
         if (
             local(shape) not in {"rect", "polygon", "path"}
@@ -736,9 +725,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
                         output,
                         svg_ns + "polyline",
                         {
-                            "points": " ".join(
-                                f"{x:.12g},{y:.12g}" for x, y in part.coords
-                            ),
+                            "points": " ".join(f"{x:.12g},{y:.12g}" for x, y in part.coords),
                             "fill": "none",
                             "stroke": "black",
                         },
@@ -747,9 +734,7 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
         for child in node:
             visit(child, ancestry, clips, output)
 
-    root_clips = (
-        [clip_polygon(root.get("clip-path"), [])] if root.get("clip-path") else []
-    )
+    root_clips = [clip_polygon(root.get("clip-path"), [])] if root.get("clip-path") else []
     for group in root:
         layer_id = group.get("data-viz-layer-id")
         if layer_id is not None:
@@ -761,23 +746,17 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
 
 def _validate_neutral_hpgl(path: Path, expected: tuple[int, ...]) -> None:
     validate_hpgl(path, expected_pens=expected)
-    text = path.read_text(encoding="ascii")
-    selections = []
-    for match in re.finditer(r"SP([^;]*);", text, re.IGNORECASE):
-        value = match.group(1)
-        if not re.fullmatch(r"[0-8]", value):
-            raise ConversionError(f"Unexpected HP-GL pen selection SP{value}")
-        if value != "0" and int(value) not in selections:
-            selections.append(int(value))
-    if tuple(selections) != expected:
-        raise ConversionError(
-            f"HP-GL physical pen order {selections} differs from {expected}"
-        )
+    try:
+        selections = physical_pens_in_hpgl(path)
+    except PenPlanError as error:
+        raise ConversionError(str(error)) from error
+    if selections != expected:
+        raise ConversionError(f"HP-GL physical pen order {selections} differs from {expected}")
 
 
-def convert_neutral_svg(
+def convert_planned_svg(
     source: Path,
-    spec: LogicalPenPlanSpec | None,
+    spec: PenPlanSpec | None,
     output_dir: Path,
     *,
     config_path: Path = DEFAULT_VPYPE_CONFIG,
@@ -797,16 +776,24 @@ def convert_neutral_svg(
     No temporary SVGs or output directories are created by dry runs.
     """
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-    contract, manifest_hash = _neutral_context(source)
-    passes = resolve_logical_pen_plan(
-        contract, spec, source_manifest_hash=manifest_hash
+    source_contract, manifest_hash = _planning_context(source)
+    neutral = source_contract.mode == InputMode.NEUTRAL
+    spec = spec or PenPlanSpec(
+        "compact" if neutral or source_contract.mode == InputMode.GENERIC else "preserve"
+    )
+    passes = resolve_plot_passes(
+        inspect_plan_layers(source, catalog=source_contract.layers if neutral else None), spec
     )
     names = set()
     outputs = []
     for plot_pass in passes:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", plot_pass.id):
             raise ConversionError(f"Unsafe pass filename id: {plot_pass.id!r}")
-        name = f"{source.stem}.{plot_pass.id}.hpgl"
+        name = (
+            f"{source.stem}.hpgl"
+            if len(passes) == 1 and spec.policy != "explicit"
+            else f"{source.stem}.{plot_pass.id}.hpgl"
+        )
         if name.casefold() in names:
             raise ConversionError(f"Pass filename collision: {name}")
         names.add(name.casefold())
@@ -823,20 +810,37 @@ def convert_neutral_svg(
     for path in artifacts:
         if path.exists() and (not overwrite or not path.is_file()):
             raise FileExistsError(f"Output already exists: {path}; use --overwrite")
-    layers = _materialize_neutral_layers(source)
     root = ET.parse(source).getroot()
+    if neutral:
+        layers = _materialize_neutral_layers(source)
+    elif source_contract.mode == InputMode.LEGACY:
+        layers = {g.get("id"): g for g in root if g.get("id", "").startswith("pen-")}
+    else:
+        artwork = ET.Element("{http://www.w3.org/2000/svg}g")
+        for child in root:
+            if child.tag.rsplit("}", 1)[-1] not in ("defs", "style"):
+                artwork.append(copy.deepcopy(child))
+        layers = {"artwork": artwork}
     roots = []
     for plot_pass in passes:
         fragment = ET.Element(root.tag, dict(root.attrib))
         fragment.attrib.pop("data-viz-layer-contract", None)
-        fragment.attrib.pop("clip-path", None)
-        fragment.attrib.pop("transform", None)
+        if neutral:
+            fragment.attrib.pop("clip-path", None)
+            fragment.attrib.pop("transform", None)
+        else:
+            for child in root:
+                if child.tag.rsplit("}", 1)[-1] in ("defs", "style"):
+                    fragment.append(copy.deepcopy(child))
         for number, assignment in enumerate(plot_pass.assignments, 1):
             group = ET.SubElement(
                 fragment, "{http://www.w3.org/2000/svg}g", {"id": f"pen-{number}"}
             )
             for layer_id in assignment.layer_ids:
-                group.append(copy.deepcopy(layers[layer_id]))
+                content = copy.deepcopy(layers[layer_id])
+                content.attrib.pop("id", None)
+                content.attrib.pop("data-pen", None)
+                group.append(content)
             if not any(len(child) for child in group):
                 raise ConversionError(
                     f"Pass {plot_pass.id} slot {assignment.physical_slot} has no geometry after clipping"
@@ -855,41 +859,58 @@ def convert_neutral_svg(
     # Validate layout against the real source; dry-run pass paths do not exist.
     template = build_vpype_command(source, outputs[0], **options)
     if dry_run:
+        for plot_pass in passes:
+            LOG.info("Planned physical pass: %s", plot_pass.id)
+            for assignment in plot_pass.assignments:
+                gf = (
+                    None
+                    if spec.pen_force is None
+                    else effective_force(spec.pen_force, assignment.physical_slot)
+                )
+                LOG.info(
+                    "SP%d: logical %s; %s",
+                    assignment.physical_slot,
+                    ", ".join(assignment.layer_ids),
+                    "force unmanaged" if gf is None else f"expected {gf} gf",
+                )
+            if spec.pen_force is not None:
+                if spec.pen_force.mode == "software":
+                    commands = (
+                        f"FS{force_code(spec.pen_force.default_gf)};"
+                        if spec.pen_force.default_gf is not None
+                        else ""
+                    )
+                    commands += "".join(
+                        f"FS{force_code(gf)},{slot};" for slot, gf in spec.pen_force.slot_overrides
+                    )
+                    LOG.info("Planned FS block: %s; confirm AUTO OFF.", commands)
+                else:
+                    LOG.info(
+                        "Panel force: confirm AUTO ON and listed settings applied; no FS emitted."
+                    )
         for dest in outputs:
             command = list(template)
             command[command.index("read") + 1] = str(dest.with_suffix(".svg"))
             command[-1] = str(dest)
             run_command(command, dry_run=True)
-            LOG.info(
-                "Planned artifacts: %s, %s", dest, default_resolved_pen_plan_path(dest)
-            )
+            LOG.info("Planned artifacts: %s, %s", dest, default_resolved_pen_plan_path(dest))
         return outputs
     output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".neutral-", dir=output_dir) as scratch:
         staging = Path(scratch)
         staged = []
-        for index, (plot_pass, fragment, destination) in enumerate(
-            zip(passes, roots, outputs), 1
-        ):
+        for index, (plot_pass, fragment, destination) in enumerate(zip(passes, roots, outputs), 1):
             temp_svg = staging / destination.with_suffix(".svg").name
             temp_hpgl = staging / destination.name
-            ET.ElementTree(fragment).write(
-                temp_svg, encoding="utf-8", xml_declaration=True
-            )
+            ET.ElementTree(fragment).write(temp_svg, encoding="utf-8", xml_declaration=True)
             run_command(build_vpype_command(temp_svg, temp_hpgl, **options))
             logical = tuple(range(1, len(plot_pass.assignments) + 1))
             physical = tuple(a.physical_slot for a in plot_pass.assignments)
             _validate_neutral_hpgl(temp_hpgl, logical)
-            remap = ResolvedPenPlan(
-                str(source),
-                "explicit",
-                (),
-                tuple(
-                    ResolvedAssignment(n, a.physical_slot, (), "")
-                    for n, a in enumerate(plot_pass.assignments, 1)
-                ),
+            remap_hpgl_pen_selections(temp_hpgl, dict(zip(logical, physical)))
+            temp_hpgl.write_text(
+                apply_force(temp_hpgl.read_text(encoding="ascii"), spec.pen_force), encoding="ascii"
             )
-            remap_hpgl_pen_selections(temp_hpgl, remap)
             _validate_neutral_hpgl(temp_hpgl, physical)
             placement = temp_hpgl.with_suffix(".placement.json")
             report = validate_hpgl_placement(
@@ -901,44 +922,31 @@ def convert_neutral_svg(
             )
             write_placement_report(report, placement)
             sidecar = default_resolved_pen_plan_path(temp_hpgl)
-            payload = {
-                "schema_version": 2,
-                "kind": "resolved-dpx3300-logical-pass",
-                "pass_id": plot_pass.id,
-                "pass_number": index,
-                "pass_count": len(passes),
-                "source_svg": str(source.resolve()),
-                "source_svg_sha256": source_hash,
-                "source_manifest_hash": manifest_hash,
-                "assignments": [
-                    {"layer_ids": list(a.layer_ids), "physical_slot": a.physical_slot}
-                    for a in plot_pass.assignments
-                ],
-                "omitted_layers": list(plot_pass.omitted_layers),
-                "repeated_layers": list(spec.repeated_layers if spec else ()),
-                "physical_slots": list(physical),
-            }
+            payload = make_resolved_pass(
+                source,
+                plot_pass,
+                spec,
+                temp_hpgl,
+                manifest_hash=manifest_hash,
+                pass_number=index,
+                pass_count=len(passes),
+            )
             write_resolved_plot_pass(sidecar, payload)
+            validate_resolved_sidecar_for_hpgl(temp_hpgl, sidecar)
             staged.extend((temp_hpgl, sidecar, placement))
         # Keep previous artifacts intact until every pass has succeeded. Restore
         # them too if publication itself fails partway through.
         if hashlib.sha256(source.read_bytes()).hexdigest() != source_hash:
-            raise ConversionError(
-                "Source SVG changed during conversion; no passes published"
-            )
-        if _neutral_context(source)[1] != manifest_hash:
-            raise ConversionError(
-                "Source manifest changed during conversion; no passes published"
-            )
+            raise ConversionError("Source SVG changed during conversion; no passes published")
+        if neutral and _neutral_context(source)[1] != manifest_hash:
+            raise ConversionError("Source manifest changed during conversion; no passes published")
         backups = {path: path.read_bytes() for path in artifacts if path.exists()}
         published = []
         try:
             for path in staged:
                 target = output_dir / path.name
                 if target.exists() and not overwrite:
-                    raise FileExistsError(
-                        f"Output appeared during conversion: {target}"
-                    )
+                    raise FileExistsError(f"Output appeared during conversion: {target}")
                 path.replace(target)
                 published.append(target)
         except BaseException:
@@ -974,133 +982,55 @@ def convert_files(
     """Convert all *sources* and optionally transmit each result."""
     sources = list(sources)
     if pen_plan_path is not None and len(sources) != 1:
-        raise ValueError("--pen-plan may only be used when converting one SVG")
-    outputs: list[Path] = []
-
-    device_page_size = resolve_device_page_size(
-        page_size=page_size,
-        paper_position=paper_position,
-        landscape=landscape,
+        raise ValueError("--pen-plan may only be used for one SVG")
+    outputs = []
+    profile = resolve_device_page_size(
+        page_size=page_size, paper_position=paper_position, landscape=landscape
     )
-    LOG.info(
-        "Paper placement: %s (layout=%s, device-profile=%s)",
-        paper_position,
-        page_size,
-        device_page_size,
-    )
-
     for source in sources:
-        root = ET.parse(source).getroot()
-        if root.get("data-viz-layer-contract") == NEUTRAL_CONTRACT:
-            if send:
-                raise ConversionError("Neutral jobs do not support automatic --send; plot each verified pass separately")
-            if pen_policy is not None or pen_map is not None or confirm_pen_plan:
-                raise PenPlanError("Neutral input requires a v2 plan; legacy pen flags are incompatible")
-            selected = discover_pen_plan(source, pen_plan_path)
-            spec = load_pen_plan(selected) if selected is not None else None
-            if spec is not None and not isinstance(spec, LogicalPenPlanSpec):
-                raise PenPlanError("Neutral input requires a schema_version=2 pen plan")
-            outputs.extend(convert_neutral_svg(
-                source, spec, output_dir, config_path=config_path, device=device,
-                page_size=page_size, device_page_size=device_page_size,
-                landscape=landscape, margin=margin, velocity=velocity,
-                absolute=absolute, overwrite=overwrite, dry_run=dry_run,
-            ))
-            continue
-        inspect_svg_contract(source)  # Reject unknown, partial, and mixed declarations.
-        output_dir.mkdir(parents=True, exist_ok=True)
-        pen_contract = inspect_pen_layer_contract(source)
-        resolved_pen_plan = None
-        expected_logical_pens = None
-        if pen_contract is not None:
-            resolved_pen_plan = resolve_pen_plan(
-                source,
-                plan_path=pen_plan_path,
-                cli_policy=pen_policy,
-                cli_pen_map=pen_map,
+        context, _ = _planning_context(source)
+        mode = context.mode
+        if mode == InputMode.NEUTRAL and (pen_policy is not None or pen_map is not None or send):
+            raise ConversionError(
+                "neutral input uses schema-3 plans and the reviewed serial sender"
             )
-            expected_logical_pens = resolved_pen_plan.logical_pens
-            LOG.info(
-                "Detected logical SVG pen layers: %s",
-                ", ".join(
-                    f"pen-{pen}" for pen in resolved_pen_plan.declared_logical_pens
-                ),
-            )
-            for line in format_pen_plan(resolved_pen_plan).splitlines():
-                LOG.info("%s", line)
-        elif pen_plan_path is not None or pen_policy is not None or pen_map is not None:
-            raise PenPlanError(
-                "Pen assignment options require a contract SVG with top-level pen-N layers"
-            )
-
-        destination = output_dir / f"{source.stem}.hpgl"
-
-        if destination.exists() and not overwrite:
-            raise FileExistsError(
-                f"Output already exists: {destination}. Use --overwrite to replace it."
-            )
-
-        command = build_vpype_command(
+        spec, _ = source_plan(
             source,
-            destination,
+            plan_path=pen_plan_path,
+            cli_policy=pen_policy,
+            cli_pen_map=pen_map,
+            catalog=context.layers if mode == InputMode.NEUTRAL else None,
+        )
+        paths = convert_planned_svg(
+            source,
+            spec,
+            output_dir,
             config_path=config_path,
             device=device,
             page_size=page_size,
-            device_page_size=device_page_size,
             landscape=landscape,
             margin=margin,
             velocity=velocity,
             absolute=absolute,
+            device_page_size=profile,
+            overwrite=overwrite,
+            dry_run=dry_run,
         )
-        LOG.info("Converting %s -> %s", source.name, destination.name)
-        run_command(command, dry_run=dry_run)
-
-        if not dry_run:
-            validate_hpgl(destination, expected_pens=expected_logical_pens)
-            placement_report = validate_hpgl_placement(
-                destination,
-                config_path=config_path,
-                device=device,
-                page_profile=device_page_size,
-                margin=margin,
-            )
-            placement_path = destination.with_suffix(".placement.json")
-            write_placement_report(placement_report, placement_path)
-            LOG.info(
-                "Placement validated: drawing X=%.0f..%.0f, Y=%.0f..%.0f; report=%s",
-                placement_report.drawing_bounds.min_x,
-                placement_report.drawing_bounds.max_x,
-                placement_report.drawing_bounds.min_y,
-                placement_report.drawing_bounds.max_y,
-                placement_path,
-            )
-            if resolved_pen_plan is not None:
-                remap_hpgl_pen_selections(destination, resolved_pen_plan)
-                validate_hpgl(
-                    destination, expected_pens=resolved_pen_plan.physical_pens
-                )
-                sidecar = default_resolved_pen_plan_path(destination)
-                write_resolved_pen_plan(sidecar, resolved_pen_plan)
-                LOG.info("Created resolved pen plan: %s", sidecar)
-                if send and len(resolved_pen_plan.physical_pens) > 1:
-                    if not plan_has_documented_tools(resolved_pen_plan):
-                        raise ConversionError(
-                            "Multi-pen --send requires a pen-plan JSON with a tool "
-                            "or label for every used physical slot."
-                        )
-                    if not confirm_pen_plan:
-                        raise ConversionError(
-                            "Multi-pen --send requires --confirm-pen-plan after "
-                            "verifying the printed carriage loading plan."
-                        )
-            LOG.info(
-                "Created %s (%d bytes)", destination, destination.stat().st_size
-            )
-            if send:
-                send_with_chiplotle(destination)
-
-        outputs.append(destination)
-
+        if send and not dry_run:
+            for path in paths:
+                resolved = validate_resolved_sidecar_for_hpgl(path)
+                for line in format_resolved_plot_pass(resolved).splitlines():
+                    LOG.info("%s", line)
+                if (
+                    len(resolved.physical_slots) > 1 or resolved.pen_force
+                ) and not confirm_pen_plan:
+                    raise ConversionError(
+                        "--send requires --confirm-pen-plan for carriage/force setup"
+                    )
+                if len(resolved.physical_slots) > 1 and not plan_has_documented_tools(resolved):
+                    raise ConversionError("Multi-pen --send requires documented tools")
+                send_with_chiplotle(path)
+        outputs.extend(paths)
     return outputs
 
 
@@ -1204,8 +1134,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--confirm-pen-plan",
         action="store_true",
         help=(
-            "Confirm that the printed multi-pen carriage loading plan has been "
-            "checked. Required for multi-pen --send."
+            "Confirm carriage and force setup: software AUTO off; panel AUTO on with settings applied. "
+            "Required for multi-pen or force-aware --send."
         ),
     )
     parser.add_argument(
@@ -1241,9 +1171,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     if shutil.which("vpype") is None and not args.dry_run:
-        LOG.error(
-            "vpype is not available on PATH. Install it in the active environment."
-        )
+        LOG.error("vpype is not available on PATH. Install it in the active environment.")
         return 2
 
     try:

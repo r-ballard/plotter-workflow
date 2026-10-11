@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "policy": "preserve",
   "notes": "Preserve each active logical SVG layer's slot number."
 }

@@ -12,7 +12,7 @@ def test_golden_pen_plan_matches_commissioning_invariants() -> None:
     plan = _load("golden.penplan.json")
     expected = _load("expected.json")
 
-    assert plan["schema_version"] == 1
+    assert plan["schema_version"] == 3
     assert plan["policy"] == expected["assignment_policy"] == "compact"
 
     slots = plan["slots"]

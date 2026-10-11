@@ -635,6 +635,34 @@ uv run python scripts/send_hpgl.py --list-ports
 
 ## 8. Send HP-GL over serial
 
+### Review physical pen force
+
+Authored and resolved pen plans now use schema 3 for both legacy pen-N artwork
+and neutral logical-layer artwork. Migrate old authored plans and reconvert;
+old resolved schemas and fallback filenames are not accepted. See the
+[pen-plan reference](../reference/pen-plan.md) for the shared assignment format.
+
+Force is optional and job-specific. The eight-slot Micron examples request
+65 gf using one default, with optional physical-slot overrides. The supported
+forces are 20, 35, 50, 65, 80, 95, 110, and 125 gf. 65 gf encodes as FS7,
+not FS65. Preflight validates every used slot's expected setting against the
+final HP-GL state and hash.
+
+- Software mode: verify AUTO is off. The converter encodes settings after
+  initialization and reapplies them after resets.
+- Panel mode: verify AUTO is on and set the displayed panel forces. This
+  avoids IN resetting a manually applied setting while AUTO is off.
+
+`--confirm-pen-plan` acknowledges the displayed carriage and this force setup,
+even for a single pen. It is an operator assertion, not device telemetry.
+After power cycling, recheck mode, paper, loading, and settings; do not assume
+the previous panel override survived. Run a small sacrificial line test, inspect
+line quality, then separately send the reviewed full job. Record actual hardware
+observations in job notes rather than marking encoded force as measured force.
+
+Port recovery sends no artwork and applies no force; it does not resume a job
+or replace this setup review.
+
 ### macOS
 
 ```bash

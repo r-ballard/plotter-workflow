@@ -7,9 +7,8 @@ control. The script sends the file in chunks and waits for the operating-system
 serial buffer to drain before closing the port.
 """
 
-# Imports after the direct-script sys.path bootstrap are intentional.
+# Direct-script sys.path bootstrap intentionally precedes project imports.
 # ruff: noqa: E402
-
 from __future__ import annotations
 
 import argparse
@@ -28,13 +27,18 @@ if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
 
 from pen_plan import (
     PenPlanError,
-    ResolvedPenPlan,
+    ResolvedPlotPass,
     discover_resolved_pen_plan_path,
-    format_pen_plan,
     format_resolved_plot_pass,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
+)
+from scripts.job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+    write_preflight_report,
 )
 from serial_session import (
     CancelKeys,
@@ -43,13 +47,6 @@ from serial_session import (
     discard_and_close,
     open_serial,
     recover_port,
-)
-
-from scripts.job_preflight import (
-    JobPreflightError,
-    format_job_preflight,
-    run_job_preflight,
-    write_preflight_report,
 )
 
 LOG = logging.getLogger("dpx3300.sender")
@@ -220,13 +217,16 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Resolved .resolved.penplan.json sidecar. By default the sender "
             "discovers <stem>.resolved.penplan.json beside the HP-GL file, "
-            "with read-only fallback for legacy resolved <stem>.penplan.json."
+            "schema 3 is required; old resolved formats must be reconverted."
         ),
     )
     parser.add_argument(
         "--confirm-pen-plan",
         action="store_true",
-        help="Confirm that the printed multi-pen carriage loading plan was checked.",
+        help=(
+            "Confirm carriage loading and force setup: software requires AUTO off; "
+            "panel force requires AUTO on and listed panel settings applied."
+        ),
     )
     parser.add_argument(
         "--allow-unplanned-multipen",
@@ -322,13 +322,11 @@ def main() -> int:
             else discover_resolved_pen_plan_path(args.hpgl)
         )
         resolved_plan = None
+        if args.pen_plan is not None and not sidecar.is_file():
+            raise PenPlanError(f"Explicit resolved pen plan does not exist: {sidecar}")
         if sidecar.is_file():
             resolved_plan = validate_resolved_sidecar_for_hpgl(args.hpgl, sidecar)
-            carriage = (
-                format_pen_plan(resolved_plan)
-                if isinstance(resolved_plan, ResolvedPenPlan)
-                else format_resolved_plot_pass(resolved_plan)
-            )
+            carriage = format_resolved_plot_pass(resolved_plan)
             for line in carriage.splitlines():
                 LOG.info("%s", line)
         elif len(physical_pens) > 1 and not args.allow_unplanned_multipen:
@@ -338,8 +336,17 @@ def main() -> int:
                 "for a deliberately reviewed legacy job."
             )
 
+        if (
+            resolved_plan is not None
+            and resolved_plan.pen_force is not None
+            and not args.confirm_pen_plan
+        ):
+            raise PenPlanError(
+                "--confirm-pen-plan required for force setup: software AUTO off, "
+                "or panel AUTO on with settings applied"
+            )
         if len(physical_pens) > 1 and resolved_plan is not None:
-            if isinstance(resolved_plan, ResolvedPenPlan) and not plan_has_documented_tools(
+            if isinstance(resolved_plan, ResolvedPlotPass) and not plan_has_documented_tools(
                 resolved_plan
             ):
                 raise PenPlanError(

@@ -10,6 +10,13 @@ import re
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, '') and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from hpgl_commands import tokenize_hpgl  # noqa: E402
+from pen_force import force_gf  # noqa: E402
+
 NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)")
 PEN_COLORS = ("#1d3557", "#b21e35", "#18714a", "#713d9a", "#a05214", "#007f91", "#765b15", "#4f4f4f")
 
@@ -32,13 +39,17 @@ def trace(text: str):
     stroke_start = True
     stroke_count = 0
     selections = []
-    for raw in text.replace("\r", "\n").split(";"):
-        command = raw.strip()
-        if not command:
+    for token in tokenize_hpgl(text):
+        opcode, arguments = token.opcode, token.arguments
+        command = text[token.start:token.end]
+        if opcode == 'FS':
+            parts = arguments.split(',')
+            if len(parts) not in (1, 2) or any(not p.strip().isdigit() for p in parts):
+                raise ValueError('invalid FS command')
+            force_gf(int(parts[0]))
+            if len(parts) == 2 and not 1 <= int(parts[1]) <= 8:
+                raise ValueError('invalid FS physical slot')
             continue
-        if len(command) < 2:
-            raise ValueError(f"unsupported HP-GL command: {command!r}")
-        opcode, arguments = command[:2].upper(), command[2:].strip()
         if opcode in ("IN", "DF"):
             if arguments:
                 raise ValueError(f"unsupported HP-GL command: {command!r}")

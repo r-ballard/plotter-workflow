@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from hpgl_commands import tokenize_hpgl
+
 import json
 import re
 import tomllib
@@ -136,12 +138,12 @@ def parse_hpgl_coordinates(text: str) -> ParsedHPGL:
             drawing_segments += 1
         current = destination
 
-    for raw_command in text.replace("\r", "\n").split(";"):
-        command = raw_command.strip()
-        if len(command) < 2:
-            continue
-        opcode = command[:2].upper()
-        arguments = command[2:]
+    try:
+        commands = tokenize_hpgl(text)
+    except ValueError as error:
+        raise PlacementValidationError(str(error)) from error
+    for command in commands:
+        opcode, arguments = command.opcode, command.arguments
         if opcode == "IN":
             absolute = True
             pen_down = False

@@ -703,10 +703,24 @@ power-cycle it, and recheck paper, carriage loading, and pen settings before a
 fresh send. Host buffer discard cannot erase HP-GL already inside the plotter;
 reopening a port alone does not clear that device buffer.
 
-Rescan available ports with `python scripts/send_hpgl.py --list-ports`. If the
-adapter was reconnected, confirm its current port name before a separately reviewed
-send. If a stale process still owns the port, finish cancelling that process first.
-Do not restart a partially plotted file just to test whether the port reopened.
+Rescan available ports with `python scripts/send_hpgl.py --list-ports`. Then test
+reopening the selected port explicitly:
+
+```powershell
+python scripts/send_hpgl.py --recover-port COM4
+```
+
+This command rescans, requires the selected port to be detected, opens it using
+the standard 9600 8N1/XON-XOFF profile, discards host output, and closes it. It sends
+no HP-GL and never resumes a job. It cannot be combined with an artwork file,
+`--port`, or `--list-ports`. A successful reopen confirms host access, not plotter
+readiness or a cleared device buffer. A missing, busy, or faulty port produces a
+nonzero result instead of selecting a different adapter.
+
+If the adapter was reconnected, confirm its current port name before this check
+and any separately reviewed send. If a stale process still owns the port, finish
+cancelling that process first. Recovery does not terminate other processes or
+restart drivers. Do not restart a partially plotted file just to test the port.
 
 From Python, callers can pass a `serial_session.Cancellation` token as
 `send_file(..., cancellation=token, interactive=False)` and call `token.request()`

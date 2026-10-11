@@ -7,7 +7,54 @@ import os
 import sys
 import threading
 
+import serial
+from serial.tools import list_ports
+
 LOG = logging.getLogger("dpx3300.sender")
+
+
+def open_serial(port: str, *, timeout: float = 2.0, write_timeout: float = 30.0):
+    """Open the shared DPX-3300 transport profile; caller owns port closure."""
+    return serial.Serial(
+        port=port,
+        baudrate=9600,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        timeout=timeout,
+        write_timeout=write_timeout,
+        xonxoff=True,
+        rtscts=False,
+        dsrdtr=False,
+    )
+
+
+def recover_port(port: str) -> None:
+    """Rescan and verify a selected port can reopen; never transmit or resume."""
+    ports = tuple(sorted(list_ports.comports(), key=lambda p: p.device))
+    for detected in ports:
+        LOG.info("Detected %s: %s [%s]", detected.device, detected.description, detected.hwid)
+
+    def identity(value):
+        return value.casefold() if os.name == "nt" else value
+
+    matched = [p for p in ports if identity(p.device) == identity(port)]
+    if not matched:
+        raise ValueError(f"{port} is not detected; check/reconnect the adapter and rescan")
+    if len(matched) != 1:
+        raise ValueError(f"{port} has ambiguous scan results; select a unique port")
+    selected = matched[0].device
+    LOG.info("Testing reopen of %s at 9600 8N1 with XON/XOFF; Ctrl+C cancels.", selected)
+    connection = open_serial(selected)
+    try:
+        connection.reset_output_buffer()
+    finally:
+        connection.close()
+    LOG.info("%s reopened and released. No HP-GL sent; no job resumed.", selected)
+    LOG.warning(
+        "This does not clear the plotter buffer or confirm hardware readiness. "
+        "Clear the buffered job or power-cycle after a fault before a separate reviewed send."
+    )
 
 
 class Cancellation:

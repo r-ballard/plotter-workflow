@@ -36,7 +36,14 @@ from pen_plan import (
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
 )
-from serial_session import CancelKeys, Cancellation, TransmissionCancelled, discard_and_close
+from serial_session import (
+    CancelKeys,
+    Cancellation,
+    TransmissionCancelled,
+    discard_and_close,
+    open_serial,
+    recover_port,
+)
 
 from scripts.job_preflight import (
     JobPreflightError,
@@ -142,18 +149,7 @@ def send_file(
                 ctrl.request()
             if ctrl.event.is_set():
                 raise TransmissionCancelled(sent, len(data))
-            connection = serial.Serial(
-                port=port,
-                baudrate=9600,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=timeout,
-                write_timeout=write_timeout,
-                xonxoff=True,
-                rtscts=False,
-                dsrdtr=False,
-            )
+            connection = open_serial(port, timeout=timeout, write_timeout=write_timeout)
             connection.reset_output_buffer()
             if keys.requested():
                 ctrl.request()
@@ -201,6 +197,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("hpgl", nargs="?", type=hpgl_file, help="HP-GL file to send.")
     parser.add_argument("--port", help="Serial port, such as COM3 or /dev/cu.usbserial-...")
+    parser.add_argument(
+        "--recover-port",
+        metavar="PORT",
+        help="Rescan and test reopening the selected port, then close it; sends no HP-GL.",
+    )
     parser.add_argument(
         "--list-ports", action="store_true", help="List detected serial ports and exit."
     )
@@ -269,6 +270,22 @@ def main() -> int:
         format="%(levelname)s: %(message)s",
     )
 
+    recovery_port = getattr(args, "recover_port", None)
+    if recovery_port is not None:
+        if args.hpgl is not None or args.port is not None or args.list_ports:
+            LOG.error(
+                "--recover-port cannot be combined with an HP-GL file, --port, or --list-ports."
+            )
+            return 2
+        try:
+            recover_port(recovery_port)
+        except KeyboardInterrupt:
+            LOG.warning("Port recovery cancelled; no job resumed.")
+            return 130
+        except (OSError, ValueError) as error:
+            LOG.error("Port recovery failed: %s", error)
+            return 1
+        return 0
     if args.list_ports:
         print_ports()
         return 0

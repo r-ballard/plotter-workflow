@@ -7,12 +7,16 @@ control. The script sends the file in chunks and waits for the operating-system
 serial buffer to drain before closing the port.
 """
 
+# Imports after the direct-script sys.path bootstrap are intentional.
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import argparse
 import logging
+import math
 import sys
-import time
+import threading
 from pathlib import Path
 
 import serial
@@ -32,6 +36,8 @@ from pen_plan import (
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
 )
+from serial_session import CancelKeys, Cancellation, TransmissionCancelled, discard_and_close
+
 from scripts.job_preflight import (
     JobPreflightError,
     format_job_preflight,
@@ -77,37 +83,116 @@ def send_file(
     inter_chunk_delay: float = 0.0,
     timeout: float = 2.0,
     write_timeout: float = 30.0,
+    cancellation: Cancellation | None = None,
+    interactive: bool = True,
 ) -> None:
     """Send *path* to *port* using the agreed DPX-3300 serial settings."""
     data = path.read_bytes()
     validate_hpgl(data)
+    if (
+        type(chunk_size) is not int
+        or chunk_size <= 0
+        or not math.isfinite(inter_chunk_delay)
+        or inter_chunk_delay < 0
+    ):
+        raise ValueError("chunk size must be positive and delay finite and nonnegative")
+    ctrl = cancellation if cancellation is not None else Cancellation()
+    if ctrl.event.is_set():
+        raise TransmissionCancelled(0, len(data))
+    sent = 0
+    done = threading.Event()
+    failures = []
+    connection = None
+    worker = None
 
-    LOG.info("Opening %s at 9600 8N1 with XON/XOFF", port)
-    with serial.Serial(
-        port=port,
-        baudrate=9600,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        timeout=timeout,
-        write_timeout=write_timeout,
-        xonxoff=True,
-        rtscts=False,
-        dsrdtr=False,
-    ) as connection:
-        connection.reset_output_buffer()
+    def transmit():
+        nonlocal sent
+        try:
+            for start in range(0, len(data), chunk_size):
+                chunk = data[start : start + chunk_size]
+                offset = 0
+                while offset < len(chunk):
+                    if ctrl.event.is_set():
+                        return
+                    written = connection.write(chunk[offset:])
+                    if type(written) is int and 0 <= written <= len(chunk) - offset:
+                        sent += written
+                        offset += written
+                    elif not ctrl.event.is_set():
+                        raise serial.SerialException("Serial write returned an invalid byte count")
+                    if ctrl.event.is_set():
+                        return
+                    if written == 0:
+                        raise serial.SerialTimeoutException("Serial write made no progress")
+                LOG.debug("Driver reported %d/%d bytes written", sent, len(data))
+                if ctrl.event.wait(inter_chunk_delay):
+                    return
+            if not ctrl.event.is_set():
+                connection.flush()
+        except BaseException as error:
+            failures.append(error)
+        finally:
+            done.set()
 
-        sent = 0
-        for start in range(0, len(data), chunk_size):
-            chunk = data[start : start + chunk_size]
-            connection.write(chunk)
-            sent += len(chunk)
-            LOG.debug("Sent %d/%d bytes", sent, len(data))
-            if inter_chunk_delay:
-                time.sleep(inter_chunk_delay)
-
-        connection.flush()
-
+    with CancelKeys(interactive) as keys:
+        LOG.info("Cancel transmission with Ctrl+C%s.", " or Q/Escape" if keys.enabled else "")
+        LOG.info("Opening %s at 9600 8N1 with XON/XOFF", port)
+        try:
+            if keys.requested():
+                ctrl.request()
+            if ctrl.event.is_set():
+                raise TransmissionCancelled(sent, len(data))
+            connection = serial.Serial(
+                port=port,
+                baudrate=9600,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=timeout,
+                write_timeout=write_timeout,
+                xonxoff=True,
+                rtscts=False,
+                dsrdtr=False,
+            )
+            connection.reset_output_buffer()
+            if keys.requested():
+                ctrl.request()
+            if ctrl.event.is_set():
+                raise TransmissionCancelled(sent, len(data))
+            worker = threading.Thread(target=transmit, name="hpgl-transmit", daemon=True)
+            worker.start()
+            try:
+                while not done.wait(0.02):
+                    if keys.requested():
+                        ctrl.request()
+                    if ctrl.event.is_set():
+                        break
+            except KeyboardInterrupt:
+                ctrl.request()
+            if keys.requested():
+                ctrl.request()
+            if ctrl.event.is_set():
+                raise TransmissionCancelled(sent, len(data))
+            if failures:
+                raise failures[0]
+        except KeyboardInterrupt:
+            ctrl.request()
+            raise TransmissionCancelled(sent, len(data)) from None
+        finally:
+            if connection is not None:
+                if ctrl.event.is_set() or failures:
+                    discard_and_close(connection)
+                else:
+                    connection.close()
+            if worker is not None:
+                worker.join(0.5)
+                if worker.is_alive():
+                    LOG.warning(
+                        "Serial worker did not finish; connection closed. Do not resume this job."
+                    )
+    # Cancellation is accepted through cleanup; completion is committed here.
+    if ctrl.event.is_set():
+        raise TransmissionCancelled(sent, len(data))
     LOG.info("Transmission complete: %d bytes from %s", len(data), path.name)
 
 
@@ -116,8 +201,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("hpgl", nargs="?", type=hpgl_file, help="HP-GL file to send.")
     parser.add_argument("--port", help="Serial port, such as COM3 or /dev/cu.usbserial-...")
-    parser.add_argument("--list-ports", action="store_true", help="List detected serial ports and exit.")
-    parser.add_argument("--chunk-size", type=int, default=1024, help="Bytes per write call. Default: 1024.")
+    parser.add_argument(
+        "--list-ports", action="store_true", help="List detected serial ports and exit."
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, default=1024, help="Bytes per write call. Default: 1024."
+    )
     parser.add_argument(
         "--inter-chunk-delay",
         type=float,
@@ -189,8 +278,8 @@ def main() -> int:
     if args.chunk_size <= 0:
         LOG.error("--chunk-size must be greater than zero.")
         return 2
-    if args.inter_chunk_delay < 0:
-        LOG.error("--inter-chunk-delay cannot be negative.")
+    if not math.isfinite(args.inter_chunk_delay) or args.inter_chunk_delay < 0:
+        LOG.error("--inter-chunk-delay must be finite and nonnegative.")
         return 2
 
     try:
@@ -233,7 +322,9 @@ def main() -> int:
             )
 
         if len(physical_pens) > 1 and resolved_plan is not None:
-            if isinstance(resolved_plan, ResolvedPenPlan) and not plan_has_documented_tools(resolved_plan):
+            if isinstance(resolved_plan, ResolvedPenPlan) and not plan_has_documented_tools(
+                resolved_plan
+            ):
                 raise PenPlanError(
                     "Multi-pen send requires a tool or label for every used physical slot."
                 )
@@ -249,6 +340,16 @@ def main() -> int:
             chunk_size=args.chunk_size,
             inter_chunk_delay=args.inter_chunk_delay,
         )
+    except TransmissionCancelled as exc:
+        LOG.warning("%s", exc)
+        LOG.warning(
+            "Host cancellation may leave HP-GL inside the plotter. "
+            "Clear or power-cycle it after a hardware fault before restarting a job."
+        )
+        return 130
+    except KeyboardInterrupt:
+        LOG.warning("Cancelled before transmission started.")
+        return 130
     except (OSError, serial.SerialException, ValueError, JobPreflightError) as exc:
         LOG.error("%s", exc)
         return 1

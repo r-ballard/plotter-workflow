@@ -10,8 +10,24 @@ import re
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from hpgl_commands import tokenize_hpgl  # noqa: E402
+from pen_force import force_gf  # noqa: E402
+
 NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)")
-PEN_COLORS = ("#1d3557", "#b21e35", "#18714a", "#713d9a", "#a05214", "#007f91", "#765b15", "#4f4f4f")
+PEN_COLORS = (
+    "#1d3557",
+    "#b21e35",
+    "#18714a",
+    "#713d9a",
+    "#a05214",
+    "#007f91",
+    "#765b15",
+    "#4f4f4f",
+)
 
 
 def pairs(arguments: str) -> list[tuple[float, float]]:
@@ -32,13 +48,17 @@ def trace(text: str):
     stroke_start = True
     stroke_count = 0
     selections = []
-    for raw in text.replace("\r", "\n").split(";"):
-        command = raw.strip()
-        if not command:
+    for token in tokenize_hpgl(text):
+        opcode, arguments = token.opcode, token.arguments
+        command = text[token.start : token.end]
+        if opcode == "FS":
+            parts = arguments.split(",")
+            if len(parts) not in (1, 2) or any(not p.strip().isdigit() for p in parts):
+                raise ValueError("invalid FS command")
+            force_gf(int(parts[0]))
+            if len(parts) == 2 and not 1 <= int(parts[1]) <= 8:
+                raise ValueError("invalid FS physical slot")
             continue
-        if len(command) < 2:
-            raise ValueError(f"unsupported HP-GL command: {command!r}")
-        opcode, arguments = command[:2].upper(), command[2:].strip()
         if opcode in ("IN", "DF"):
             if arguments:
                 raise ValueError(f"unsupported HP-GL command: {command!r}")
@@ -86,11 +106,18 @@ def trace(text: str):
 def placement_data(path: Path, hpgl: Path):
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("source_hpgl") != hpgl.name or data.get("status") != "pass":
-        raise ValueError("placement sidecar does not describe a passing report for this HP-GL filename")
+        raise ValueError(
+            "placement sidecar does not describe a passing report for this HP-GL filename"
+        )
     unit = float(data["plotter_unit_length_mm"])
     bounds = data["paper_bounds"]
     xmin, ymin, xmax, ymax = (float(bounds[key]) for key in ("min_x", "min_y", "max_x", "max_y"))
-    if not all(math.isfinite(value) for value in (unit, xmin, ymin, xmax, ymax)) or unit <= 0 or xmin >= xmax or ymin >= ymax:
+    if (
+        not all(math.isfinite(value) for value in (unit, xmin, ymin, xmax, ymax))
+        or unit <= 0
+        or xmin >= xmax
+        or ymin >= ymax
+    ):
         raise ValueError("invalid physical unit or paper bounds in placement sidecar")
     return unit, (xmin, ymin, xmax, ymax)
 
@@ -121,19 +148,21 @@ def output(segments, selections, stroke_count, unit, bounds, hpgl_bytes):
         entry["pen_down_mm"] = round(entry["pen_down_mm"], 3)
     xmin, ymin, xmax, ymax = bounds
     width, height = xmax - xmin, ymax - ymin
-    svg = "\n".join([
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width * unit:g}mm" height="{height * unit:g}mm" viewBox="{xmin:g} {-ymax:g} {width:g} {height:g}">',
-        "<title>Offline HP-GL preview; colors identify physical slots, not actual ink</title>",
-        f'<rect x="{xmin:g}" y="{-ymax:g}" width="{width:g}" height="{height:g}" fill="white" stroke="#888" stroke-width="3"/>',
-        '<g fill="none" stroke="#a0a0a0" stroke-width="2" stroke-dasharray="12 8"><title>Pen-up travel</title>',
-        *travel,
-        "</g>",
-        '<g fill="none" stroke-width="4"><title>Pen-down drawing</title>',
-        *drawing,
-        "</g>",
-        "</svg>",
-        "",
-    ])
+    svg = "\n".join(
+        [
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width * unit:g}mm" height="{height * unit:g}mm" viewBox="{xmin:g} {-ymax:g} {width:g} {height:g}">',
+            "<title>Offline HP-GL preview; colors identify physical slots, not actual ink</title>",
+            f'<rect x="{xmin:g}" y="{-ymax:g}" width="{width:g}" height="{height:g}" fill="white" stroke="#888" stroke-width="3"/>',
+            '<g fill="none" stroke="#a0a0a0" stroke-width="2" stroke-dasharray="12 8"><title>Pen-up travel</title>',
+            *travel,
+            "</g>",
+            '<g fill="none" stroke-width="4"><title>Pen-down drawing</title>',
+            *drawing,
+            "</g>",
+            "</svg>",
+            "",
+        ]
+    )
     metrics = {
         "schema_version": 1,
         "preview_only": True,
@@ -161,7 +190,9 @@ def main(argv=None) -> int:
     placement = args.placement or args.hpgl.with_suffix(".placement.json")
     sources = {args.hpgl.resolve(), placement.resolve()}
     targets = (args.preview, args.metrics)
-    if args.preview.resolve() == args.metrics.resolve() or any(path.resolve() in sources for path in targets):
+    if args.preview.resolve() == args.metrics.resolve() or any(
+        path.resolve() in sources for path in targets
+    ):
         parser.error("preview and metrics must be distinct from each other and from source files")
     if not args.overwrite and any(path.exists() for path in targets):
         parser.error("output exists; use --overwrite intentionally")

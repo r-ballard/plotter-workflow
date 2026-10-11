@@ -259,7 +259,8 @@ accent = [item for item in ids if item.startswith("accent-")]
 assert len(ids) == 50 and len(body) == 36 and len(accent) == 13
 assert set(ids) == {"orbits", *body, *accent}
 plan = {
-    "schema_version": 2,
+    "schema_version": 3,
+    "policy": "explicit",
     "passes": [
         {"id": "body", "assignments": [
             {"layer_ids": ["orbits"], "physical_slot": 1},

@@ -1,3 +1,5 @@
+# Direct-script sys.path bootstrap intentionally precedes project imports.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -13,15 +15,17 @@ if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_placement
+from pen_force import force_payload
 from pen_plan import (
     PenPlanError,
-    ResolvedPenPlan,
+    ResolvedPlotPass,
     discover_resolved_pen_plan_path,
     format_resolved_plot_pass,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
 )
+from pen_plan_models import ForceAudit
 
 
 class JobPreflightError(ValueError):
@@ -48,9 +52,22 @@ class JobPreflightReport:
     tool_documentation_status: str
     operator_confirmation_status: str
     ready_to_send: bool
+    pen_force: ForceAudit | None = None
+    force_confirmation_status: str = "unmanaged"
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        raw = asdict(self)
+        raw["pen_force"] = (
+            None
+            if self.pen_force is None
+            else {
+                "spec": force_payload(self.pen_force.spec),
+                "effective_slot_forces": [
+                    {"slot": s, "force_gf": gf} for s, gf in self.pen_force.effective_slot_forces
+                ],
+            }
+        )
+        return raw
 
 
 def _load_json_object(path: Path, *, label: str) -> dict[str, Any]:
@@ -108,13 +125,10 @@ def _load_and_revalidate_placement(
         )
     raw = _load_json_object(placement_path, label="placement report")
     if raw.get("status") != "pass":
-        raise JobPreflightError(
-            f"Placement report {placement_path} does not have status='pass'"
-        )
+        raise JobPreflightError(f"Placement report {placement_path} does not have status='pass'")
     if raw.get("source_hpgl") not in (None, "", hpgl_path.name):
         raise JobPreflightError(
-            f"Placement report was generated for {raw.get('source_hpgl')!r}, "
-            f"not {hpgl_path.name!r}"
+            f"Placement report was generated for {raw.get('source_hpgl')!r}, not {hpgl_path.name!r}"
         )
 
     try:
@@ -164,7 +178,7 @@ def run_job_preflight(
     placement_report_path: Path | None = None,
     require_operator_confirmation: bool = False,
     operator_confirmed: bool = False,
-) -> tuple[JobPreflightReport, ResolvedPenPlan | dict[str, Any] | None]:
+) -> tuple[JobPreflightReport, ResolvedPlotPass | None]:
     hpgl_path = Path(hpgl_path).expanduser().resolve()
     config_path = Path(config_path).expanduser().resolve()
     if not hpgl_path.is_file() or hpgl_path.stat().st_size == 0:
@@ -184,7 +198,7 @@ def run_job_preflight(
         hpgl_path, placement_report_path, config_path=config_path
     )
 
-    resolved_plan: ResolvedPenPlan | dict[str, Any] | None = None
+    resolved_plan: ResolvedPlotPass | None = None
     if pen_plan_path is None:
         candidate = discover_resolved_pen_plan_path(hpgl_path)
     else:
@@ -196,13 +210,15 @@ def run_job_preflight(
         except PenPlanError as exc:
             raise JobPreflightError(str(exc)) from exc
         pen_plan_status = "pass"
-        documented = (
-            plan_has_documented_tools(resolved_plan)
-            if isinstance(resolved_plan, ResolvedPenPlan)
-            else False
+        documented = plan_has_documented_tools(resolved_plan)
+        tool_status = (
+            "pass"
+            if documented
+            else "logical-layer-map"
+            if resolved_plan.source_manifest_hash
+            else "fail"
         )
-        tool_status = "pass" if documented else "logical-layer-map" if isinstance(resolved_plan, dict) else "fail"
-        if len(physical_pens) > 1 and isinstance(resolved_plan, ResolvedPenPlan) and not documented:
+        if len(physical_pens) > 1 and resolved_plan.source_manifest_hash is None and not documented:
             raise JobPreflightError(
                 "Multi-pen job requires a tool or label for every used physical slot"
             )
@@ -216,10 +232,13 @@ def run_job_preflight(
         tool_status = "not-required-single-pen"
         pen_plan_file = None
 
-    needs_confirmation = len(physical_pens) > 1
+    force_audit = resolved_plan.pen_force if resolved_plan is not None else None
+    if type(operator_confirmed) is not bool:
+        raise JobPreflightError("operator_confirmed must be a boolean acknowledgement")
+    needs_confirmation = len(physical_pens) > 1 or force_audit is not None
     if needs_confirmation and require_operator_confirmation and not operator_confirmed:
         raise JobPreflightError(
-            "Multi-pen send requires --confirm-pen-plan after physically checking carriage loading"
+            "Reviewed carriage/force setup requires --confirm-pen-plan before send"
         )
     confirmation_status = (
         "confirmed"
@@ -229,6 +248,15 @@ def run_job_preflight(
         else "not-required-single-pen"
     )
     ready_to_send = not needs_confirmation or operator_confirmed
+    force_status = (
+        "unmanaged"
+        if force_audit is None
+        else "required-before-send"
+        if not operator_confirmed
+        else "operator-confirmed-auto-off"
+        if force_audit.spec.mode == "software"
+        else "operator-confirmed-panel-settings-auto-on"
+    )
 
     report = JobPreflightReport(
         hpgl_file=str(hpgl_path),
@@ -249,13 +277,13 @@ def run_job_preflight(
         tool_documentation_status=tool_status,
         operator_confirmation_status=confirmation_status,
         ready_to_send=ready_to_send,
+        pen_force=force_audit,
+        force_confirmation_status=force_status,
     )
     return report, resolved_plan
 
 
-def format_job_preflight(
-    report: JobPreflightReport, plan: ResolvedPenPlan | dict[str, Any] | None = None
-) -> str:
+def format_job_preflight(report: JobPreflightReport, plan: ResolvedPlotPass | None = None) -> str:
     lines = [
         "DPX-3300 JOB PREFLIGHT",
         f"File: {Path(report.hpgl_file).name}",
@@ -273,29 +301,21 @@ def format_job_preflight(
             f"X={report.addressed_bounds.min_x:.0f}..{report.addressed_bounds.max_x:.0f}, "
             f"Y={report.addressed_bounds.min_y:.0f}..{report.addressed_bounds.max_y:.0f}"
         ),
-        "HPGL pen order: " + " -> ".join([*(f"SP{pen}" for pen in report.physical_pen_order), "SP0"]),
+        "HPGL pen order: "
+        + " -> ".join([*(f"SP{pen}" for pen in report.physical_pen_order), "SP0"]),
     ]
-    if isinstance(plan, dict):
+    if plan is not None:
         lines.append(format_resolved_plot_pass(plan))
-    elif plan is not None:
-        lines.append("Carriage:")
-        for assignment in plan.assignments:
-            description = " / ".join(
-                value
-                for value in (assignment.label, assignment.tool, assignment.color)
-                if value
-            ) or "<not documented>"
-            lines.append(
-                f"  SP{assignment.physical_slot}: logical {assignment.logical_layer} "
-                f"(generations {','.join(map(str, assignment.generations)) or '-'}) - {description}"
-            )
     lines.extend(
         [
             f"Pen plan: {report.pen_plan_status.upper()}",
             f"Placement: {report.placement_status.upper()}",
             f"Carriage documentation: {report.tool_documentation_status.upper()}",
             f"Operator confirmation: {report.operator_confirmation_status}",
-            "READY TO SEND" if report.ready_to_send else "VALIDATED - OPERATOR CONFIRMATION REQUIRED",
+            f"Force setup: {report.force_confirmation_status}",
+            "READY TO SEND"
+            if report.ready_to_send
+            else "VALIDATED - OPERATOR CONFIRMATION REQUIRED",
         ]
     )
     return "\n".join(lines)
@@ -329,7 +349,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--confirm-pen-plan",
         action="store_true",
-        help="Record that the physical multi-pen carriage loading has been checked.",
+        help="Confirm carriage and force setup: software AUTO off; panel AUTO on with settings applied.",
     )
     parser.add_argument(
         "--write-report",

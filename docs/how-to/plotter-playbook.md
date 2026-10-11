@@ -635,6 +635,34 @@ uv run python scripts/send_hpgl.py --list-ports
 
 ## 8. Send HP-GL over serial
 
+### Review physical pen force
+
+Authored and resolved pen plans now use schema 3 for both legacy pen-N artwork
+and neutral logical-layer artwork. Migrate old authored plans and reconvert;
+old resolved schemas and fallback filenames are not accepted. See the
+[pen-plan reference](../reference/pen-plan.md) for the shared assignment format.
+
+Force is optional and job-specific. The eight-slot Micron examples request
+65 gf using one default, with optional physical-slot overrides. The supported
+forces are 20, 35, 50, 65, 80, 95, 110, and 125 gf. 65 gf encodes as FS7,
+not FS65. Preflight validates every used slot's expected setting against the
+final HP-GL state and hash.
+
+- Software mode: verify AUTO is off. The converter encodes settings after
+  initialization and reapplies them after resets.
+- Panel mode: verify AUTO is on and set the displayed panel forces. This
+  avoids IN resetting a manually applied setting while AUTO is off.
+
+`--confirm-pen-plan` acknowledges the displayed carriage and this force setup,
+even for a single pen. It is an operator assertion, not device telemetry.
+After power cycling, recheck mode, paper, loading, and settings; do not assume
+the previous panel override survived. Run a small sacrificial line test, inspect
+line quality, then separately send the reviewed full job. Record actual hardware
+observations in job notes rather than marking encoded force as measured force.
+
+Port recovery sends no artwork and applies no force; it does not resume a job
+or replace this setup review.
+
 ### macOS
 
 ```bash
@@ -683,6 +711,53 @@ Replace the example device name with the actual port detected on the computer.
 14. Only then proceed to larger jobs.
 
 ## 10. Serial troubleshooting
+
+### Cancel a stalled transmission or hardware-error job
+
+During transmission, press **Ctrl+C**, or **Q/Escape** in an interactive terminal
+(no Enter needed). The sender advertises available keys before opening the port.
+Cancellation interrupts pending writes where supported, discards unsent host
+output, and closes the connection. It also works during inter-chunk delays and
+final drain. The sender exits with status **130** and does not report transmission
+completion. A close failure is reported explicitly; port release is then unconfirmed.
+
+The byte count is what completed serial write calls reported, not proof of
+plotter receipt or drawing completion. An interrupted write can have sent more
+bytes than the reported count. Cancellation does not resume or restart the job.
+
+For a flashing ERROR light or failed pen pickup, cancel the host sender first.
+Follow the plotter's hardware-error recovery procedure, clear its buffered job or
+power-cycle it, and recheck paper, carriage loading, and pen settings before a
+fresh send. Host buffer discard cannot erase HP-GL already inside the plotter;
+reopening a port alone does not clear that device buffer.
+
+Rescan available ports with `python scripts/send_hpgl.py --list-ports`. Then test
+reopening the selected port explicitly:
+
+```powershell
+python scripts/send_hpgl.py --recover-port COM4
+```
+
+This command rescans, requires the selected port to be detected, opens it using
+the standard 9600 8N1/XON-XOFF profile, discards host output, and closes it. It sends
+no HP-GL and never resumes a job. It cannot be combined with an artwork file,
+`--port`, or `--list-ports`. A successful reopen confirms host access, not plotter
+readiness or a cleared device buffer. A missing, busy, or faulty port produces a
+nonzero result instead of selecting a different adapter.
+
+If the adapter was reconnected, confirm its current port name before this check
+and any separately reviewed send. If a stale process still owns the port, finish
+cancelling that process first. Recovery does not terminate other processes or
+restart drivers. Do not restart a partially plotted file just to test the port.
+
+From Python, callers can pass a `serial_session.Cancellation` token as
+`send_file(..., cancellation=token, interactive=False)` and call `token.request()`
+from another thread. The sender raises `TransmissionCancelled` after cleanup.
+Other serial failures propagate to the caller. Terminal key handling is enabled
+only for an interactive input terminal; Ctrl+C remains available otherwise.
+
+No physical-device acceptance is implied by fake-serial tests. On the next supervised
+plot, verify cancellation releases the actual port during the observed hardware fault.
 
 ### The plotter receives nothing
 

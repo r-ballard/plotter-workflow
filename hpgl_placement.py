@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import json
 import re
-import tomllib
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import tomllib
+
+from hpgl_commands import numeric_arguments, tokenize_hpgl
 
 
 class PlacementValidationError(ValueError):
@@ -98,7 +101,10 @@ def _bounds(points: Iterable[tuple[float, float]], *, label: str) -> Bounds:
 
 
 def _coordinate_pairs(argument_text: str) -> list[tuple[float, float]]:
-    values = [float(value) for value in _NUMBER_RE.findall(argument_text)]
+    try:
+        values = numeric_arguments(argument_text)
+    except ValueError as error:
+        raise PlacementValidationError(str(error)) from error
     if not values:
         return []
     if len(values) % 2:
@@ -136,12 +142,12 @@ def parse_hpgl_coordinates(text: str) -> ParsedHPGL:
             drawing_segments += 1
         current = destination
 
-    for raw_command in text.replace("\r", "\n").split(";"):
-        command = raw_command.strip()
-        if len(command) < 2:
-            continue
-        opcode = command[:2].upper()
-        arguments = command[2:]
+    try:
+        commands = tokenize_hpgl(text)
+    except ValueError as error:
+        raise PlacementValidationError(str(error)) from error
+    for command in commands:
+        opcode, arguments = command.opcode, command.arguments
         if opcode == "IN":
             absolute = True
             pen_down = False
@@ -196,7 +202,9 @@ def parse_length_mm(value: str) -> float:
     return magnitude * 25.4
 
 
-def _load_device_profile(config_path: Path, *, device: str, page_profile: str) -> tuple[Bounds, float]:
+def _load_device_profile(
+    config_path: Path, *, device: str, page_profile: str
+) -> tuple[Bounds, float]:
     with Path(config_path).open("rb") as handle:
         config = tomllib.load(handle)
     try:

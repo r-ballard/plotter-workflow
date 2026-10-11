@@ -1,392 +1,106 @@
-# DPX-3300 pen plans
+﻿# Unified DPX-3300 physical pen plans
 
-`plotter-workflow` distinguishes **logical SVG layers** from **physical DPX-3300
-pen slots**.
+Use authored schema **3** for legacy pen-N SVGs and neutral logical-layer SVGs. Both resolve to the same physical-pass audit format. Logical IDs describe artwork; physical slots 1-8 describe carriage positions. Force belongs here, not in viz_virtualserver geometry or SVG layer metadata.
 
-A `viz-virtualserver` SVG may declare logical layers such as `pen-1`, `pen-2`,
-and `pen-6`. These identifiers describe the producer's layer organization. The
-physical carriage still has slots 1 through 8, and a plot job may preserve the
-logical numbers, compact active layers into the lowest slots, or explicitly map
-logical layers to chosen physical slots.
+## Files and policies
 
-This separation is important when a declared logical layer contains no drawable
-geometry. For example, the plant L-system can declare logical `pen-1` for
-initial generation 0 even though that generation contains only the rewrite
-symbol `X`. There is then no reason to consume physical slot 1 unless the user
-chooses a compact or explicit assignment that puts some active layer there.
-
-## Pen-plan filenames
-
-For an SVG named:
-
-```text
-input/plant_test_drawing.svg
-```
-
-an adjacent, user-authored plan is automatically discovered at:
-
-```text
-input/plant_test_drawing.penplan.json
-```
-
-You may instead provide a plan explicitly with:
-
-```bash
---pen-plan path/to/job.penplan.json
-```
-
-After successful conversion, the converter writes the **resolved audit
-sidecar** beside the HPGL output:
-
-```text
-output/plant_test_drawing.hpgl
-output/plant_test_drawing.resolved.penplan.json
-```
-
-The output sidecar records the exact logical-to-physical mapping used, inactive
-logical layers, expected tool metadata, and unused physical slots. It is an
-audit artifact; the input format documented below is intentionally smaller and
-simpler for a person to prepare.
-
-## Input schema
-
-The formal JSON Schema is [`penplan.schema.json`](../../penplan.schema.json).
-
-A user-authored plan has this general shape:
+For input/drawing.svg, the authored plan is input/drawing.penplan.json, or supply it with --pen-plan. Conversion produces HP-GL, placement JSON, and a .resolved.penplan.json audit. Automatic single passes use drawing.hpgl; explicit passes use drawing.<pass-id>.hpgl. Authored and resolved files are distinct formats and suffixes.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "policy": "compact",
-  "slots": [
-    {
-      "slot": 1,
-      "label": "black fine",
-      "tool": "Sakura Pigma Micron 03",
-      "color": "black",
-      "notes": "0.35 mm"
-    }
-  ],
-  "notes": "Load and test all pens before sending the job."
+  "slots": [{"slot": 1, "tool": "Micron", "label": "black fine"}]
 }
 ```
 
-### `schema_version`
+Policies:
 
-Required for user-authored plans. The current value is `1`.
+- preserve uses physical numbers only for unambiguous pen-N identities in 1-8.
+- compact assigns active layers in source/catalog order to slots 1 onward.
+- explicit requires passes with layer-ID assignments, allows merging and multiple passes.
 
-### `policy`
-
-One of:
-
-- `preserve`
-- `compact`
-- `explicit`
-
-The policy controls only physical pen selection. It does not alter drawing
-geometry, page placement, scaling, or SVG colors.
-
-### `slots`
-
-Optional for conversion, but strongly recommended. Each entry documents what
-the user intends to load in a physical DPX slot.
-
-Supported fields are:
-
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `slot` | yes | Physical DPX carriage slot, 1 through 8 |
-| `label` | no | Short human-facing identifier such as `black fine` |
-| `tool` | no | Pen/tool model or type |
-| `color` | no | Human-facing ink/color description |
-| `notes` | no | Nib size, adapter, pressure notes, etc. |
-
-`label` and `tool` are especially useful because `plotter-workflow` cannot
-physically detect which pen is loaded in a slot. The preflight report compares
-the resolved drawing assignment with this declared carriage plan.
-
-### `assignments`
-
-Used only with `policy: "explicit"`.
-
-Every **active** logical layer must be assigned exactly once, and every physical
-slot may be assigned to at most one active logical layer for a single job.
+Empty declared layers do not consume slots. Over eight active layers require explicit merging or multiple passes. Without an authored plan, legacy pen-N input preserves numbers; neutral/generic input compacts. CLI --pen-policy/--pen-map construct the same model and cannot conflict with an authored plan. Neutral input uses JSON plans rather than legacy numeric CLI maps.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "policy": "explicit",
-  "assignments": [
-    {"logical_layer": 2, "physical_slot": 8},
-    {"logical_layer": 3, "physical_slot": 4},
-    {"logical_layer": 4, "physical_slot": 1}
-  ]
-}
-```
-
-Inactive logical layers must **not** be listed. They contain no drawable
-geometry and therefore do not generate an HPGL `SPn;` selection.
-
-## Policy behavior
-
-Assume an SVG declares logical layers 1 through 6, but logical layer 1 is empty:
-
-```text
-logical layer     active?
-1                 no
-2                 yes
-3                 yes
-4                 yes
-5                 yes
-6                 yes
-```
-
-### Preserve
-
-```json
-{
-  "schema_version": 1,
-  "policy": "preserve"
-}
-```
-
-Resolution:
-
-```text
-logical 2 -> physical SP2
-logical 3 -> physical SP3
-logical 4 -> physical SP4
-logical 5 -> physical SP5
-logical 6 -> physical SP6
-```
-
-Physical slot 1 remains unused. This is backward-compatible with the original
-SVG `pen-N` semantics.
-
-### Compact
-
-```json
-{
-  "schema_version": 1,
-  "policy": "compact"
-}
-```
-
-Resolution:
-
-```text
-logical 2 -> physical SP1
-logical 3 -> physical SP2
-logical 4 -> physical SP3
-logical 5 -> physical SP4
-logical 6 -> physical SP5
-```
-
-This is the convenient policy when you prefer to load the lowest carriage slots
-without losing a slot to an empty logical generation.
-
-### Explicit
-
-```json
-{
-  "schema_version": 1,
-  "policy": "explicit",
-  "assignments": [
-    {"logical_layer": 2, "physical_slot": 8},
-    {"logical_layer": 3, "physical_slot": 6},
-    {"logical_layer": 4, "physical_slot": 4},
-    {"logical_layer": 5, "physical_slot": 2},
-    {"logical_layer": 6, "physical_slot": 1}
-  ]
-}
-```
-
-This is useful when specific physical slots are already loaded with particular
-pens or adapters.
-
-## CLI-only assignment
-
-A JSON plan is recommended for repeatable physical jobs, but policies can be
-selected directly at the command line for experimentation:
-
-```bash
---pen-policy compact
-```
-
-or:
-
-```bash
---pen-policy explicit \
---pen-map 2:8,3:6,4:4,5:2,6:1
-```
-
-Do not combine `--pen-plan` with `--pen-policy` or `--pen-map`. An adjacent
-`*.penplan.json` file is also authoritative; remove/rename it if you want to use
-CLI-only assignment for that SVG.
-
-## Preflight output
-
-Before conversion, a multi-pen job prints a carriage-oriented plan similar to:
-
-```text
-Pen assignment policy: compact
-Logical  Generations  ->  DPX slot  Expected tool / color
--------  -----------      --------  ---------------------
-      2  1            ->         1  black fine / Micron 03 / black
-      3  2            ->         2  red fine / Micron 03 / red
-      4  3            ->         3  blue fine / Micron 03 / blue
-      5  4            ->         4  green fine / Micron 03 / green
-      6  5            ->         5  violet fine / Micron 03 / violet
-Inactive logical layers (no drawable geometry): 1
-```
-
-Treat this as the carriage loading checklist. The program can validate that its
-configuration is internally consistent, but **it cannot sense the tool actually
-installed in a physical DPX slot**.
-
-## Sending safety
-
-For a contract SVG using more than one physical pen, `scripts/dpx3300_convert.py --send`
-requires:
-
-1. every used physical slot to have a `tool` or `label` in the pen-plan JSON;
-2. `--confirm-pen-plan` on the command line.
-
-This is intentionally stricter than conversion. You may always generate and
-inspect HPGL with undocumented slots, but an automated multi-pen send should not
-proceed without an explicit carriage plan.
-
-Example:
-
-```bash
-uv run python scripts/dpx3300_convert.py \
-  --input-dir ./input \
-  --output-dir ./output \
-  --file plant_test_drawing.svg \
-  --page-size letter \
-  --landscape \
-  --margin 0.5in \
-  --absolute \
-  --overwrite \
-  --send \
-  --confirm-pen-plan
-```
-
-The adjacent `input/plant_test_drawing.penplan.json` is discovered automatically.
-
-## Resolved output sidecar
-
-The generated `output/<stem>.resolved.penplan.json` includes fields such as:
-
-```json
-{
-  "schema_version": 1,
-  "kind": "resolved-dpx3300-pen-plan",
-  "source_svg": "plant_test_drawing.svg",
-  "policy": "compact",
-  "logical_layers": [
-    {
-      "logical_layer": 1,
-      "active": false,
-      "generations": [0],
-      "preview_color": "#1f77b4"
-    }
-  ],
-  "assignments": [
-    {
-      "logical_layer": 2,
-      "physical_slot": 1,
-      "generations": [1],
-      "preview_color": "#ff7f0e",
-      "tool": "Sakura Pigma Micron 03",
-      "color": "black",
-      "label": "black fine",
-      "notes": null
-    }
-  ],
-  "unused_physical_slots": [6, 7, 8]
-}
-```
-
-The SVG preview color and the physical ink color are deliberately separate.
-`preview_color` describes the producer's logical layer; `color` describes the
-physical tool the user intends to load.
-
-## Input versus resolved sidecar filenames
-
-Pen-plan input specifications and generated resolved audit artifacts use distinct
-filenames:
-
-```text
-<stem>.penplan.json
-    Optional user-authored input specification adjacent to the source SVG.
-
-<stem>.resolved.penplan.json
-    Generated resolved physical-slot audit sidecar adjacent to the HP-GL output.
-```
-
-This distinction allows SVG input and HP-GL output to occupy the same directory
-without the converter reading its own prior output as a new input plan. For
-backward compatibility, preflight and sending may read a legacy
-`<stem>.penplan.json` as a resolved sidecar only when its JSON `kind` is
-`resolved-dpx3300-pen-plan`. New conversions never write the legacy resolved
-filename.
-
-## Neutral logical-layer multipass plans (v2)
-
-A neutral SVG uses catalog IDs from `design.json`, not `pen-N` numeric layers.
-The converter requires an imposed SVG with preserve-layout metadata and an
-adjacent imposition audit.
-
-A user-authored v2 plan has required keys `schema_version` (2), `passes`
-(at least one), `omitted_layers`, and `repeated_layers`. Each pass has an `id`
-and 1..8 assignments. Each assignment has nonempty `layer_ids` and a
-`physical_slot` of 1..8, and may group multiple logical IDs into one physical
-slot. A pass may use each slot and each logical ID only once.
-
-Accounting rules:
-
-- Every catalog ID must be assigned in a pass or listed in `omitted_layers`.
-- A catalog ID used in more than one pass must be declared in
-  `repeated_layers`, and every listed ID must actually occur in at least two
-  passes.
-- Omitted IDs cannot also be assigned or repeated.
-
-```json
-{
-  "schema_version": 2,
   "passes": [
-    {
-      "id": "warm",
-      "assignments": [
-        {"layer_ids": ["orbit", "accent"], "physical_slot": 1},
-        {"layer_ids": ["body-warm"], "physical_slot": 3}
-      ]
-    },
-    {
-      "id": "cool",
-      "assignments": [
-        {"layer_ids": ["body-cool"], "physical_slot": 2},
-        {"layer_ids": ["orbit"], "physical_slot": 4}
-      ]
-    }
+    {"id": "warm", "assignments": [
+      {"layer_ids": ["orbit", "accent"], "physical_slot": 1},
+      {"layer_ids": ["body-warm"], "physical_slot": 3}
+    ]},
+    {"id": "cool", "assignments": [
+      {"layer_ids": ["body-cool"], "physical_slot": 2},
+      {"layer_ids": ["orbit"], "physical_slot": 4}
+    ]}
   ],
   "omitted_layers": ["registration-guide"],
   "repeated_layers": ["orbit"]
 }
 ```
 
-The IDs in this example are placeholders taken from
-[`examples/penplans/logical-multipass.penplan.json`](../../examples/penplans/logical-multipass.penplan.json);
-adapt them to the catalog IDs in your own `design.json` — they do not fit any
-arbitrary bundle.
+Every active layer must be assigned or explicitly omitted. Repeated layers across passes must be declared. No layer appears twice within one pass; each physical slot has one assignment per pass, possibly merging several layers. IDs and slots must be valid, unique where required, and present in the source. Optional slots record tool, color, label, and notes. JSON duplicate keys and unknown fields fail.
 
-On conversion, one HP-GL per pass is emitted in plan order, named
-`<svg-stem>.<pass-id>.hpgl`, with `<svg-stem>.<pass-id>.resolved.penplan.json`
-and `<svg-stem>.<pass-id>.placement.json` sidecars; the pass ID appears in all
-three names. Neutral conversion does not use `--send`; preflight
-and send each pass separately in plan order.
+The formal [schema](../../penplan.schema.json) describes the JSON shape; runtime additionally checks source accounting, strict numeric forms, and duplicate slot identities.
 
-The v2 JSON structure is in [`penplan.schema.json`](../../penplan.schema.json). The
-full Git Bash operator walkthrough is
-[`docs/how-to/neutral-logical-layer-plotting.md`](../how-to/neutral-logical-layer-plotting.md).
+## Optional pen force
+
+```json
+"pen_force": {
+  "mode": "software",
+  "default_gf": 65,
+  "slot_overrides": [{"slot": 2, "force_gf": 50}]
+}
+```
+
+Default applies to all eight slots; overrides are physical-slot settings shared across passes. When force is enabled, every used slot must have an explicit effective force. No default plus incomplete overrides is an error. Omit pen_force for unmanaged force; there is no automatic 65-gf default for unrelated jobs.
+
+| Nominal gf | Generated FS code | Equivalent accepted code |
+| --- | --- | --- |
+| 20 | 1 | 2 |
+| 35 | 3 | 4 |
+| 50 | 5 | 6 |
+| 65 | 7 | 8 |
+| 80 | 9 | 10 |
+| 95 | 11 | 12 |
+| 110 | 13 | 14 |
+| 125 | 15 | 16 |
+
+65 gf encodes FS7; FS7,2 targets slot 2. FS65 is incorrect. Values must be supported integers; strings, booleans, fractions, nulls, duplicate overrides, and unsupported forces fail.
+
+Software mode encodes FS after initialization/resets and before drawing. Confirm AUTO is **off**. The force-state checker requires an explicit setting at every drawing operation, even for 20 gf; it does not assume a hardware default. Conflicting FS, unsupported drawing commands, and unsafe pen changes fail. Command-like text inside labels is tokenized correctly; convert text to vector paths before force-managed HP-GL drawing.
+
+Panel mode emits no FS. Set AUTO **on** and apply the requested panel forces, then confirm both. The manufacturer states IN can reset force when AUTO is off, while AUTO on preserves it. Panel jobs containing FS are rejected.
+
+`--confirm-pen-plan` acknowledges carriage loading and this mode/setup. Force-aware jobs require it even with one pen; bypass flags do not waive it. Preflight reports expected/encoded/operator-confirmed force, never measured force. The sender cannot read actual AUTO state or pressure.
+
+See [software Micron example](../../examples/penplans/micron-eight-software.penplan.json) and [panel example](../../examples/penplans/micron-eight-panel.penplan.json). Both document eight tools with one job-wide 65-gf setting. Recheck setup after power cycling and run a small sacrificial line before a full job.
+
+Source: [DPX-3300 operation manual](https://lesporteslogiques.net/materiel/plotter_roland_DPX-3300/DPX-3300_operation_manual.pdf#page=146), PDF pp.47,146-147,151. Nominal force is not a measurement of contact pressure or a recommendation for every pen/paper.
+
+## Resolved audits and preflight
+
+Each resolved audit uses schema3 and kind resolved-dpx3300-plot-pass. It records source SVG/hash, nullable source-manifest hash, pass identity/count, shared assignments and physical slot order, omission/repetition, applicable tool metadata, final HP-GL hash, and optional force spec/effective-slot values.
+
+Preflight recomputes HP-GL hash, pen order and force state; matching hashes alone do not excuse wrong force. Available source SVG/manifest hashes are checked. Current placement is independently revalidated against the report. Moved source files are not a new requirement for sending reviewed HP-GL/audits.
+
+```powershell
+python scripts/job_preflight.py output/drawing.hpgl --confirm-pen-plan --write-report
+python scripts/send_hpgl.py --port COM4 --confirm-pen-plan output/drawing.hpgl
+```
+
+Port recovery sends no artwork and sets no force. It does not authorize restarting a partially drawn job.
+
+## Migrate old plans
+
+Versions 1 and 2 are rejected; regenerate resolved audits by reconverting the SVG. No runtime wrapper or fallback reader is retained. Do not edit a sidecar version number to disguise an old payload.
+
+For v1 authored plans, set schema_version 3. Preserve/compact policies and tool slot metadata keep their meaning. Replace explicit numeric assignments with a passes array and layer_ids strings: logical_layer 2 becomes layer_ids ["pen-2"]. Choose a pass ID such as plot.
+
+For v2 authored plans, set schema_version 3 and policy explicit; keep passes, logical string IDs, omissions, and repetition. Add slot/tool metadata and optional force deliberately. The repository example plans are already migrated.
+
+Old generated .penplan.json sidecars are not discovered as resolved audits. Remove/archive them yourself when appropriate and reconvert into .resolved.penplan.json. Found stale/invalid files fail explicitly. Personal files are not automatically rewritten by conversion or sending.
+
+The supported HP-GL subset uses explicit semicolon termination, finite numeric motion/control arguments, and label terminators. Implicit mnemonic termination and embedded commands are rejected rather than interpreted incompletely.

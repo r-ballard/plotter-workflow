@@ -1,3 +1,4 @@
+import hashlib
 import json
 from argparse import Namespace
 from pathlib import Path
@@ -14,7 +15,7 @@ from scripts.job_preflight import (
 
 def write_config(path: Path) -> Path:
     path.write_text(
-        '''[device.dpx3300]\nplotter_unit_length = "0.025mm"\npen_count = 8\n\n[[device.dpx3300.paper]]\nname = "letter"\nx_range = [-5588, 5588]\ny_range = [-4318, 4318]\n''',
+        """[device.dpx3300]\nplotter_unit_length = "0.025mm"\npen_count = 8\n\n[[device.dpx3300.paper]]\nname = "letter"\nx_range = [-5588, 5588]\ny_range = [-4318, 4318]\n""",
         encoding="utf-8",
     )
     return path
@@ -23,44 +24,40 @@ def write_config(path: Path) -> Path:
 def write_hpgl(path: Path, pens=(8, 6), x0=-1000, y0=-1000, x1=1000, y1=1000) -> Path:
     chunks = ["IN", "PA"]
     for index, pen in enumerate(pens):
-        chunks += [f"SP{pen}", f"PU{x0 + index * 10},{y0}", f"PD{x1},{y1}"]
+        chunks += [f"SP{pen}", f"PU{x0 + index * 10},{y0}", f"PD{x1},{y1}", "PU"]
     chunks += ["PU", "SP0"]
     path.write_text(";".join(chunks) + ";", encoding="ascii")
     return path
 
 
 def write_penplan(path: Path, pens=(8, 6), documented=True) -> Path:
-    assignments = []
-    logical_layers = []
-    for logical, pen in enumerate(pens, start=2):
-        logical_layers.append({
-            "logical_layer": logical,
-            "active": True,
-            "generations": [logical - 1],
-            "preview_color": "#000000",
-        })
-        assignments.append({
-            "logical_layer": logical,
-            "physical_slot": pen,
-            "generations": [logical - 1],
-            "preview_color": "#000000",
-            "tool": "technical pen" if documented else None,
-            "color": "black",
-            "label": f"tool {logical}" if documented else None,
-            "notes": None,
-        })
+    hpgl = path.with_name(path.name.replace(".resolved.penplan.json", ".hpgl"))
     raw = {
-        "schema_version": 1,
-        "kind": "resolved-dpx3300-pen-plan",
+        "schema_version": 3,
+        "kind": "resolved-dpx3300-plot-pass",
         "source_svg": "drawing.svg",
+        "source_svg_sha256": "a" * 64,
+        "source_manifest_hash": None,
         "policy": "explicit",
-        "logical_layers": logical_layers,
-        "assignments": assignments,
-        "slots": [],
-        "unused_physical_slots": [],
-        "notes": None,
+        "pass_id": "plot",
+        "pass_number": 1,
+        "pass_count": 1,
+        "assignments": [
+            {"layer_ids": [f"pen-{i}"], "physical_slot": pen} for i, pen in enumerate(pens, 2)
+        ],
+        "physical_slots": list(pens),
+        "omitted_layers": [],
+        "repeated_layers": [],
+        "slots": [
+            {"slot": pen, "tool": "technical pen", "label": f"tool {i}", "color": "black"}
+            if documented
+            else {"slot": pen, "color": "black"}
+            for i, pen in enumerate(pens, 2)
+        ],
+        "hpgl_sha256": hashlib.sha256(hpgl.read_bytes()).hexdigest(),
+        "pen_force": None,
     }
-    path.write_text(json.dumps(raw), encoding="utf-8")
+    path.write_text(json.dumps(raw))
     return path
 
 
@@ -90,41 +87,34 @@ def write_placement(path: Path, hpgl_name="drawing.hpgl", drawing=None) -> Path:
 def setup_job(tmp_path: Path, pens=(8, 6), documented=True):
     config = write_config(tmp_path / "vpype.toml")
     hpgl = write_hpgl(tmp_path / "drawing.hpgl", pens=pens)
-    penplan = write_penplan(tmp_path / "drawing.penplan.json", pens=pens, documented=documented)
+    penplan = write_penplan(
+        tmp_path / "drawing.resolved.penplan.json", pens=pens, documented=documented
+    )
     placement = write_placement(tmp_path / "drawing.placement.json")
     return config, hpgl, penplan, placement
 
 
 def write_logical_pass(path: Path, pens=(8, 6)) -> Path:
-    payload = {
-        "schema_version": 2,
-        "kind": "resolved-dpx3300-logical-pass",
-        "pass_id": "warm",
-        "pass_number": 1,
-        "pass_count": 2,
-        "source_svg": "drawing.svg",
-        "source_svg_sha256": "a" * 64,
-        "source_manifest_hash": "b" * 64,
-        "assignments": [
-            {"layer_ids": [f"layer-{index}"], "physical_slot": pen}
-            for index, pen in enumerate(pens, start=1)
-        ],
-        "omitted_layers": [],
-        "repeated_layers": [],
-        "physical_slots": list(pens),
-    }
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    write_penplan(path, pens)
+    raw = json.loads(path.read_text())
+    raw.update(pass_id="warm", pass_count=2, source_manifest_hash="b" * 64)
+    raw["assignments"] = [
+        {"layer_ids": [f"layer-{i}"], "physical_slot": pen} for i, pen in enumerate(pens, 1)
+    ]
+    path.write_text(json.dumps(raw))
     return path
 
 
-def test_v2_multi_pen_preflight_shows_logical_carriage_and_requires_confirmation(tmp_path: Path):
+def test_schema3_multi_pen_preflight_shows_logical_carriage_and_requires_confirmation(
+    tmp_path: Path,
+):
     config, hpgl, legacy, _ = setup_job(tmp_path)
     legacy.unlink()
     write_logical_pass(tmp_path / "drawing.resolved.penplan.json")
     report, plan = run_job_preflight(hpgl, config_path=config)
     assert report.pen_plan_status == "pass"
     assert report.ready_to_send is False
-    assert plan["pass_id"] == "warm"
+    assert plan.pass_id == "warm"
     formatted = format_job_preflight(report, plan)
     assert "layer-1" in formatted and "SP8" in formatted
     with pytest.raises(JobPreflightError, match="requires --confirm-pen-plan"):
@@ -135,41 +125,69 @@ def test_v2_multi_pen_preflight_shows_logical_carriage_and_requires_confirmation
     assert confirmed.ready_to_send is True
 
 
-def test_v2_multi_pen_preflight_rejects_wrong_pen_order(tmp_path: Path):
+def test_schema3_multi_pen_preflight_rejects_wrong_pen_order(tmp_path: Path):
     config, hpgl, legacy, _ = setup_job(tmp_path)
     legacy.unlink()
     write_logical_pass(tmp_path / "drawing.resolved.penplan.json", pens=(6, 8))
-    with pytest.raises(JobPreflightError, match="does not match resolved logical pass"):
+    with pytest.raises(JobPreflightError, match="pen order"):
         run_job_preflight(hpgl, config_path=config)
 
 
-def test_sender_accepts_confirmed_v2_pass_without_opening_serial(tmp_path: Path, monkeypatch):
+def test_sender_accepts_confirmed_schema3_pass_without_opening_serial(tmp_path: Path, monkeypatch):
     config, hpgl, legacy, _ = setup_job(tmp_path)
     legacy.unlink()
     write_logical_pass(tmp_path / "drawing.resolved.penplan.json")
     sent = []
-    monkeypatch.setattr(send_hpgl, "parse_args", lambda: Namespace(
-        list_ports=False, port="COM_TEST", hpgl=hpgl, chunk_size=1024,
-        inter_chunk_delay=0.0, allow_unvalidated_job=False, vpype_config=config,
-        pen_plan=None, placement_report=None, confirm_pen_plan=True,
-        allow_unplanned_multipen=False, verbose=False,
-    ))
-    monkeypatch.setattr(send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path)))
+    monkeypatch.setattr(
+        send_hpgl,
+        "parse_args",
+        lambda: Namespace(
+            list_ports=False,
+            port="COM_TEST",
+            hpgl=hpgl,
+            chunk_size=1024,
+            inter_chunk_delay=0.0,
+            allow_unvalidated_job=False,
+            vpype_config=config,
+            pen_plan=None,
+            placement_report=None,
+            confirm_pen_plan=True,
+            allow_unplanned_multipen=False,
+            verbose=False,
+        ),
+    )
+    monkeypatch.setattr(
+        send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path))
+    )
     assert send_hpgl.main() == 0
     assert sent == [("COM_TEST", hpgl)]
     assert (tmp_path / "drawing.preflight.json").is_file()
 
 
-def test_sender_keeps_legacy_v1_resolved_sidecar_compatibility(tmp_path: Path, monkeypatch):
+def test_sender_accepts_legacy_source_with_schema3_sidecar(tmp_path: Path, monkeypatch):
     config, hpgl, _, _ = setup_job(tmp_path)
     sent = []
-    monkeypatch.setattr(send_hpgl, "parse_args", lambda: Namespace(
-        list_ports=False, port="COM_TEST", hpgl=hpgl, chunk_size=1024,
-        inter_chunk_delay=0.0, allow_unvalidated_job=False, vpype_config=config,
-        pen_plan=None, placement_report=None, confirm_pen_plan=True,
-        allow_unplanned_multipen=False, verbose=False,
-    ))
-    monkeypatch.setattr(send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path)))
+    monkeypatch.setattr(
+        send_hpgl,
+        "parse_args",
+        lambda: Namespace(
+            list_ports=False,
+            port="COM_TEST",
+            hpgl=hpgl,
+            chunk_size=1024,
+            inter_chunk_delay=0.0,
+            allow_unvalidated_job=False,
+            vpype_config=config,
+            pen_plan=None,
+            placement_report=None,
+            confirm_pen_plan=True,
+            allow_unplanned_multipen=False,
+            verbose=False,
+        ),
+    )
+    monkeypatch.setattr(
+        send_hpgl, "send_file", lambda port, path, **kwargs: sent.append((port, path))
+    )
     assert send_hpgl.main() == 0
     assert sent == [("COM_TEST", hpgl)]
 
@@ -210,8 +228,8 @@ def test_sender_mode_rejects_unconfirmed_multi_pen_job(tmp_path: Path):
 
 def test_pen_order_mismatch_is_rejected(tmp_path: Path):
     config, hpgl, _, _ = setup_job(tmp_path, pens=(8, 6))
-    write_penplan(tmp_path / "drawing.penplan.json", pens=(8, 4))
-    with pytest.raises(JobPreflightError, match="does not match resolved pen plan"):
+    write_penplan(tmp_path / "drawing.resolved.penplan.json", pens=(8, 4))
+    with pytest.raises(JobPreflightError, match="pen order"):
         run_job_preflight(hpgl, config_path=config)
 
 

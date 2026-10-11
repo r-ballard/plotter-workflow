@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pen_force import ForceSpec
 
 SCHEMA_VERSION = 3
-RESOLVED_KIND = 'resolved-dpx3300-plot-pass'
+RESOLVED_KIND = "resolved-dpx3300-plot-pass"
 
 
 class PenPlanError(ValueError):

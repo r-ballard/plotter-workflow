@@ -6,15 +6,23 @@ from pathlib import Path
 import pytest
 
 import scripts.dpx3300_convert as converter
-from pen_plan import LogicalAssignment, LogicalPenPlanSpec, PassSpec, PenPlanError
+from pen_plan_models import (
+    Assignment as LogicalAssignment,
+)
+from pen_plan_models import (
+    PassSpec,
+    PenPlanError,
+)
+from pen_plan_models import (
+    PenPlanSpec as LogicalPenPlanSpec,
+)
 from scripts.dpx3300_convert import ConversionError, validate_hpgl
 from scripts.job_preflight import run_job_preflight
 
 
 def neutral_job(tmp_path, count=2, geometry=None, definitions="", imposed=True):
     layers = [
-        {"id": f"layer-{n}", "ordinal": n, "label": f"Layer {n}"}
-        for n in range(1, count + 1)
+        {"id": f"layer-{n}", "ordinal": n, "label": f"Layer {n}"} for n in range(1, count + 1)
     ]
     groups = "".join(
         f'<g data-viz-layer-id="{item["id"]}" '
@@ -69,9 +77,7 @@ def neutral_job(tmp_path, count=2, geometry=None, definitions="", imposed=True):
                 "logical_layer_contract": "viz-logical-layers/v1",
                 "sheet": {"name": "a3", "orientation": "portrait"},
                 "source_manifest_path": str(manifest),
-                "source_manifest_sha256": hashlib.sha256(
-                    manifest.read_bytes()
-                ).hexdigest(),
+                "source_manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
                 "logical_layers": layers,
                 "logical_layer_ids": [item["id"] for item in layers],
             }
@@ -83,7 +89,7 @@ def neutral_job(tmp_path, count=2, geometry=None, definitions="", imposed=True):
 
 def two_pass_spec():
     return LogicalPenPlanSpec(
-        2,
+        "explicit",
         (
             PassSpec(
                 "pass-1",
@@ -91,8 +97,6 @@ def two_pass_spec():
             ),
             PassSpec("pass-2", (LogicalAssignment(("layer-9",), 3),)),
         ),
-        (),
-        (),
     )
 
 
@@ -123,20 +127,18 @@ def test_neutral_two_pass_artifacts_and_remapping(tmp_path, monkeypatch):
     source = neutral_job(tmp_path, 9)
     original = source.read_bytes()
     inputs = mock_vpype(monkeypatch)
-    outputs = converter.convert_neutral_svg(source, two_pass_spec(), tmp_path / "out")
+    outputs = converter.convert_planned_svg(source, two_pass_spec(), tmp_path / "out")
     assert [p.name for p in outputs] == ["drawing.pass-1.hpgl", "drawing.pass-2.hpgl"]
     assert "SP8;" in outputs[0].read_text() and "SP3;" in outputs[1].read_text()
     assert len(inputs[0].findall("{http://www.w3.org/2000/svg}g")) == 8
-    assert [
-        g.get("data-viz-layer-id")
-        for g in inputs[1].iter()
-        if g.get("data-viz-layer-id")
-    ] == ["layer-9"]
+    assert [g.get("data-viz-layer-id") for g in inputs[1].iter() if g.get("data-viz-layer-id")] == [
+        "layer-9"
+    ]
     assert source.read_bytes() == original
     assert not list((tmp_path / "out").glob("*.svg"))
     payload = json.loads(outputs[1].with_suffix(".resolved.penplan.json").read_text())
-    assert payload["schema_version"] == 2
-    assert payload["kind"] == "resolved-dpx3300-logical-pass"
+    assert payload["schema_version"] == 3
+    assert payload["kind"] == "resolved-dpx3300-plot-pass"
     assert (payload["pass_id"], payload["pass_number"], payload["pass_count"]) == (
         "pass-2",
         2,
@@ -154,22 +156,21 @@ def test_neutral_two_pass_artifacts_and_remapping(tmp_path, monkeypatch):
 def test_neutral_merge_omission_and_repetition(tmp_path, monkeypatch):
     source = neutral_job(tmp_path, 4)
     spec = LogicalPenPlanSpec(
-        2,
+        "explicit",
         (
             PassSpec("first", (LogicalAssignment(("layer-3", "layer-1"), 7),)),
             PassSpec("second", (LogicalAssignment(("layer-1", "layer-4"), 2),)),
         ),
-        ("layer-2",),
-        ("layer-1",),
+        omitted_layers=("layer-2",),
+        repeated_layers=("layer-1",),
     )
     inputs = mock_vpype(monkeypatch)
-    outputs = converter.convert_neutral_svg(source, spec, tmp_path / "out")
+    outputs = converter.convert_planned_svg(source, spec, tmp_path / "out")
     assert len(list(inputs[0])) == 1
-    assert [
-        g.get("data-viz-layer-id")
-        for g in inputs[0].iter()
-        if g.get("data-viz-layer-id")
-    ] == ["layer-1", "layer-3"]
+    assert [g.get("data-viz-layer-id") for g in inputs[0].iter() if g.get("data-viz-layer-id")] == [
+        "layer-1",
+        "layer-3",
+    ]
     payload = json.loads(outputs[0].with_suffix(".resolved.penplan.json").read_text())
     assert payload["omitted_layers"] == ["layer-2"]
     assert payload["repeated_layers"] == ["layer-1"]
@@ -183,9 +184,7 @@ def test_neutral_merge_omission_and_repetition(tmp_path, monkeypatch):
         ('<path d="M0 0 L10 0 L0 10 Z"/>', (20, 25)),
     ],
 )
-def test_neutral_clipping_truncates_transformed_geometry(
-    tmp_path, monkeypatch, shape, expected
-):
+def test_neutral_clipping_truncates_transformed_geometry(tmp_path, monkeypatch, shape, expected):
     source = neutral_job(
         tmp_path,
         1,
@@ -193,7 +192,7 @@ def test_neutral_clipping_truncates_transformed_geometry(
         definitions='<defs><clipPath id="domain">' + shape + "</clipPath></defs>",
     )
     inputs = mock_vpype(monkeypatch)
-    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    converter.convert_planned_svg(source, None, tmp_path / "out")
     import io
 
     import vpype
@@ -218,15 +217,11 @@ def test_neutral_clipping_truncates_transformed_geometry(
         ),
     ],
 )
-def test_neutral_unsupported_clips_fail_before_execution(
-    tmp_path, monkeypatch, definitions, clip
-):
-    source = neutral_job(
-        tmp_path, 1, f'<path clip-path="{clip}" d="M0 0 L20 20"/>', definitions
-    )
+def test_neutral_unsupported_clips_fail_before_execution(tmp_path, monkeypatch, definitions, clip):
+    source = neutral_job(tmp_path, 1, f'<path clip-path="{clip}" d="M0 0 L20 20"/>', definitions)
     inputs = mock_vpype(monkeypatch)
     with pytest.raises((ConversionError, ValueError), match="clip|reference|URL"):
-        converter.convert_neutral_svg(source, None, tmp_path / "out")
+        converter.convert_planned_svg(source, None, tmp_path / "out")
     assert inputs == []
 
 
@@ -273,42 +268,34 @@ def test_neutral_invalid_audit_fails_before_execution(tmp_path, monkeypatch, dam
     with pytest.raises(
         (ConversionError, ValueError), match="audit|manifest|catalog|inventory|layout"
     ):
-        converter.convert_neutral_svg(source, None, tmp_path / "out")
+        converter.convert_planned_svg(source, None, tmp_path / "out")
     assert inputs == []
 
 
 def test_neutral_default_limit_and_dry_run(tmp_path, monkeypatch):
     source = neutral_job(tmp_path, 9)
     inputs = mock_vpype(monkeypatch)
-    with pytest.raises(PenPlanError, match="explicit merge or multiple passes"):
-        converter.convert_neutral_svg(source, None, tmp_path / "out", dry_run=True)
-    outputs = converter.convert_neutral_svg(
-        source, two_pass_spec(), tmp_path / "out", dry_run=True
-    )
+    with pytest.raises(PenPlanError, match="explicit passes"):
+        converter.convert_planned_svg(source, None, tmp_path / "out", dry_run=True)
+    outputs = converter.convert_planned_svg(source, two_pass_spec(), tmp_path / "out", dry_run=True)
     assert len(outputs) == 2 and all(not p.exists() for p in outputs)
     assert not (tmp_path / "out").exists()
     assert inputs == []
 
 
 @pytest.mark.parametrize("ids", [("same", "SAME"), ("a/b", "a-b"), ("same", "same")])
-def test_neutral_pass_filenames_reject_collisions_and_unsafe_ids(
-    tmp_path, monkeypatch, ids
-):
+def test_neutral_pass_filenames_reject_collisions_and_unsafe_ids(tmp_path, monkeypatch, ids):
     source = neutral_job(tmp_path)
     spec = LogicalPenPlanSpec(
-        2,
+        "explicit",
         tuple(
             PassSpec(name, (LogicalAssignment((f"layer-{n}",), 1),))
             for n, name in enumerate(ids, 1)
         ),
-        (),
-        (),
     )
     inputs = mock_vpype(monkeypatch)
-    with pytest.raises(
-        (ConversionError, PenPlanError), match="pass|filename|collision"
-    ):
-        converter.convert_neutral_svg(source, spec, tmp_path / "out")
+    with pytest.raises((ConversionError, PenPlanError), match="pass|filename|collision"):
+        converter.convert_planned_svg(source, spec, tmp_path / "out")
     assert inputs == []
 
 
@@ -320,10 +307,10 @@ def test_neutral_later_pass_failure_preserves_existing_artifacts(tmp_path, monke
     existing.write_bytes(b"existing")
     inputs = mock_vpype(monkeypatch, fail_on=2)
     with pytest.raises(FileExistsError):
-        converter.convert_neutral_svg(source, two_pass_spec(), out)
+        converter.convert_planned_svg(source, two_pass_spec(), out)
     assert inputs == []
     with pytest.raises(ConversionError, match="vpype failed"):
-        converter.convert_neutral_svg(source, two_pass_spec(), out, overwrite=True)
+        converter.convert_planned_svg(source, two_pass_spec(), out, overwrite=True)
     assert existing.read_bytes() == b"existing"
     assert list(out.iterdir()) == [existing]
 
@@ -351,13 +338,12 @@ def test_neutral_converter_integration_and_discovered_plan(tmp_path, monkeypatch
     source.with_suffix(".penplan.json").write_text(
         json.dumps(
             {
-                "schema_version": 2,
+                "schema_version": 3,
+                "policy": "explicit",
                 "passes": [
                     {
                         "id": "ink",
-                        "assignments": [
-                            {"layer_ids": ["layer-2", "layer-1"], "physical_slot": 7}
-                        ],
+                        "assignments": [{"layer_ids": ["layer-2", "layer-1"], "physical_slot": 7}],
                     }
                 ],
                 "omitted_layers": [],
@@ -371,24 +357,18 @@ def test_neutral_converter_integration_and_discovered_plan(tmp_path, monkeypatch
     assert "SP7;" in outputs[0].read_text()
 
 
-def test_neutral_requires_imposed_preserve_layout_before_execution(
-    tmp_path, monkeypatch
-):
+def test_neutral_requires_imposed_preserve_layout_before_execution(tmp_path, monkeypatch):
     source = neutral_job(tmp_path, 1, imposed=False)
     inputs = mock_vpype(monkeypatch)
     out = tmp_path / "out"
     with pytest.raises(ConversionError, match="preserve-layout"):
-        converter.convert_neutral_svg(source, None, out)
+        converter.convert_planned_svg(source, None, out)
     assert inputs == []
     assert not out.exists()
 
 
-@pytest.mark.parametrize(
-    "options", [{"send": True}, {"pen_policy": "compact"}, {"pen_map": "1:2"}]
-)
-def test_neutral_rejects_legacy_flags_and_send_before_execution(
-    tmp_path, monkeypatch, options
-):
+@pytest.mark.parametrize("options", [{"send": True}, {"pen_policy": "compact"}, {"pen_map": "1:2"}])
+def test_neutral_rejects_legacy_flags_and_send_before_execution(tmp_path, monkeypatch, options):
     source = neutral_job(tmp_path)
     inputs = mock_vpype(monkeypatch)
     with pytest.raises((ConversionError, PenPlanError), match="neutral|Neutral"):
@@ -396,9 +376,7 @@ def test_neutral_rejects_legacy_flags_and_send_before_execution(
     assert inputs == []
 
 
-def test_neutral_cli_dry_run_is_non_mutating_and_deterministic(
-    tmp_path, monkeypatch, caplog
-):
+def test_neutral_cli_dry_run_is_non_mutating_and_deterministic(tmp_path, monkeypatch, caplog):
     source = neutral_job(tmp_path)
     caplog.set_level("INFO")
     mock_vpype(monkeypatch)
@@ -418,7 +396,7 @@ def test_neutral_rejects_extra_or_reordered_hpgl_pens(tmp_path, monkeypatch, hpg
     source = neutral_job(tmp_path)
     mock_vpype(monkeypatch, hpgl=hpgl)
     with pytest.raises(ConversionError, match="pen selection|pen order"):
-        converter.convert_neutral_svg(source, None, tmp_path / "out")
+        converter.convert_planned_svg(source, None, tmp_path / "out")
     assert list((tmp_path / "out").iterdir()) == []
 
 
@@ -457,9 +435,7 @@ def test_neutral_real_imposition_and_vpype_pipeline(tmp_path, monkeypatch):
         assert result.exit_code == 0, result.output
 
     monkeypatch.setattr(converter, "run_command", real_vpype)
-    outputs = converter.convert_neutral_svg(
-        imposed, None, tmp_path / "out", landscape=True
-    )
+    outputs = converter.convert_planned_svg(imposed, None, tmp_path / "out", landscape=True)
     assert outputs[0].exists()
     assert "layout" not in commands[0]
     assert "--center" not in commands[0]
@@ -475,7 +451,7 @@ def test_neutral_real_imposition_and_vpype_pipeline(tmp_path, monkeypatch):
     )
     assert report.pen_plan_status == "pass"
     assert report.ready_to_send is False
-    assert plan["kind"] == "resolved-dpx3300-logical-pass"
+    assert plan.pass_id == "plot"
 
 
 def test_neutral_nested_svg_viewbox_and_intersecting_clips(tmp_path, monkeypatch):
@@ -490,7 +466,7 @@ def test_neutral_nested_svg_viewbox_and_intersecting_clips(tmp_path, monkeypatch
         '<clipPath id="domain" transform="translate(1,0)"><path d="M0 0 L10 0 L0 10 Z"/></clipPath></defs>',
     )
     inputs = mock_vpype(monkeypatch)
-    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    converter.convert_planned_svg(source, None, tmp_path / "out")
     import io
 
     import vpype
@@ -502,13 +478,11 @@ def test_neutral_nested_svg_viewbox_and_intersecting_clips(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("value", ["stroke-dasharray:1,2", "clip-path:url(#missing)"])
-def test_neutral_unsupported_inline_rendering_fails_before_execution(
-    tmp_path, monkeypatch, value
-):
+def test_neutral_unsupported_inline_rendering_fails_before_execution(tmp_path, monkeypatch, value):
     source = neutral_job(tmp_path, 1, f'<path style="{value}" d="M0 0 L10 10"/>')
     inputs = mock_vpype(monkeypatch)
     with pytest.raises(ConversionError, match="style|clip"):
-        converter.convert_neutral_svg(source, None, tmp_path / "out")
+        converter.convert_planned_svg(source, None, tmp_path / "out")
     assert inputs == []
 
 
@@ -524,7 +498,7 @@ def test_neutral_snapshot_keeps_source_svg_hash_consistent(tmp_path, monkeypatch
 
     monkeypatch.setattr(converter, "run_command", change_source)
     with pytest.raises(ConversionError, match="changed"):
-        converter.convert_neutral_svg(source, None, tmp_path / "out")
+        converter.convert_planned_svg(source, None, tmp_path / "out")
     assert len(calls) == 1
     assert list((tmp_path / "out").iterdir()) == []
     monkeypatch.setattr(converter, "run_command", run)
@@ -538,7 +512,7 @@ def test_neutral_nested_svg_viewport_clips_crossing_geometry(tmp_path, monkeypat
         'viewBox="0 0 10 20"><path d="M-10 5 L20 5"/></svg></g>',
     )
     inputs = mock_vpype(monkeypatch)
-    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    converter.convert_planned_svg(source, None, tmp_path / "out")
     import io
 
     import vpype
@@ -549,9 +523,7 @@ def test_neutral_nested_svg_viewport_clips_crossing_geometry(tmp_path, monkeypat
     assert lines.bounds() == pytest.approx((12, 33, 32, 33))
 
 
-def test_neutral_nested_svg_without_viewbox_translates_geometry_and_crop(
-    tmp_path, monkeypatch
-):
+def test_neutral_nested_svg_without_viewbox_translates_geometry_and_crop(tmp_path, monkeypatch):
     source = neutral_job(
         tmp_path,
         1,
@@ -559,7 +531,7 @@ def test_neutral_nested_svg_without_viewbox_translates_geometry_and_crop(
         '<path d="M-10 5 L20 5"/></svg></g>',
     )
     inputs = mock_vpype(monkeypatch)
-    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    converter.convert_planned_svg(source, None, tmp_path / "out")
     import io
 
     import vpype
@@ -571,17 +543,14 @@ def test_neutral_nested_svg_without_viewbox_translates_geometry_and_crop(
 
 
 @pytest.mark.parametrize("x", ["20%", "20% "])
-def test_neutral_nested_svg_percent_offset_uses_parent_viewport(
-    tmp_path, monkeypatch, x
-):
+def test_neutral_nested_svg_percent_offset_uses_parent_viewport(tmp_path, monkeypatch, x):
     source = neutral_job(
         tmp_path,
         1,
-        f'<svg x="{x}" y="10" width="40" height="40">'
-        '<path d="M-10 5 L20 5"/></svg>',
+        f'<svg x="{x}" y="10" width="40" height="40"><path d="M-10 5 L20 5"/></svg>',
     )
     inputs = mock_vpype(monkeypatch)
-    converter.convert_neutral_svg(source, None, tmp_path / "out")
+    converter.convert_planned_svg(source, None, tmp_path / "out")
     import io
 
     import vpype
@@ -596,8 +565,8 @@ def test_neutral_nested_svg_percent_offset_uses_parent_viewport(
 def test_neutral_preserve_default_and_output_metadata(tmp_path, monkeypatch, count):
     source = neutral_job(tmp_path, count)
     inputs = mock_vpype(monkeypatch)
-    outputs = converter.convert_neutral_svg(source, None, tmp_path / "out")
-    assert outputs[0].name == "drawing.preserve.hpgl"
+    outputs = converter.convert_planned_svg(source, None, tmp_path / "out")
+    assert outputs[0].name == "drawing.hpgl"
     assert inputs[0].get("width") == "100"
     assert inputs[0].get("height") == "100"
     assert inputs[0].get("viewBox") == "0 0 100 100"
@@ -609,7 +578,7 @@ def test_neutral_rejects_legacy_input_plan(tmp_path, monkeypatch):
     source = neutral_job(tmp_path)
     source.with_suffix(".penplan.json").write_text('{"schema_version":1,"policy":"preserve"}')
     inputs = mock_vpype(monkeypatch)
-    with pytest.raises(PenPlanError, match="schema_version=2"):
+    with pytest.raises(PenPlanError, match="schema_version 3"):
         convert_job(source, tmp_path / "out")
     assert inputs == []
 
@@ -618,11 +587,11 @@ def test_neutral_existing_sidecar_is_not_overwritten(tmp_path, monkeypatch):
     source = neutral_job(tmp_path)
     out = tmp_path / "out"
     out.mkdir()
-    sidecar = out / "drawing.preserve.resolved.penplan.json"
+    sidecar = out / "drawing.resolved.penplan.json"
     sidecar.write_bytes(b"previous")
     inputs = mock_vpype(monkeypatch)
     with pytest.raises(FileExistsError):
-        converter.convert_neutral_svg(source, None, out)
+        converter.convert_planned_svg(source, None, out)
     assert inputs == []
     assert sidecar.read_bytes() == b"previous"
 

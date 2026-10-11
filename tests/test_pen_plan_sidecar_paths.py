@@ -1,161 +1,120 @@
-# Regression tests for input/resolved pen-plan sidecar naming.
+"""Only current resolved audit suffix/schema is accepted; no stale fallback."""
 
-from __future__ import annotations
-
+import hashlib
 import json
-from pathlib import Path
 
 import pytest
 
-import pen_plan
 from pen_plan import (
     default_pen_plan_path,
     default_resolved_pen_plan_path,
     discover_pen_plan,
     discover_resolved_pen_plan_path,
+    validate_resolved_sidecar_for_hpgl,
 )
+from pen_plan_io import (
+    load_resolved_plot_pass,
+    parse_resolved,
+    resolved_payload,
+    write_resolved_plot_pass,
+)
+from pen_plan_models import Assignment, ResolvedPlotPass
 
 
-def valid_logical_sidecar():
-    return {
-        "schema_version": 2,
-        "kind": "resolved-dpx3300-logical-pass",
-        "pass_id": "ink",
-        "pass_number": 1,
-        "pass_count": 2,
-        "source_svg": "drawing.svg",
-        "source_svg_sha256": "a" * 64,
-        "source_manifest_hash": "b" * 64,
-        "assignments": [{"layer_ids": ["orbit", "body"], "physical_slot": 7}],
-        "omitted_layers": ["accent"],
-        "repeated_layers": ["orbit"],
-        "physical_slots": [7],
-    }
+def current(tmp_path):
+    hpgl = tmp_path / "drawing.hpgl"
+    hpgl.write_text("IN;SP7;PU0,0;PD1,1;PU;SP0;")
+    plan = ResolvedPlotPass(
+        "drawing.svg",
+        "a" * 64,
+        "b" * 64,
+        "ink",
+        1,
+        2,
+        "explicit",
+        (Assignment(("orbit", "body"), 7),),
+        (7,),
+        ("accent",),
+        ("orbit",),
+        (),
+        hashlib.sha256(hpgl.read_bytes()).hexdigest(),
+        None,
+    )
+    return hpgl, plan
 
 
-def test_logical_sidecar_round_trip_is_strict_and_deterministic(tmp_path):
-    path = tmp_path / "drawing.ink.resolved.penplan.json"
-    payload = valid_logical_sidecar()
-    pen_plan.write_resolved_plot_pass(path, payload)
+def test_round_trip_is_strict_and_deterministic(tmp_path):
+    hpgl, plan = current(tmp_path)
+    path = default_resolved_pen_plan_path(hpgl)
+    write_resolved_plot_pass(path, plan)
     first = path.read_bytes()
-    assert pen_plan.load_resolved_plot_pass(path) == payload
-    pen_plan.write_resolved_plot_pass(path, payload)
-    assert path.read_bytes() == first
-    with pytest.raises(pen_plan.PenPlanError, match="schema_version"):
-        pen_plan.load_resolved_pen_plan(path)
+    assert load_resolved_plot_pass(path) == plan
+    write_resolved_plot_pass(path, plan)
+    assert first == path.read_bytes()
+    assert validate_resolved_sidecar_for_hpgl(hpgl, path) == plan
 
 
-def test_logical_sidecar_matches_hpgl_pen_order(tmp_path):
-    hpgl = tmp_path / "drawing.hpgl"
-    hpgl.write_text("IN;SP7;PU0,0;PD1,1;SP0;", encoding="ascii")
-    payload = valid_logical_sidecar()
-    _write_json(tmp_path / "drawing.resolved.penplan.json", payload)
-    assert pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl) == payload
-
-
-def test_logical_sidecar_rejects_wrong_hpgl_pen_order(tmp_path):
-    hpgl = tmp_path / "drawing.hpgl"
-    hpgl.write_text("IN;SP6;PU0,0;PD1,1;SP0;", encoding="ascii")
-    path = _write_json(tmp_path / "drawing.resolved.penplan.json", valid_logical_sidecar())
-    with pytest.raises(pen_plan.PenPlanError, match="does not match"):
-        pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl, path)
-
-
-def test_logical_sidecar_requires_resolved_file(tmp_path):
-    hpgl = tmp_path / "drawing.hpgl"
-    hpgl.write_text("IN;SP7;PU0,0;PD1,1;SP0;", encoding="ascii")
-    with pytest.raises(pen_plan.PenPlanError, match="does not exist"):
-        pen_plan.validate_resolved_plot_pass_for_hpgl(hpgl)
+def test_hash_and_pen_order_both_checked(tmp_path):
+    hpgl, plan = current(tmp_path)
+    path = default_resolved_pen_plan_path(hpgl)
+    write_resolved_plot_pass(path, plan)
+    hpgl.write_text("IN;SP3;PU0,0;PD1,1;PU;SP0;")
+    with pytest.raises(ValueError, match="SHA-256"):
+        validate_resolved_sidecar_for_hpgl(hpgl, path)
+    raw = resolved_payload(plan)
+    raw["hpgl_sha256"] = hashlib.sha256(hpgl.read_bytes()).hexdigest()
+    path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError, match="pen order"):
+        validate_resolved_sidecar_for_hpgl(hpgl, path)
 
 
 @pytest.mark.parametrize(
     "field,value",
     [
         ("schema_version", 1),
-        ("kind", "resolved-dpx3300-pen-plan"),
-        ("pass_number", True),
-        ("pass_number", 3),
+        ("schema_version", 2),
+        ("schema_version", True),
+        ("kind", "resolved-dpx3300-logical-pass"),
+        ("pass_number", 0),
         ("pass_count", 0),
-        ("source_manifest_hash", "wrong"),
-        ("source_svg_sha256", ""),
-        ("physical_slots", [1]),
+        ("source_manifest_hash", "bad"),
+        ("source_svg_sha256", None),
+        ("physical_slots", [8]),
+        ("physical_slots", None),
+        ("assignments", []),
+        ("slots", [{"slot": 1}]),
         ("omitted_layers", ["orbit"]),
-        ("assignments", [{"layer_ids": ["orbit"], "physical_slot": 9}]),
-        ("assignments", [{"layer_ids": ["orbit", "orbit"], "physical_slot": 1}]),
+        ("pen_force", {}),
+        ("unknown", 1),
     ],
 )
-def test_logical_sidecar_rejects_ambiguous_or_invalid_payloads(tmp_path, field, value):
-    payload = valid_logical_sidecar()
-    payload[field] = value
-    path = _write_json(tmp_path / "pass.resolved.penplan.json", payload)
-    with pytest.raises(pen_plan.PenPlanError):
-        pen_plan.load_resolved_plot_pass(path)
+def test_malformed_or_stale_resolved_payloads_fail(tmp_path, field, value):
+    hpgl, plan = current(tmp_path)
+    raw = resolved_payload(plan)
+    raw[field] = value
+    with pytest.raises(ValueError):
+        parse_resolved(raw)
 
 
-def _write_json(path: Path, payload: dict[str, object]) -> Path:
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return path
-
-
-def test_input_and_resolved_paths_are_distinct(tmp_path: Path) -> None:
+def test_authored_and_resolved_suffixes_remain_distinct_and_old_fallback_is_retired(tmp_path):
     svg = tmp_path / "drawing.svg"
     hpgl = tmp_path / "drawing.hpgl"
+    authored = default_pen_plan_path(svg)
+    resolved = default_resolved_pen_plan_path(hpgl)
+    assert authored == tmp_path / "drawing.penplan.json"
+    assert resolved == tmp_path / "drawing.resolved.penplan.json"
+    authored.write_text(json.dumps({"schema_version": 1, "kind": "resolved-dpx3300-pen-plan"}))
+    assert discover_resolved_pen_plan_path(hpgl) == resolved
+    # A stale file at an authored path is found and rejected, not silently ignored.
+    assert discover_pen_plan(svg) == authored
+    from pen_plan_io import load_pen_plan
 
-    assert default_pen_plan_path(svg) == tmp_path / "drawing.penplan.json"
-    assert default_resolved_pen_plan_path(hpgl) == (
-        tmp_path / "drawing.resolved.penplan.json"
-    )
-
-
-def test_input_discovery_accepts_user_plan(tmp_path: Path) -> None:
-    svg = tmp_path / "drawing.svg"
-    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
-    plan = _write_json(
-        default_pen_plan_path(svg),
-        {"schema_version": 1, "policy": "preserve"},
-    )
-
-    assert discover_pen_plan(svg) == plan
+    with pytest.raises(ValueError, match="migrate"):
+        load_pen_plan(authored)
+    with pytest.raises(ValueError):
+        validate_resolved_sidecar_for_hpgl(hpgl, resolved)
 
 
-def test_input_discovery_ignores_legacy_resolved_output(tmp_path: Path) -> None:
-    svg = tmp_path / "drawing.svg"
-    svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")
-    _write_json(
-        default_pen_plan_path(svg),
-        {"schema_version": 1, "kind": "resolved-dpx3300-pen-plan"},
-    )
-
-    assert discover_pen_plan(svg) is None
-
-
-def test_resolved_discovery_prefers_new_filename(tmp_path: Path) -> None:
-    hpgl = tmp_path / "drawing.hpgl"
-    preferred = _write_json(
-        default_resolved_pen_plan_path(hpgl),
-        {"schema_version": 1, "kind": "resolved-dpx3300-pen-plan"},
-    )
-    _write_json(
-        hpgl.with_suffix(".penplan.json"),
-        {"schema_version": 1, "kind": "resolved-dpx3300-pen-plan"},
-    )
-
-    assert discover_resolved_pen_plan_path(hpgl) == preferred
-
-
-def test_resolved_discovery_uses_only_valid_legacy_resolved_plan(
-    tmp_path: Path,
-) -> None:
-    hpgl = tmp_path / "drawing.hpgl"
-    legacy = hpgl.with_suffix(".penplan.json")
-    _write_json(legacy, {"schema_version": 1, "policy": "preserve"})
-
-    assert discover_resolved_pen_plan_path(hpgl) == (
-        tmp_path / "drawing.resolved.penplan.json"
-    )
-
-    _write_json(
-        legacy,
-        {"schema_version": 1, "kind": "resolved-dpx3300-pen-plan"},
-    )
-    assert discover_resolved_pen_plan_path(hpgl) == legacy
+def test_missing_explicit_authored_file_fails(tmp_path):
+    with pytest.raises(ValueError, match="does not exist"):
+        discover_pen_plan(tmp_path / "drawing.svg", tmp_path / "absent.json")

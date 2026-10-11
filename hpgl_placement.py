@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from hpgl_commands import tokenize_hpgl
-
 import json
 import re
-import tomllib
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+import tomllib
+
+from hpgl_commands import tokenize_hpgl
 
 
 class PlacementValidationError(ValueError):
@@ -198,7 +199,9 @@ def parse_length_mm(value: str) -> float:
     return magnitude * 25.4
 
 
-def _load_device_profile(config_path: Path, *, device: str, page_profile: str) -> tuple[Bounds, float]:
+def _load_device_profile(
+    config_path: Path, *, device: str, page_profile: str
+) -> tuple[Bounds, float]:
     with Path(config_path).open("rb") as handle:
         config = tomllib.load(handle)
     try:

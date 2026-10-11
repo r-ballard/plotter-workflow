@@ -1,3 +1,5 @@
+# Direct-script sys.path bootstrap intentionally precedes project imports.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -15,7 +17,7 @@ if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
 from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_placement
 from pen_plan import (
     PenPlanError,
-    ResolvedPenPlan,
+    ResolvedPlotPass,
     discover_resolved_pen_plan_path,
     format_resolved_plot_pass,
     physical_pens_in_hpgl,
@@ -108,13 +110,10 @@ def _load_and_revalidate_placement(
         )
     raw = _load_json_object(placement_path, label="placement report")
     if raw.get("status") != "pass":
-        raise JobPreflightError(
-            f"Placement report {placement_path} does not have status='pass'"
-        )
+        raise JobPreflightError(f"Placement report {placement_path} does not have status='pass'")
     if raw.get("source_hpgl") not in (None, "", hpgl_path.name):
         raise JobPreflightError(
-            f"Placement report was generated for {raw.get('source_hpgl')!r}, "
-            f"not {hpgl_path.name!r}"
+            f"Placement report was generated for {raw.get('source_hpgl')!r}, not {hpgl_path.name!r}"
         )
 
     try:
@@ -164,7 +163,7 @@ def run_job_preflight(
     placement_report_path: Path | None = None,
     require_operator_confirmation: bool = False,
     operator_confirmed: bool = False,
-) -> tuple[JobPreflightReport, ResolvedPenPlan | dict[str, Any] | None]:
+) -> tuple[JobPreflightReport, ResolvedPlotPass | None]:
     hpgl_path = Path(hpgl_path).expanduser().resolve()
     config_path = Path(config_path).expanduser().resolve()
     if not hpgl_path.is_file() or hpgl_path.stat().st_size == 0:
@@ -184,7 +183,7 @@ def run_job_preflight(
         hpgl_path, placement_report_path, config_path=config_path
     )
 
-    resolved_plan: ResolvedPenPlan | dict[str, Any] | None = None
+    resolved_plan: ResolvedPlotPass | None = None
     if pen_plan_path is None:
         candidate = discover_resolved_pen_plan_path(hpgl_path)
     else:
@@ -196,13 +195,15 @@ def run_job_preflight(
         except PenPlanError as exc:
             raise JobPreflightError(str(exc)) from exc
         pen_plan_status = "pass"
-        documented = (
-            plan_has_documented_tools(resolved_plan)
-            if isinstance(resolved_plan, ResolvedPenPlan)
-            else False
+        documented = plan_has_documented_tools(resolved_plan)
+        tool_status = (
+            "pass"
+            if documented
+            else "logical-layer-map"
+            if resolved_plan.source_manifest_hash
+            else "fail"
         )
-        tool_status = "pass" if documented else "logical-layer-map" if isinstance(resolved_plan, dict) else "fail"
-        if len(physical_pens) > 1 and isinstance(resolved_plan, ResolvedPenPlan) and not documented:
+        if len(physical_pens) > 1 and resolved_plan.source_manifest_hash is None and not documented:
             raise JobPreflightError(
                 "Multi-pen job requires a tool or label for every used physical slot"
             )
@@ -253,9 +254,7 @@ def run_job_preflight(
     return report, resolved_plan
 
 
-def format_job_preflight(
-    report: JobPreflightReport, plan: ResolvedPenPlan | dict[str, Any] | None = None
-) -> str:
+def format_job_preflight(report: JobPreflightReport, plan: ResolvedPlotPass | None = None) -> str:
     lines = [
         "DPX-3300 JOB PREFLIGHT",
         f"File: {Path(report.hpgl_file).name}",
@@ -273,29 +272,20 @@ def format_job_preflight(
             f"X={report.addressed_bounds.min_x:.0f}..{report.addressed_bounds.max_x:.0f}, "
             f"Y={report.addressed_bounds.min_y:.0f}..{report.addressed_bounds.max_y:.0f}"
         ),
-        "HPGL pen order: " + " -> ".join([*(f"SP{pen}" for pen in report.physical_pen_order), "SP0"]),
+        "HPGL pen order: "
+        + " -> ".join([*(f"SP{pen}" for pen in report.physical_pen_order), "SP0"]),
     ]
-    if isinstance(plan, dict):
+    if plan is not None:
         lines.append(format_resolved_plot_pass(plan))
-    elif plan is not None:
-        lines.append("Carriage:")
-        for assignment in plan.assignments:
-            description = " / ".join(
-                value
-                for value in (assignment.label, assignment.tool, assignment.color)
-                if value
-            ) or "<not documented>"
-            lines.append(
-                f"  SP{assignment.physical_slot}: logical {assignment.logical_layer} "
-                f"(generations {','.join(map(str, assignment.generations)) or '-'}) - {description}"
-            )
     lines.extend(
         [
             f"Pen plan: {report.pen_plan_status.upper()}",
             f"Placement: {report.placement_status.upper()}",
             f"Carriage documentation: {report.tool_documentation_status.upper()}",
             f"Operator confirmation: {report.operator_confirmation_status}",
-            "READY TO SEND" if report.ready_to_send else "VALIDATED - OPERATOR CONFIRMATION REQUIRED",
+            "READY TO SEND"
+            if report.ready_to_send
+            else "VALIDATED - OPERATOR CONFIRMATION REQUIRED",
         ]
     )
     return "\n".join(lines)

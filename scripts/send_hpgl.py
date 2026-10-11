@@ -7,6 +7,8 @@ control. The script sends the file in chunks and waits for the operating-system
 serial buffer to drain before closing the port.
 """
 
+# Direct-script sys.path bootstrap intentionally precedes project imports.
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse
@@ -24,9 +26,8 @@ if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
 
 from pen_plan import (
     PenPlanError,
-    ResolvedPenPlan,
+    ResolvedPlotPass,
     discover_resolved_pen_plan_path,
-    format_pen_plan,
     format_resolved_plot_pass,
     physical_pens_in_hpgl,
     plan_has_documented_tools,
@@ -116,8 +117,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("hpgl", nargs="?", type=hpgl_file, help="HP-GL file to send.")
     parser.add_argument("--port", help="Serial port, such as COM3 or /dev/cu.usbserial-...")
-    parser.add_argument("--list-ports", action="store_true", help="List detected serial ports and exit.")
-    parser.add_argument("--chunk-size", type=int, default=1024, help="Bytes per write call. Default: 1024.")
+    parser.add_argument(
+        "--list-ports", action="store_true", help="List detected serial ports and exit."
+    )
+    parser.add_argument(
+        "--chunk-size", type=int, default=1024, help="Bytes per write call. Default: 1024."
+    )
     parser.add_argument(
         "--inter-chunk-delay",
         type=float,
@@ -218,11 +223,7 @@ def main() -> int:
         resolved_plan = None
         if sidecar.is_file():
             resolved_plan = validate_resolved_sidecar_for_hpgl(args.hpgl, sidecar)
-            carriage = (
-                format_pen_plan(resolved_plan)
-                if isinstance(resolved_plan, ResolvedPenPlan)
-                else format_resolved_plot_pass(resolved_plan)
-            )
+            carriage = format_resolved_plot_pass(resolved_plan)
             for line in carriage.splitlines():
                 LOG.info("%s", line)
         elif len(physical_pens) > 1 and not args.allow_unplanned_multipen:
@@ -233,7 +234,9 @@ def main() -> int:
             )
 
         if len(physical_pens) > 1 and resolved_plan is not None:
-            if isinstance(resolved_plan, ResolvedPenPlan) and not plan_has_documented_tools(resolved_plan):
+            if isinstance(resolved_plan, ResolvedPlotPass) and not plan_has_documented_tools(
+                resolved_plan
+            ):
                 raise PenPlanError(
                     "Multi-pen send requires a tool or label for every used physical slot."
                 )

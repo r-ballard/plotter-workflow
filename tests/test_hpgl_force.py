@@ -60,3 +60,10 @@ def test_force_commands_do_not_change_preview_geometry():
 
     text = "IN;SP1;PU0,0;PD1,1;PU;"
     assert trace(apply_force(text, SOFTWARE)) == trace(text)
+
+
+def test_even_20_gf_requires_explicit_software_setting():
+    spec = parse_force({'mode': 'software', 'default_gf': 20})
+    with pytest.raises(ValueError, match='incorrect force'):
+        validate_force('IN;SP1;PD1,1;', spec, (1,))
+    validate_force('IN;FS1;SP1;PD1,1;', spec, (1,))

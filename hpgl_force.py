@@ -33,14 +33,14 @@ def validate_force(text: str, spec: ForceSpec | None, used_slots: tuple[int, ...
         if effective_force(spec, slot) is None:
             raise ForceValidationError(f"missing force for physical slot {slot}")
     slot, down = 0, False
-    forces = {s: 20 for s in range(1, 9)}
+    forces = {s: None for s in range(1, 9)}
     for command in tokenize_hpgl(text):
         op, args = command.opcode, command.arguments
         if op in ("IN", "DF"):
             if args or down:
                 raise ForceValidationError(f"unsafe or malformed {op} reset")
             slot, down = 0, False
-            forces = {s: 20 for s in range(1, 9)}
+            forces = {s: None for s in range(1, 9)}
         elif op == "FS":
             if spec.mode == "panel":
                 raise ForceValidationError("panel-force job must not contain FS")

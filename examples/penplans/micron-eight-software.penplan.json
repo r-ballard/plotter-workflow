@@ -1,0 +1,51 @@
+{
+  "schema_version": 3,
+  "policy": "compact",
+  "slots": [
+    {
+      "slot": 1,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 1"
+    },
+    {
+      "slot": 2,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 2"
+    },
+    {
+      "slot": 3,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 3"
+    },
+    {
+      "slot": 4,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 4"
+    },
+    {
+      "slot": 5,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 5"
+    },
+    {
+      "slot": 6,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 6"
+    },
+    {
+      "slot": 7,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 7"
+    },
+    {
+      "slot": 8,
+      "tool": "Sakura Pigma Micron",
+      "label": "Micron slot 8"
+    }
+  ],
+  "pen_force": {
+    "mode": "software",
+    "default_gf": 65
+  },
+  "notes": "Job-specific 65 gf example; verify pens and setup before plotting."
+}

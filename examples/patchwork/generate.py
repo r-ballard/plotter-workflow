@@ -163,7 +163,7 @@ def main() -> int:
         parser.error(f"job exceeds limit: {len(polygons)} polygons, {path_mm:.1f} mm pen-down path")
     svg = svg_text(polygons)
     plan = {
-        "schema_version": 1,
+        "schema_version": 3,
         "policy": "preserve",
         "slots": [{"slot": 1, "label": "black fine", "tool": "technical pen", "color": "black"}],
     }

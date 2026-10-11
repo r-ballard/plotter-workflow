@@ -219,3 +219,21 @@ def test_formal_schema_has_only_version3():
     assert schema["properties"]["schema_version"] == {"const": 3}
     assert schema["additionalProperties"] is False
     assert {"policy", "schema_version"} <= set(schema["required"])
+
+
+def test_legacy_compact_uses_xml_source_order_including_noncanonical_ids(tmp_path):
+    p = tmp_path / "reversed.svg"
+    p.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg">'
+        + "".join(
+            f'<g id="pen-{name}" data-pen="{number}" data-generations="0" fill="none" stroke="black">'
+            '<g data-generation="0"><path d="M0 0L1 1"/></g></g>'
+            for name, number in (("3", 3), ("01", 1))
+        )
+        + "</svg>"
+    )
+    _, passes = source_plan(p, cli_policy="compact")
+    assert [(a.layer_ids, a.physical_slot) for a in passes[0].assignments] == [
+        (("pen-3",), 1),
+        (("pen-01",), 2),
+    ]

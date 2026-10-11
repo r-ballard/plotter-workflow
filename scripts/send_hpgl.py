@@ -34,6 +34,12 @@ from pen_plan import (
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
 )
+from scripts.job_preflight import (
+    JobPreflightError,
+    format_job_preflight,
+    run_job_preflight,
+    write_preflight_report,
+)
 from serial_session import (
     CancelKeys,
     Cancellation,
@@ -41,13 +47,6 @@ from serial_session import (
     discard_and_close,
     open_serial,
     recover_port,
-)
-
-from scripts.job_preflight import (
-    JobPreflightError,
-    format_job_preflight,
-    run_job_preflight,
-    write_preflight_report,
 )
 
 LOG = logging.getLogger("dpx3300.sender")
@@ -218,7 +217,7 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Resolved .resolved.penplan.json sidecar. By default the sender "
             "discovers <stem>.resolved.penplan.json beside the HP-GL file, "
-            "with read-only fallback for legacy resolved <stem>.penplan.json."
+            "schema 3 is required; old resolved formats must be reconverted."
         ),
     )
     parser.add_argument(

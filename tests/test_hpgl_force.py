@@ -63,7 +63,22 @@ def test_force_commands_do_not_change_preview_geometry():
 
 
 def test_even_20_gf_requires_explicit_software_setting():
-    spec = parse_force({'mode': 'software', 'default_gf': 20})
-    with pytest.raises(ValueError, match='incorrect force'):
-        validate_force('IN;SP1;PD1,1;', spec, (1,))
-    validate_force('IN;FS1;SP1;PD1,1;', spec, (1,))
+    spec = parse_force({"mode": "software", "default_gf": 20})
+    with pytest.raises(ValueError, match="incorrect force"):
+        validate_force("IN;SP1;PD1,1;", spec, (1,))
+    validate_force("IN;FS1;SP1;PD1,1;", spec, (1,))
+
+
+@pytest.mark.parametrize("spec", [SOFTWARE, PANEL])
+@pytest.mark.parametrize("hidden", ["PUFS5,1;", "VS10FS15,1;", "PA0,0FS15,1;", "PGIN;"])
+def test_embedded_mnemonics_cannot_bypass_force_state(spec, hidden):
+    with pytest.raises(ValueError):
+        validate_force(
+            "IN;"
+            + ("FS7;" if spec.mode == "software" else "")
+            + "SP1;PU0,0;"
+            + hidden
+            + "PD10,10;PU;",
+            spec,
+            (1,),
+        )

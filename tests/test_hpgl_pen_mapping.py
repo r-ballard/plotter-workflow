@@ -613,3 +613,25 @@ def test_validate_hpgl_rejects_missing_expected_pen(tmp_path: Path):
     )
     with pytest.raises(ConversionError, match="SP3"):
         validate_hpgl(path, expected_pens=(1, 3))
+
+
+def test_sparse_neutral_svg_uses_authoritative_catalog_for_active_assignment(tmp_path, monkeypatch):
+    source = neutral_job(tmp_path, 2)
+    tree = ET.parse(source)
+    root = tree.getroot()
+    root.remove(root.findall("{http://www.w3.org/2000/svg}g")[0])
+    tree.write(source, encoding="utf-8")
+    manifest_path = tmp_path / "design.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["surfaces"][0]["logical_layer_ids"] = ["layer-2"]
+    manifest["surfaces"][0]["sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest))
+    audit_path = source.with_suffix(".imposition.json")
+    audit = json.loads(audit_path.read_text())
+    audit["logical_layer_ids"] = ["layer-2"]
+    audit["source_manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    audit_path.write_text(json.dumps(audit))
+    mock_vpype(monkeypatch)
+    outputs = convert_job(source, tmp_path / "out")
+    resolved = json.loads(outputs[0].with_suffix(".resolved.penplan.json").read_text())
+    assert resolved["assignments"] == [{"layer_ids": ["layer-2"], "physical_slot": 1}]

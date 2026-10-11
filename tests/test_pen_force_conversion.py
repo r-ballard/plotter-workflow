@@ -72,3 +72,63 @@ def test_legacy_failure_does_not_replace_prior_artifacts(tmp_path, monkeypatch):
         converter.convert_files([source], dest, overwrite=True, **OPTIONS)
     assert (dest / "drawing.hpgl").read_bytes() == b"old plot"
     assert (dest / "drawing.resolved.penplan.json").read_bytes() == b"old audit"
+
+
+def test_dry_run_reports_force_and_auto_setup_without_mutation(tmp_path, monkeypatch, caplog):
+    import logging
+
+    source = legacy_svg(tmp_path)
+    source.with_suffix(".penplan.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "policy": "compact",
+                "pen_force": {"mode": "software", "default_gf": 65},
+            }
+        )
+    )
+    monkeypatch.setattr(converter, "run_command", lambda *a, **kw: None)
+    dest = tmp_path / "output"
+    with caplog.at_level(logging.INFO):
+        converter.convert_files([source], dest, overwrite=False, **{**OPTIONS, "dry_run": True})
+    assert not dest.exists()
+    assert "65 gf" in caplog.text and "FS7;" in caplog.text and "AUTO OFF" in caplog.text
+
+
+def test_converter_send_displays_carriage_and_force_before_device_open(
+    tmp_path, monkeypatch, caplog
+):
+    import logging
+
+    source = legacy_svg(tmp_path)
+    source.with_suffix(".penplan.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 3,
+                "policy": "compact",
+                "slots": [{"slot": 1, "tool": "Micron"}],
+                "pen_force": {"mode": "software", "default_gf": 65},
+            }
+        )
+    )
+    monkeypatch.setattr(
+        converter,
+        "run_command",
+        lambda command, **kw: Path(command[-1]).write_text("IN;SP1;PU0,0;PD10,10;PU;SP0;"),
+    )
+    sent = []
+
+    def fake_send(path):
+        assert "65 gf" in caplog.text and "AUTO OFF" in caplog.text and "Micron" in caplog.text
+        sent.append(path)
+
+    monkeypatch.setattr(converter, "send_with_chiplotle", fake_send)
+    with caplog.at_level(logging.INFO):
+        converter.convert_files(
+            [source],
+            tmp_path / "output",
+            overwrite=False,
+            confirm_pen_plan=True,
+            **{**OPTIONS, "send": True},
+        )
+    assert len(sent) == 1

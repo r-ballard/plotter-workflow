@@ -1,7 +1,7 @@
 # Plot a neutral logical-layer booklet
 
 This Git Bash procedure takes a neutral `viz-logical-layers/v1` bundle through
-imposition, a v2 pen plan, conversion, preflight, and DPX-3300 sending. The
+imposition, a schema-3 physical pen plan, conversion, preflight, and DPX-3300 sending. The
 logical layer IDs come from the bundle's `design.json`; physical `SP1`–`SP8`
 slots are assigned by this repository. Keep the bundle, imposition audit,
 pen plan, resolved pass sidecars, and preflight reports with the finished job.
@@ -73,7 +73,7 @@ the imposed output; recheck the audit and plan afterward.
 
 ## 2. Assign logical layers to physical passes
 
-Copy the sample v2 plan, then edit **every** layer ID and slot assignment to
+Copy the sample schema-3 plan, then edit **every** layer ID and slot assignment to
 match the actual `design.json` catalog and loaded pens:
 
 ```bash
@@ -90,7 +90,7 @@ plan is discovered automatically; an explicit `--pen-plan PATH` is also
 supported. See `penplan.schema.json` for the contract.
 
 Write down the intended ink or tool in each slot and the pass order before
-conversion. The v2 resolved sidecar records layer and slot assignments; it
+conversion. The schema-3 resolved sidecar records layer and slot assignments; it
 cannot sense the pen installed in the carriage.
 
 ## 3. Preview, then convert

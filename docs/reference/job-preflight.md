@@ -8,17 +8,11 @@ The final pre-send check combines three independently useful artifacts:
 <stem>.placement.json
 ```
 
-`scripts/job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL. It accepts legacy v1 resolved plans and v2 resolved logical-pass sidecars by their `kind` field.
+`scripts/job_preflight.py` does not merely trust those sidecars. It re-reads the current HP-GL, checks its actual `SP1`–`SP8` order against the resolved pen plan, and re-runs placement validation using the device/profile/margin recorded in the placement report. Stored drawing/addressed bounds must still match the current HP-GL. It accepts only schema-3 resolved-dpx3300-plot-pass audits, verifies final HP-GL SHA-256 and configured force state, and checks source hashes when available. Reconvert old jobs.
 
 This catches a common unsafe workflow: generating valid sidecars and then editing or replacing the HP-GL file afterward.
 
-For a v2 logical pass, the printed carriage table maps logical layer IDs to
-physical `SP` slots and shows the pass ID and pass number. The v2 sidecar does
-not contain pen tool or color labels; the operator must identify the actual
-tools and confirm their loading before a multi-pen send. The recorded source
-SVG and manifest hashes are audit references. Preflight cannot recompute them
-from the HP-GL job alone, so preserve the source bundle and imposition audit
-with the job records.
+All input SVG contracts use one carriage/pass model. Applicable tool metadata and expected force appear beside the physical slot. Force is either unmanaged, software encoded (AUTO off), or operator-applied panel force (AUTO on). The confirmation flag acknowledges setup, not a sensor reading.
 
 ## Review a job
 
@@ -53,7 +47,7 @@ The report includes a SHA-256 digest of the exact HP-GL bytes reviewed.
 
 ## Sender integration
 
-`scripts/send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission requires `--confirm-pen-plan`. No separate integration step is required in a normal checkout.
+`scripts/send_hpgl.py` automatically runs the same preflight immediately before serial transmission. Multi-pen transmission and every force-configured job, including one pen, require `--confirm-pen-plan`. No separate integration step is required in a normal checkout.
 
 ```bash
 uv run python scripts/send_hpgl.py \
@@ -103,14 +97,13 @@ A validated multi-pen job requires:
 
 - current HP-GL is non-empty and contains physical `SP1`–`SP8` selections;
 - HP-GL physical pen order exactly matches the resolved pen plan;
-- for a v1 plan, every used physical slot has a `tool` or `label` documented;
-- for a v2 pass, every used slot is mapped to one or more logical layer IDs,
-  and the operator checks the actual pen/tool loaded in that slot;
+- every slot is mapped through the shared schema-3 layer-ID assignments; carriage tools must be physically checked;
+- configured effective force covers every used slot and matches HP-GL force state;
 - placement sidecar has `status: pass` and names the same HP-GL file;
 - current HP-GL still fits the sidecar's device/page/margin configuration;
 - current drawing/addressed bounds match the stored placement bounds;
-- multi-pen send has explicit operator confirmation.
+- multi-pen or force-aware send has explicit carriage/force confirmation.
 
 The operator remains responsible for confirming actual paper placement, pen/tool loading, pen condition, and a conservative first hardware test.
 
-Legacy generated `<stem>.penplan.json` files remain readable when their JSON `kind` is `resolved-dpx3300-pen-plan`.
+Old schema-1/2 resolved files are rejected, and old generated .penplan.json files are not used as a fallback. See [migration and force setup](pen-plan.md). Force audits distinguish required setup from operator-confirmed AUTO-off or panel-settings/AUTO-on state. No physical force is measured by preflight.

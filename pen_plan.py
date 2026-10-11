@@ -66,8 +66,8 @@ def _drawable(node):
     return any(_drawable(child) for child in node)
 
 
-def inspect_plan_layers(source_svg: Path) -> tuple[LayerInfo, ...]:
-    contract = inspect_svg_contract(source_svg)
+def inspect_plan_layers(source_svg: Path, *, catalog=None) -> tuple[LayerInfo, ...]:
+    contract = inspect_svg_contract(source_svg, catalog=catalog)
     root = ET.parse(source_svg).getroot()
     if contract.mode == InputMode.NEUTRAL:
         groups = {
@@ -75,12 +75,20 @@ def inspect_plan_layers(source_svg: Path) -> tuple[LayerInfo, ...]:
         }
         return tuple(
             LayerInfo(layer.id, layer.id in groups and _drawable(groups[layer.id]), layer.ordinal)
-            for layer in contract.layers
+            for layer in (catalog if catalog is not None else contract.layers)
         )
     if contract.mode == InputMode.LEGACY:
         return tuple(
-            LayerInfo(f"pen-{n}", n in contract.legacy.pens, i)
-            for i, n in enumerate(contract.legacy.declared_pens, 1)
+            LayerInfo(group.get("id"), int(group.get("data-pen")) in contract.legacy.pens, i)
+            for i, group in enumerate(
+                (
+                    g
+                    for g in root
+                    if g.tag.rsplit("}", 1)[-1] == "g"
+                    and re.fullmatch(r"pen-[0-9]+", g.get("id", ""))
+                ),
+                1,
+            )
         )
     return (LayerInfo("artwork", _drawable(root), 1),)
 
@@ -101,7 +109,7 @@ def parse_pen_map(raw: str | None) -> tuple[Assignment, ...]:
     return tuple(result)
 
 
-def source_plan(source_svg, *, plan_path=None, cli_policy=None, cli_pen_map=None):
+def source_plan(source_svg, *, plan_path=None, cli_policy=None, cli_pen_map=None, catalog=None):
     discovered = discover_pen_plan(source_svg, plan_path)
     if discovered is not None:
         if cli_policy is not None or cli_pen_map is not None:
@@ -112,10 +120,10 @@ def source_plan(source_svg, *, plan_path=None, cli_policy=None, cli_pen_map=None
             raise PenPlanError("pen map requires explicit policy")
         spec = PenPlanSpec("explicit", (PassSpec("plot", parse_pen_map(cli_pen_map)),))
     else:
-        contract = inspect_svg_contract(source_svg)
+        contract = inspect_svg_contract(source_svg, catalog=catalog)
         default = "preserve" if contract.mode == InputMode.LEGACY else "compact"
         spec = PenPlanSpec(cli_policy or default)
-    return spec, resolve_plot_passes(inspect_plan_layers(source_svg), spec)
+    return spec, resolve_plot_passes(inspect_plan_layers(source_svg, catalog=catalog), spec)
 
 
 def physical_pens_in_hpgl(path: Path) -> tuple[int, ...]:

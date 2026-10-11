@@ -133,3 +133,14 @@ def test_stale_sidecar_is_not_ignored_even_with_bypass(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(send_hpgl, "send_file", lambda *a, **kw: pytest.fail("port opened"))
     assert send_hpgl.main() == 1
+
+
+@pytest.mark.parametrize("mode", ["software", "panel"])
+def test_hidden_force_with_updated_hash_is_rejected(tmp_path, mode):
+    config, hpgl, plan, _ = force_job(tmp_path, mode)
+    hpgl.write_text(hpgl.read_text().replace("PU;", "PUFS15,8;PU;", 1))
+    raw = json.loads(plan.read_text())
+    raw["hpgl_sha256"] = hashlib.sha256(hpgl.read_bytes()).hexdigest()
+    plan.write_text(json.dumps(raw))
+    with pytest.raises(ValueError):
+        run_job_preflight(hpgl, config_path=config, operator_confirmed=True)

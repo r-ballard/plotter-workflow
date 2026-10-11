@@ -2,7 +2,7 @@
 
 import re
 
-from hpgl_commands import tokenize_hpgl
+from hpgl_commands import numeric_arguments, tokenize_hpgl
 from pen_force import ForceSpec, effective_force, force_code, force_gf
 
 
@@ -64,7 +64,13 @@ def validate_force(text: str, spec: ForceSpec | None, used_slots: tuple[int, ...
                     raise ForceValidationError(f"drawing with unreviewed physical slot {slot}")
                 if spec.mode == "software" and forces[slot] != effective_force(spec, slot):
                     raise ForceValidationError(f"incorrect force at {op} for physical slot {slot}")
-        elif op not in ("VS", "DT", "PG"):
+        elif op == "VS":
+            values = numeric_arguments(args)
+            if len(values) > 2 or (values and values[0] <= 0):
+                raise ForceValidationError("invalid VS arguments")
+            if len(values) == 2 and (not values[1].is_integer() or not 1 <= values[1] <= 8):
+                raise ForceValidationError("invalid VS physical slot")
+        elif op not in ("DT", "PG"):
             message = "convert text to paths" if op == "LB" else "unsupported drawing/state command"
             raise ForceValidationError(f"{op}: {message} in force-managed HP-GL")
 

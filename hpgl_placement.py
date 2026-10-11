@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomllib
 
-from hpgl_commands import tokenize_hpgl
+from hpgl_commands import numeric_arguments, tokenize_hpgl
 
 
 class PlacementValidationError(ValueError):
@@ -101,7 +101,10 @@ def _bounds(points: Iterable[tuple[float, float]], *, label: str) -> Bounds:
 
 
 def _coordinate_pairs(argument_text: str) -> list[tuple[float, float]]:
-    values = [float(value) for value in _NUMBER_RE.findall(argument_text)]
+    try:
+        values = numeric_arguments(argument_text)
+    except ValueError as error:
+        raise PlacementValidationError(str(error)) from error
     if not values:
         return []
     if len(values) % 2:

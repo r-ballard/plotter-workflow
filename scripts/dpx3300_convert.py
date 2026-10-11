@@ -81,6 +81,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -95,10 +96,12 @@ from logical_layer_contract import (
     inspect_svg_contract,
     load_logical_layer_manifest,
 )
+from pen_force import effective_force, force_code
 from pen_plan import (
     PEN_POLICIES,
     PenPlanError,
     default_resolved_pen_plan_path,
+    format_resolved_plot_pass,
     inspect_plan_layers,
     make_resolved_pass,
     physical_pens_in_hpgl,
@@ -473,7 +476,14 @@ def _neutral_context(source: Path):
     sheet = audit.get("sheet", {})
     if not isinstance(sheet, dict) or (sheet.get("name"), sheet.get("orientation")) != physical:
         raise ConversionError("SVG physical layout differs from imposition audit")
-    return contract, manifest_hash
+    return replace(contract, layers=manifest.layers), manifest_hash
+
+
+def _planning_context(source):
+    declaration = ET.parse(source).getroot().get("data-viz-layer-contract")
+    if declaration == NEUTRAL_CONTRACT:
+        return _neutral_context(source)
+    return inspect_svg_contract(source), None
 
 
 def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
@@ -492,8 +502,10 @@ def _materialize_neutral_layers(source: Path) -> dict[str, ET.Element]:
     _validate_neutral_renderables(root, source)
     svg_ns = "{http://www.w3.org/2000/svg}"
     drawable = {"path", "line", "polyline", "polygon", "rect", "circle", "ellipse"}
+
     def local(node):
         return node.tag.rsplit("}", 1)[-1]
+
     ids = {}
     for node in root.iter():
         if node.get("id"):
@@ -764,13 +776,14 @@ def convert_planned_svg(
     No temporary SVGs or output directories are created by dry runs.
     """
     source_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-    source_contract = inspect_svg_contract(source)
+    source_contract, manifest_hash = _planning_context(source)
     neutral = source_contract.mode == InputMode.NEUTRAL
-    manifest_hash = _neutral_context(source)[1] if neutral else None
     spec = spec or PenPlanSpec(
         "compact" if neutral or source_contract.mode == InputMode.GENERIC else "preserve"
     )
-    passes = resolve_plot_passes(inspect_plan_layers(source), spec)
+    passes = resolve_plot_passes(
+        inspect_plan_layers(source, catalog=source_contract.layers if neutral else None), spec
+    )
     names = set()
     outputs = []
     for plot_pass in passes:
@@ -846,6 +859,35 @@ def convert_planned_svg(
     # Validate layout against the real source; dry-run pass paths do not exist.
     template = build_vpype_command(source, outputs[0], **options)
     if dry_run:
+        for plot_pass in passes:
+            LOG.info("Planned physical pass: %s", plot_pass.id)
+            for assignment in plot_pass.assignments:
+                gf = (
+                    None
+                    if spec.pen_force is None
+                    else effective_force(spec.pen_force, assignment.physical_slot)
+                )
+                LOG.info(
+                    "SP%d: logical %s; %s",
+                    assignment.physical_slot,
+                    ", ".join(assignment.layer_ids),
+                    "force unmanaged" if gf is None else f"expected {gf} gf",
+                )
+            if spec.pen_force is not None:
+                if spec.pen_force.mode == "software":
+                    commands = (
+                        f"FS{force_code(spec.pen_force.default_gf)};"
+                        if spec.pen_force.default_gf is not None
+                        else ""
+                    )
+                    commands += "".join(
+                        f"FS{force_code(gf)},{slot};" for slot, gf in spec.pen_force.slot_overrides
+                    )
+                    LOG.info("Planned FS block: %s; confirm AUTO OFF.", commands)
+                else:
+                    LOG.info(
+                        "Panel force: confirm AUTO ON and listed settings applied; no FS emitted."
+                    )
         for dest in outputs:
             command = list(template)
             command[command.index("read") + 1] = str(dest.with_suffix(".svg"))
@@ -946,13 +988,18 @@ def convert_files(
         page_size=page_size, paper_position=paper_position, landscape=landscape
     )
     for source in sources:
-        mode = inspect_svg_contract(source).mode
+        context, _ = _planning_context(source)
+        mode = context.mode
         if mode == InputMode.NEUTRAL and (pen_policy is not None or pen_map is not None or send):
             raise ConversionError(
                 "neutral input uses schema-3 plans and the reviewed serial sender"
             )
         spec, _ = source_plan(
-            source, plan_path=pen_plan_path, cli_policy=pen_policy, cli_pen_map=pen_map
+            source,
+            plan_path=pen_plan_path,
+            cli_policy=pen_policy,
+            cli_pen_map=pen_map,
+            catalog=context.layers if mode == InputMode.NEUTRAL else None,
         )
         paths = convert_planned_svg(
             source,
@@ -972,6 +1019,8 @@ def convert_files(
         if send and not dry_run:
             for path in paths:
                 resolved = validate_resolved_sidecar_for_hpgl(path)
+                for line in format_resolved_plot_pass(resolved).splitlines():
+                    LOG.info("%s", line)
                 if (
                     len(resolved.physical_slots) > 1 or resolved.pen_force
                 ) and not confirm_pen_plan:
@@ -1085,8 +1134,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--confirm-pen-plan",
         action="store_true",
         help=(
-            "Confirm that the printed multi-pen carriage loading plan has been "
-            "checked. Required for multi-pen --send."
+            "Confirm carriage and force setup: software AUTO off; panel AUTO on with settings applied. "
+            "Required for multi-pen or force-aware --send."
         ),
     )
     parser.add_argument(

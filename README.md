@@ -81,6 +81,10 @@ change `compose.yaml` for a different sheet or placement. On Windows and macOS,
 run `scripts/send_hpgl.py` on the host for the attached serial device. The
 optional Compose sender profile documents a Linux serial-device setup.
 
+## Physical pen force
+
+Pen plans now use schema 3 for both legacy pen-N and neutral logical SVGs. Old plans require migration and reconversion. [Pen-plan reference](docs/reference/pen-plan.md) covers optional job-wide force and physical-slot overrides, software AUTO-off versus panel AUTO-on setup, and explicit confirmation. Eight-slot Micron examples request 65 gf once; unmanaged jobs do not inherit that setting.
+
 ## Documentation and examples
 
 - [Documentation map](docs/README.md) links the operator guides, contracts,

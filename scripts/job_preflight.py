@@ -15,6 +15,7 @@ if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from hpgl_placement import Bounds, PlacementValidationError, validate_hpgl_placement
+from pen_force import force_payload
 from pen_plan import (
     PenPlanError,
     ResolvedPlotPass,
@@ -24,6 +25,7 @@ from pen_plan import (
     plan_has_documented_tools,
     validate_resolved_sidecar_for_hpgl,
 )
+from pen_plan_models import ForceAudit
 
 
 class JobPreflightError(ValueError):
@@ -50,9 +52,22 @@ class JobPreflightReport:
     tool_documentation_status: str
     operator_confirmation_status: str
     ready_to_send: bool
+    pen_force: ForceAudit | None = None
+    force_confirmation_status: str = "unmanaged"
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        raw = asdict(self)
+        raw["pen_force"] = (
+            None
+            if self.pen_force is None
+            else {
+                "spec": force_payload(self.pen_force.spec),
+                "effective_slot_forces": [
+                    {"slot": s, "force_gf": gf} for s, gf in self.pen_force.effective_slot_forces
+                ],
+            }
+        )
+        return raw
 
 
 def _load_json_object(path: Path, *, label: str) -> dict[str, Any]:
@@ -217,10 +232,13 @@ def run_job_preflight(
         tool_status = "not-required-single-pen"
         pen_plan_file = None
 
-    needs_confirmation = len(physical_pens) > 1
+    force_audit = resolved_plan.pen_force if resolved_plan is not None else None
+    if type(operator_confirmed) is not bool:
+        raise JobPreflightError("operator_confirmed must be a boolean acknowledgement")
+    needs_confirmation = len(physical_pens) > 1 or force_audit is not None
     if needs_confirmation and require_operator_confirmation and not operator_confirmed:
         raise JobPreflightError(
-            "Multi-pen send requires --confirm-pen-plan after physically checking carriage loading"
+            "Reviewed carriage/force setup requires --confirm-pen-plan before send"
         )
     confirmation_status = (
         "confirmed"
@@ -230,6 +248,15 @@ def run_job_preflight(
         else "not-required-single-pen"
     )
     ready_to_send = not needs_confirmation or operator_confirmed
+    force_status = (
+        "unmanaged"
+        if force_audit is None
+        else "required-before-send"
+        if not operator_confirmed
+        else "operator-confirmed-auto-off"
+        if force_audit.spec.mode == "software"
+        else "operator-confirmed-panel-settings-auto-on"
+    )
 
     report = JobPreflightReport(
         hpgl_file=str(hpgl_path),
@@ -250,6 +277,8 @@ def run_job_preflight(
         tool_documentation_status=tool_status,
         operator_confirmation_status=confirmation_status,
         ready_to_send=ready_to_send,
+        pen_force=force_audit,
+        force_confirmation_status=force_status,
     )
     return report, resolved_plan
 
@@ -283,6 +312,7 @@ def format_job_preflight(report: JobPreflightReport, plan: ResolvedPlotPass | No
             f"Placement: {report.placement_status.upper()}",
             f"Carriage documentation: {report.tool_documentation_status.upper()}",
             f"Operator confirmation: {report.operator_confirmation_status}",
+            f"Force setup: {report.force_confirmation_status}",
             "READY TO SEND"
             if report.ready_to_send
             else "VALIDATED - OPERATOR CONFIRMATION REQUIRED",
@@ -319,7 +349,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--confirm-pen-plan",
         action="store_true",
-        help="Record that the physical multi-pen carriage loading has been checked.",
+        help="Confirm carriage and force setup: software AUTO off; panel AUTO on with settings applied.",
     )
     parser.add_argument(
         "--write-report",

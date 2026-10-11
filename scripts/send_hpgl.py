@@ -141,7 +141,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--confirm-pen-plan",
         action="store_true",
-        help="Confirm that the printed multi-pen carriage loading plan was checked.",
+        help=(
+            "Confirm carriage loading and force setup: software requires AUTO off; "
+            "panel force requires AUTO on and listed panel settings applied."
+        ),
     )
     parser.add_argument(
         "--allow-unplanned-multipen",
@@ -221,6 +224,8 @@ def main() -> int:
             else discover_resolved_pen_plan_path(args.hpgl)
         )
         resolved_plan = None
+        if args.pen_plan is not None and not sidecar.is_file():
+            raise PenPlanError(f"Explicit resolved pen plan does not exist: {sidecar}")
         if sidecar.is_file():
             resolved_plan = validate_resolved_sidecar_for_hpgl(args.hpgl, sidecar)
             carriage = format_resolved_plot_pass(resolved_plan)
@@ -233,6 +238,15 @@ def main() -> int:
                 "for a deliberately reviewed legacy job."
             )
 
+        if (
+            resolved_plan is not None
+            and resolved_plan.pen_force is not None
+            and not args.confirm_pen_plan
+        ):
+            raise PenPlanError(
+                "--confirm-pen-plan required for force setup: software AUTO off, "
+                "or panel AUTO on with settings applied"
+            )
         if len(physical_pens) > 1 and resolved_plan is not None:
             if isinstance(resolved_plan, ResolvedPlotPass) and not plan_has_documented_tools(
                 resolved_plan

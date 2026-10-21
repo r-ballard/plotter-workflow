@@ -2,11 +2,10 @@
 
 import copy
 import hashlib
-import json
-from pathlib import Path
 import xml.etree.ElementTree as ET
-from .artwork_io import atomic_directory, json_bytes, MAX_BYTES
-from .artwork_layout import layout_dict, bounds, affine, ID_RE
+
+from .artwork_io import MAX_BYTES, atomic_directory, json_bytes
+from .artwork_layout import ID_RE, affine, bounds, layout_dict
 
 SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
@@ -85,22 +84,22 @@ def build_artwork_job(layout, template):
     parameters.update(
         coordinate_frame="composition",
         composition_mode="continuous",
-        composition_window=dict(x=x, y=y, width=w, height=h),
+        composition_window={"x": x, "y": y, "width": w, "height": h},
     )
     p["target_domain_ids"] = [v.panel_id for v in layout.panels]
-    job = dict(
-        schema_version=1,
-        seed=template["seed"],
-        domains=[
-            dict(id=v.panel_id, vertices=[list(q) for q in v.crop_polygon])
+    job = {
+        "schema_version": 1,
+        "seed": template["seed"],
+        "domains": [
+            {"id": v.panel_id, "vertices": [list(q) for q in v.crop_polygon]}
             for v in layout.panels
         ],
-        composition_transforms=[
-            dict(domain_id=v.panel_id, matrix=list(v.assembled_matrix))
+        "composition_transforms": [
+            {"domain_id": v.panel_id, "matrix": list(v.assembled_matrix)}
             for v in layout.panels
         ],
-        passes=[p],
-    )
+        "passes": [p],
+    }
     if len(json_bytes(job)) > MAX_BYTES:
         raise ValueError("artwork job exceeds size limit")
     return job
@@ -170,23 +169,23 @@ def write_layout_export(
 ):
     job = build_artwork_job(layout, template)
     data = json_bytes(job)
-    report = dict(
-        schema_version=1,
-        artifact_type="assembled-artwork-layout",
-        layout=layout_dict(layout),
-        job_sha256=hashlib.sha256(data).hexdigest(),
-        template_sha256=hashlib.sha256(json_bytes(template)).hexdigest(),
-        producer_request=job,
-        panels=[
-            dict(
-                panel_id=p.panel_id,
-                source_path=f"surfaces/{p.panel_id}.svg",
-                rebase_offset=list(bounds(p.crop_polygon)[:2]),
-                binding=dict(p.binding),
-            )
+    report = {
+        "schema_version": 1,
+        "artifact_type": "assembled-artwork-layout",
+        "layout": layout_dict(layout),
+        "job_sha256": hashlib.sha256(data).hexdigest(),
+        "template_sha256": hashlib.sha256(json_bytes(template)).hexdigest(),
+        "producer_request": job,
+        "panels": [
+            {
+                "panel_id": p.panel_id,
+                "source_path": f"surfaces/{p.panel_id}.svg",
+                "rebase_offset": list(bounds(p.crop_polygon)[:2]),
+                "binding": dict(p.binding),
+            }
             for p in layout.panels
         ],
-    )
+    }
 
     def write(stage):
         files = {

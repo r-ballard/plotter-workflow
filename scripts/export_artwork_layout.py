@@ -2,15 +2,15 @@
 """Export resolved reading/folded layouts as continuous artwork job requests."""
 
 import argparse
-from pathlib import Path
 import sys
+from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from imposition.artwork_export import write_layout_export
 from imposition.artwork_io import read_json
 from imposition.artwork_layout import resolve_booklet_spread
 from imposition.assembled_profiles import load_cootie_assembled_profile
-from imposition.artwork_export import write_layout_export
 
 
 def main(argv=None):

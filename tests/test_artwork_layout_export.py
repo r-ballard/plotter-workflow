@@ -1,33 +1,36 @@
-import copy, json
+import copy
+import json
+
 import pytest
+
 from imposition.artwork_layout import resolve_booklet_spread
 
 
 def template():
-    return dict(
-        schema_version=1,
-        seed=31,
-        domains=[],
-        passes=[
-            dict(
-                id="tiles",
-                algorithm="truchet",
-                target_domain_ids=[],
-                parameters=dict(
-                    region_fills={
-                        "painted": dict(
-                            effect="parallel-hatch",
-                            layer_id="fill",
-                            parameters=dict(spacing=12.0),
-                        )
+    return {
+        "schema_version": 1,
+        "seed": 31,
+        "domains": [],
+        "passes": [
+            {
+                "id": "tiles",
+                "algorithm": "truchet",
+                "target_domain_ids": [],
+                "parameters": {
+                    "region_fills": {
+                        "painted": {
+                            "effect": "parallel-hatch",
+                            "layer_id": "fill",
+                            "parameters": {"spacing": 12.0},
+                        }
                     },
-                    curve_layer_ids=["curve"],
-                    tile_size=80.0,
-                ),
-                logical_layers=[dict(id="curve"), dict(id="fill")],
-            )
+                    "curve_layer_ids": ["curve"],
+                    "tile_size": 80.0,
+                },
+                "logical_layers": [{"id": "curve"}, {"id": "fill"}],
+            }
         ],
-    )
+    }
 
 
 def test_export_uses_existing_producer_schema():
@@ -51,8 +54,8 @@ def test_export_uses_existing_producer_schema():
 
 
 def test_deterministic_atomic_export(tmp_path, monkeypatch):
-    from imposition.artwork_export import write_layout_export
     from imposition import artwork_export
+    from imposition.artwork_export import write_layout_export
 
     layout = resolve_booklet_spread(
         sheet_size="a4", pages=(2, 3), margin_mm=1.0, gutter_mm=0.0
@@ -90,7 +93,7 @@ def test_deterministic_atomic_export(tmp_path, monkeypatch):
         lambda p: p["passes"][0].update(algorithm="other"),
         lambda p: p.update(unknown=1),
         lambda p: p["passes"][0]["parameters"].update(coordinate_frame="domain"),
-        lambda p: p.update(groups=[dict(id="old")]),
+        lambda p: p.update(groups=[{"id": "old"}]),
     ],
 )
 def test_export_rejects_ambiguous_template(mutate):
@@ -105,3 +108,31 @@ def test_export_rejects_ambiguous_template(mutate):
             ),
             p,
         )
+
+
+def test_failed_commit_preserves_original_if_rollback_also_fails(tmp_path, monkeypatch):
+    from imposition import artwork_io
+    from imposition.artwork_export import write_layout_export
+
+    layout = resolve_booklet_spread(
+        sheet_size="letter", pages=(2, 3), margin_mm=0.0, gutter_mm=0.0
+    )
+    dest = tmp_path / "existing"
+    write_layout_export(layout, template(), dest)
+    before = (dest / "artwork-job.json").read_bytes()
+    original = artwork_io.os.replace
+    calls = []
+
+    def fail_commit_and_restore(a, b):
+        calls.append((a, b))
+        if len(calls) > 1:
+            raise OSError("injected persistent rename failure")
+        return original(a, b)
+
+    monkeypatch.setattr(artwork_io.os, "replace", fail_commit_and_restore)
+    with pytest.raises(OSError):
+        write_layout_export(layout, template(), dest, overwrite=True)
+    backups = list(tmp_path.glob(".artwork-backup-*"))
+    assert (
+        len(backups) == 1 and (backups[0] / "artwork-job.json").read_bytes() == before
+    )

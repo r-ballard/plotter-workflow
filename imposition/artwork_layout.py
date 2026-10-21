@@ -1,12 +1,36 @@
 """Resolved intrinsic canvases and assembled artwork layouts, in SVG pixels."""
 
-from dataclasses import dataclass
-from types import MappingProxyType
 import math
 import re
+from dataclasses import dataclass
+from types import MappingProxyType
 
 MM_TO_PX = 96.0 / 25.4
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def _freeze(value):
+    if isinstance(value, dict):
+        if any(not isinstance(k, str) for k in value):
+            raise ValueError("layout metadata keys must be strings")
+        return MappingProxyType({k: _freeze(v) for k, v in value.items()})
+    if isinstance(value, (tuple, list)):
+        return tuple(_freeze(v) for v in value)
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return value
+    raise ValueError("layout metadata must be finite JSON data")
+
+
+def _thaw(value):
+    from collections.abc import Mapping
+
+    if isinstance(value, Mapping):
+        return {k: _thaw(v) for k, v in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(v) for v in value]
+    return value
 
 
 def finite(value, name):
@@ -44,7 +68,7 @@ def checked_matrix(value):
     if not isinstance(value, (list, tuple)) or len(value) != 6:
         raise ValueError("matrix requires six values")
     v = tuple(finite(c, "matrix") for c in value)
-    a, b, c, d, e, f = v
+    a, b, c, d, _e, _f = v
     det = a * d - b * c
     if not math.isfinite(det) or det == 0:
         raise ValueError("matrix must be invertible")
@@ -84,7 +108,7 @@ class PanelLayout:
         object.__setattr__(
             self, "assembled_matrix", checked_matrix(self.assembled_matrix)
         )
-        object.__setattr__(self, "binding", MappingProxyType(dict(self.binding)))
+        object.__setattr__(self, "binding", _freeze(dict(self.binding)))
 
 
 @dataclass(frozen=True)
@@ -121,11 +145,11 @@ class ArtworkLayout:
                     raise ValueError("panel crop outside layout window")
         object.__setattr__(self, "window", (x, y, w, h))
         object.__setattr__(self, "panels", tuple(self.panels))
-        object.__setattr__(self, "settings", MappingProxyType(dict(self.settings)))
+        object.__setattr__(self, "settings", _freeze(dict(self.settings)))
 
 
 def resolve_booklet_spread(*, sheet_size, pages, margin_mm, gutter_mm):
-    from scripts.booklet_impose import SHEET_SIZES_MM, ALLOWED_SPREADS
+    from scripts.booklet_impose import ALLOWED_SPREADS, SHEET_SIZES_MM
 
     if sheet_size not in SHEET_SIZES_MM:
         raise ValueError("unsupported sheet size")
@@ -163,35 +187,35 @@ def resolve_booklet_spread(*, sheet_size, pages, margin_mm, gutter_mm):
         (0.0, 0.0, 2 * W, H),
         panels,
         "validated",
-        dict(
-            layout="booklet-spread",
-            sheet_size=sheet_size,
-            pages=list(pages),
-            margin_mm=margin,
-            gutter_mm=gutter,
-            mm_to_px=MM_TO_PX,
-        ),
+        {
+            "layout": "booklet-spread",
+            "sheet_size": sheet_size,
+            "pages": list(pages),
+            "margin_mm": margin,
+            "gutter_mm": gutter,
+            "mm_to_px": MM_TO_PX,
+        },
     )
 
 
 def layout_dict(layout):
-    return dict(
-        profile_id=layout.profile_id,
-        units=layout.units,
-        window=list(layout.window),
-        validation_status=layout.validation_status,
-        settings=dict(layout.settings),
-        panels=[
-            dict(
-                panel_id=p.panel_id,
-                canvas_polygon=p.canvas_polygon,
-                crop_polygon=p.crop_polygon,
-                assembled_matrix=p.assembled_matrix,
-                binding=dict(p.binding),
-            )
+    return {
+        "profile_id": layout.profile_id,
+        "units": layout.units,
+        "window": list(layout.window),
+        "validation_status": layout.validation_status,
+        "settings": dict(layout.settings),
+        "panels": [
+            {
+                "panel_id": p.panel_id,
+                "canvas_polygon": p.canvas_polygon,
+                "crop_polygon": p.crop_polygon,
+                "assembled_matrix": p.assembled_matrix,
+                "binding": dict(p.binding),
+            }
             for p in layout.panels
         ],
-    )
+    }
 
 
 def parse_layout(value):

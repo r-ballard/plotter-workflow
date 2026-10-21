@@ -269,3 +269,11 @@ orientation should remain stable even if vpype's path serialization changes.
 A physical validation source set is checked in under
 `tests/fixtures/imposition/pocketmod8/validation_pages/`. See the
 [`pocketmod8 fixture`](../validation/pocketmod8-fixture.md) for the sacrificial-paper plot, cut, fold, and page-order check.
+
+
+## Export assembled artwork layouts
+
+For coherent generated artwork across reading/folded neighbors, see the
+[assembled artwork handoff](../how-to/assembled-artwork-handoff.md). It keeps
+composition transforms separate from physical sheet placement and restores full
+canvases before returned assets are imposed.

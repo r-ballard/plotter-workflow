@@ -424,3 +424,11 @@ For a multi-pen job, physically verify the carriage against the resolved pen
 plan before using the normal confirmation/send procedure. Imposition changes
 logical placement on the sheet; it does not relax any existing converter,
 pen-plan, placement, preflight, or hardware-send contract.
+
+
+## Export assembled artwork layouts
+
+For coherent generated artwork across reading/folded neighbors, see the
+[assembled artwork handoff](../how-to/assembled-artwork-handoff.md). It keeps
+composition transforms separate from physical sheet placement and restores full
+canvases before returned assets are imposed.

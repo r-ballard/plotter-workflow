@@ -1,27 +1,29 @@
 import copy
+
 import pytest
-from imposition.artwork_layout import MM_TO_PX, rect, affine
+
+from imposition.artwork_layout import MM_TO_PX, affine, rect
 
 
 def profile():
     side = 100 * MM_TO_PX / 4
-    return dict(
-        schema_version=1,
-        profile_id="example-folded",
-        object_id="cootie_catcher",
-        view="folded-outer",
-        validation_status="provisional",
-        units="svg-px",
-        window=[0, 0, side * 2, side * 2],
-        panels=[
-            dict(
-                slot_id=f"outer-{i + 1}",
-                canvas_polygon=rect(0, 0, side, side),
-                matrix=[1, 0, 0, 1, i % 2 * side, i // 2 * side],
-            )
+    return {
+        "schema_version": 1,
+        "profile_id": "example-folded",
+        "object_id": "cootie_catcher",
+        "view": "folded-outer",
+        "validation_status": "provisional",
+        "units": "svg-px",
+        "window": [0, 0, side * 2, side * 2],
+        "panels": [
+            {
+                "slot_id": f"outer-{i + 1}",
+                "canvas_polygon": rect(0, 0, side, side),
+                "matrix": [1, 0, 0, 1, i % 2 * side, i // 2 * side],
+            }
             for i in range(4)
         ],
-    )
+    }
 
 
 def test_explicit_profile_preserves_corner_maps():

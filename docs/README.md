@@ -10,6 +10,7 @@ Start with the repository [README](../README.md) for deployment and the
 - [Patchwork example](how-to/patchwork-example.md)
 - [Voronoi space filling](how-to/voronoi-space-filling.md)
 - [Polygon bundle to plot](how-to/impose-and-plot-polygon-bundle.md)
+- [Assembled artwork handoff](how-to/assembled-artwork-handoff.md)
 - [Neutral logical-layer booklet](how-to/neutral-logical-layer-plotting.md)
 - [Physical logical-layer acceptance](how-to/physical-logical-layer-acceptance.md)
 

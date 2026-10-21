@@ -1,6 +1,6 @@
 """Strict declared folded views; never infer them from flat-sheet adjacency."""
 
-from .artwork_layout import ArtworkLayout, PanelLayout, MM_TO_PX, finite, rect
+from .artwork_layout import MM_TO_PX, ArtworkLayout, PanelLayout, finite, rect
 from .objects.cootie_catcher import CootieCatcher
 
 
@@ -69,15 +69,15 @@ def load_cootie_assembled_profile(payload, *, square_size_mm):
                 "profile intrinsic canvas conflicts with canonical object size"
             )
         orientation = slot.target_orientation
-        binding = dict(
-            kind="cootie-slot",
-            slot=slot.slot_id,
-            up_vector=orientation.up_vector,
-            right_vector=orientation.right_vector,
-            top_feature_anchor=orientation.top_feature_anchor,
-            right_feature_anchor=orientation.right_feature_anchor,
-            orientation_validation=orientation.validation,
-        )
+        binding = {
+            "kind": "cootie-slot",
+            "slot": slot.slot_id,
+            "up_vector": orientation.up_vector,
+            "right_vector": orientation.right_vector,
+            "top_feature_anchor": orientation.top_feature_anchor,
+            "right_feature_anchor": orientation.right_feature_anchor,
+            "orientation_validation": orientation.validation,
+        }
         panels.append(PanelLayout(slot.slot_id, full, full, row["matrix"], binding))
     return ArtworkLayout(
         payload["profile_id"],
@@ -85,10 +85,10 @@ def load_cootie_assembled_profile(payload, *, square_size_mm):
         payload["window"],
         tuple(panels),
         payload["validation_status"],
-        dict(
-            layout="cootie-folded-outer",
-            square_size_mm=size,
-            mm_to_px=MM_TO_PX,
-            validation_basis="declared-profile-status; physical acceptance not performed by export",
-        ),
+        {
+            "layout": "cootie-folded-outer",
+            "square_size_mm": size,
+            "mm_to_px": MM_TO_PX,
+            "validation_basis": "declared-profile-status; physical acceptance not performed by export",
+        },
     )

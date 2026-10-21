@@ -1,14 +1,18 @@
-import hashlib, json, xml.etree.ElementTree as E
+import hashlib
+import json
+import xml.etree.ElementTree as E
+
 import pytest
-from imposition.artwork_layout import resolve_booklet_spread, bounds
-from imposition.artwork_export import write_layout_export, SVG_NS
+
+from imposition.artwork_export import SVG_NS, write_layout_export
 from imposition.artwork_io import json_bytes
-from tests.test_artwork_layout_export import template
+from imposition.artwork_layout import bounds, resolve_booklet_spread
+from imposition.source import inspect_svg_source
 from logical_layer_contract import (
     load_logical_layer_manifest,
     validate_surface_against_manifest,
 )
-from imposition.source import inspect_svg_source
+from tests.test_artwork_layout_export import template
 
 
 def producer_fixture(tmp_path, blank=False, layout=None):
@@ -47,7 +51,7 @@ def producer_fixture(tmp_path, blank=False, layout=None):
             {"id": "crop"},
         )
         E.SubElement(
-            clip, f"{{{SVG_NS}}}rect", dict(x="0", y="0", width=str(w), height=str(h))
+            clip, f"{{{SVG_NS}}}rect", {"x": "0", "y": "0", "width": str(w), "height": str(h)}
         )
         if not blank:
             g = E.SubElement(
@@ -76,20 +80,20 @@ def producer_fixture(tmp_path, blank=False, layout=None):
         path = bundle / "surfaces" / (panel.panel_id + ".svg")
         path.write_bytes(E.tostring(root))
         records.append(
-            dict(
-                surface_id=panel.panel_id,
-                domain_id=panel.panel_id,
-                path="surfaces/" + path.name,
-                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-                logical_layer_ids=[] if blank else ["curve"],
-            )
+            {
+                "surface_id": panel.panel_id,
+                "domain_id": panel.panel_id,
+                "path": "surfaces/" + path.name,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "logical_layer_ids": [] if blank else ["curve"],
+            }
         )
     audit = {
         **request,
         "logical_layer_contract": "viz-logical-layers/v1",
         "logical_layers": [
-            dict(id="curve", ordinal=1, label="curve"),
-            dict(id="fill", ordinal=2, label="fill"),
+            {"id": "curve", "ordinal": 1, "label": "curve"},
+            {"id": "fill", "ordinal": 2, "label": "fill"},
         ],
         "surfaces": records,
     }
@@ -179,7 +183,7 @@ def test_nonzero_canvas_origin_and_reflected_profile(tmp_path):
         rect(-10.0, -20.0, 200.0, 300.0),
         rect(-5.0, -15.0, 190.0, 290.0),
         (-1.0, 0.0, 0.0, 1.0, 200.0, 20.0),
-        dict(kind="booklet-page", page=8),
+        {"kind": "booklet-page", "page": 8},
     )
     layout = ArtworkLayout(
         "offset-test",
@@ -187,7 +191,7 @@ def test_nonzero_canvas_origin_and_reflected_profile(tmp_path):
         (0.0, 0.0, 210.0, 320.0),
         (panel,),
         "provisional",
-        dict(layout="booklet-spread"),
+        {"layout": "booklet-spread"},
     )
     _, export, bundle = producer_fixture(tmp_path, layout=layout)
     out = tmp_path / "returned"

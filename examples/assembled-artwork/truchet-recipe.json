@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "seed": 31,
+  "domains": [],
+  "passes": [
+    {
+      "id": "tiles",
+      "algorithm": "truchet",
+      "target_domain_ids": [],
+      "parameters": {
+        "tile_size": 80.0,
+        "curve_tolerance": 0.05,
+        "curve_layer_ids": [
+          "curve"
+        ],
+        "region_fills": {
+          "painted": {
+            "effect": "parallel-hatch",
+            "layer_id": "fill",
+            "parameters": {
+              "spacing": 12.0,
+              "angle": 25.0
+            }
+          }
+        }
+      },
+      "logical_layers": [
+        {
+          "id": "curve",
+          "label": "Curves"
+        },
+        {
+          "id": "fill",
+          "label": "Hatching"
+        }
+      ]
+    }
+  ]
+}

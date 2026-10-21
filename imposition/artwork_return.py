@@ -2,23 +2,25 @@
 
 import copy
 import hashlib
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
 from logical_layer_contract import (
     load_logical_layer_manifest,
     validate_surface_against_manifest,
 )
-from .source import inspect_svg_source
-from .artwork_layout import parse_layout, bounds, rect, layout_dict
-from .artwork_io import (
-    read_json,
-    json_bytes,
-    atomic_directory,
-    MAX_BYTES,
-    check_destination,
-)
-from .artwork_export import build_artwork_job, SVG_NS
+
 from .artwork_bindings import build_layout_bindings
+from .artwork_export import SVG_NS, build_artwork_job
+from .artwork_io import (
+    MAX_BYTES,
+    atomic_directory,
+    check_destination,
+    json_bytes,
+    read_json,
+)
+from .artwork_layout import bounds, parse_layout, rect
+from .source import inspect_svg_source
 
 
 def _subset(expected, actual):
@@ -64,12 +66,12 @@ def _load_handoff(path):
     ):
         raise ValueError("handoff request/hash differs from resolved layout")
     expected = [
-        dict(
-            panel_id=p.panel_id,
-            source_path=f"surfaces/{p.panel_id}.svg",
-            rebase_offset=list(bounds(p.crop_polygon)[:2]),
-            binding=dict(p.binding),
-        )
+        {
+            "panel_id": p.panel_id,
+            "source_path": f"surfaces/{p.panel_id}.svg",
+            "rebase_offset": list(bounds(p.crop_polygon)[:2]),
+            "binding": dict(p.binding),
+        }
         for p in layout.panels
     ]
     if json_bytes(expected) != json_bytes(report["panels"]):
@@ -157,12 +159,12 @@ def _restore_svg(data, panel, source):
         root, f"{{{SVG_NS}}}metadata", {"id": "layout-return-provenance"}
     )
     metadata.text = json_bytes(
-        dict(
-            adapter="plotter-workflow/assembled-artwork-assets/v1",
-            panel_id=panel.panel_id,
-            source_sha256=hashlib.sha256(data).hexdigest(),
-            restored_offset=[x0, y0],
-        )
+        {
+            "adapter": "plotter-workflow/assembled-artwork-assets/v1",
+            "panel_id": panel.panel_id,
+            "source_sha256": hashlib.sha256(data).hexdigest(),
+            "restored_offset": [x0, y0],
+        }
     ).decode()
     result = ET.tostring(root, encoding="utf-8", xml_declaration=True)
     if len(result) > MAX_BYTES:
@@ -214,19 +216,19 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         new_record = copy.deepcopy(record)
         new_record["sha256"] = hashlib.sha256(data).hexdigest()
         prepared.append((relative, data, new_record))
-    derivative = dict(
-        schema="plotter-workflow/assembled-artwork-assets/v1",
-        schema_version=1,
-        logical_layer_contract=manifest.raw["logical_layer_contract"],
-        logical_layers=manifest.raw["logical_layers"],
-        surfaces=[r for _, _, r in prepared],
-        adapter_provenance=dict(
-            producer_design_sha256=hashlib.sha256(audit_data).hexdigest(),
-            handoff_sha256=hashlib.sha256(handoff.read_bytes()).hexdigest(),
-            layout_profile=layout.profile_id,
-            validation_status=layout.validation_status,
-        ),
-    )
+    derivative = {
+        "schema": "plotter-workflow/assembled-artwork-assets/v1",
+        "schema_version": 1,
+        "logical_layer_contract": manifest.raw["logical_layer_contract"],
+        "logical_layers": manifest.raw["logical_layers"],
+        "surfaces": [r for _, _, r in prepared],
+        "adapter_provenance": {
+            "producer_design_sha256": hashlib.sha256(audit_data).hexdigest(),
+            "handoff_sha256": hashlib.sha256(handoff.read_bytes()).hexdigest(),
+            "layout_profile": layout.profile_id,
+            "validation_status": layout.validation_status,
+        },
+    }
 
     def write(stage):
         (stage / "surfaces").mkdir()
@@ -241,13 +243,13 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         (stage / "bindings.json").write_bytes(json_bytes(bindings))
         (stage / "asset-preparation.json").write_bytes(
             json_bytes(
-                dict(
-                    schema_version=1,
-                    adapter=derivative["schema"],
-                    provenance=derivative["adapter_provenance"],
-                    panels=report["panels"],
-                    complete_imposition_manifest=bindings["complete"],
-                )
+                {
+                    "schema_version": 1,
+                    "adapter": derivative["schema"],
+                    "provenance": derivative["adapter_provenance"],
+                    "panels": report["panels"],
+                    "complete_imposition_manifest": bindings["complete"],
+                }
             )
         )
         staged_manifest = load_logical_layer_manifest(stage / "design.json")

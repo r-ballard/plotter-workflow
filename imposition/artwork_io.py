@@ -2,9 +2,9 @@
 
 import json
 import os
-from pathlib import Path
 import shutil
 import tempfile
+from pathlib import Path
 
 MAX_BYTES = 16 * 1024 * 1024
 
@@ -79,6 +79,7 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
     dest.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".artwork-stage-", dir=dest.parent))
     backup = None
+    committed = False
     try:
         build(stage)
         if dest.exists():
@@ -92,13 +93,19 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
             os.replace(dest, backup)
         try:
             os.replace(stage, dest)
+            committed = True
         except BaseException:
             if backup is not None:
-                os.replace(backup, dest)
+                try:
+                    os.replace(backup, dest)
+                except OSError as rollback_error:
+                    raise OSError(
+                        f"Output restore failed; original artifacts preserved at {backup}"
+                    ) from rollback_error
                 backup = None
             raise
     finally:
         _remove_owned(stage, dest.parent)
-        if backup is not None:
+        if backup is not None and committed:
             _remove_owned(backup, dest.parent)
     return dest

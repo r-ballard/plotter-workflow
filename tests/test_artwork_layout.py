@@ -1,5 +1,7 @@
 import math
+
 import pytest
+
 import scripts.booklet_impose as booklet
 
 
@@ -60,11 +62,11 @@ def test_reading_spread_geometry_and_crop(pages):
 @pytest.mark.parametrize(
     "kwargs",
     [
-        dict(pages=(1, 2)),
-        dict(pages=(2, 2)),
-        dict(pages=(True, 3)),
-        *[dict(margin_mm=v) for v in [-1.0, True, "1", math.inf, math.nan, 1000.0]],
-        *[dict(gutter_mm=v) for v in [-1.0, True, "1", math.inf, 1000.0]],
+        {"pages": (1, 2)},
+        {"pages": (2, 2)},
+        {"pages": (True, 3)},
+        *[{"margin_mm": v} for v in [-1.0, True, "1", math.inf, math.nan, 1000.0]],
+        *[{"gutter_mm": v} for v in [-1.0, True, "1", math.inf, 1000.0]],
     ],
 )
 def test_invalid_and_collapsed_spreads(kwargs):
@@ -73,7 +75,22 @@ def test_invalid_and_collapsed_spreads(kwargs):
     with pytest.raises(ValueError):
         resolve_booklet_spread(
             **(
-                dict(sheet_size="letter", pages=(2, 3), margin_mm=0.0, gutter_mm=0.0)
+                {
+                    "sheet_size": "letter",
+                    "pages": (2, 3),
+                    "margin_mm": 0.0,
+                    "gutter_mm": 0.0,
+                }
                 | kwargs
             )
         )
+
+
+def test_layout_nested_records_are_immutable():
+    from imposition.artwork_layout import resolve_booklet_spread
+
+    layout = resolve_booklet_spread(
+        sheet_size="letter", pages=(2, 3), margin_mm=0.0, gutter_mm=0.0
+    )
+    with pytest.raises(TypeError):
+        layout.settings["pages"][0] = 8

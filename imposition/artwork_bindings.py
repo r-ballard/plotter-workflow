@@ -2,6 +2,7 @@
 
 import copy
 from pathlib import PurePosixPath
+
 from .objects.cootie_catcher import EXPECTED_SLOTS
 
 
@@ -38,13 +39,13 @@ def build_layout_bindings(layout, asset_paths):
             ):
                 raise ValueError("invalid logical page binding")
             entries.append(
-                dict(
-                    page=page,
-                    source=paths[p.panel_id],
-                    fit="contain",
-                    margin_mm=0.0,
-                    gutter_mm=0.0,
-                )
+                {
+                    "page": page,
+                    "source": paths[p.panel_id],
+                    "fit": "contain",
+                    "margin_mm": 0.0,
+                    "gutter_mm": 0.0,
+                }
             )
     elif kinds == {"cootie-slot"}:
         kind = "cootie"
@@ -55,24 +56,24 @@ def build_layout_bindings(layout, asset_paths):
             if slot not in EXPECTED_SLOTS or slot != p.panel_id:
                 raise ValueError("invalid cootie slot binding")
             entries.append(
-                dict(slot=slot, source=paths[p.panel_id], fit="contain", margin_mm=0.0)
+                {"slot": slot, "source": paths[p.panel_id], "fit": "contain", "margin_mm": 0.0}
             )
     else:
         raise ValueError("unsupported layout binding family")
     remaining = sorted(all_ids - set(paths))
-    return dict(
-        schema_version=1,
-        artifact_type="assembled-artwork-binding-patch",
-        kind=kind,
-        profile_id=layout.profile_id,
-        validation_status=layout.validation_status,
-        asset_manifest="design.json",
-        complete=not remaining,
-        remaining_assignments=remaining,
-        entries=entries,
-        placement_policy="existing physical page/slot placement; assembled transform is not reapplied",
-        catalog_policy="validate all complete-manifest assets against a common catalog; no implicit catalog merge",
-    )
+    return {
+        "schema_version": 1,
+        "artifact_type": "assembled-artwork-binding-patch",
+        "kind": kind,
+        "profile_id": layout.profile_id,
+        "validation_status": layout.validation_status,
+        "asset_manifest": "design.json",
+        "complete": not remaining,
+        "remaining_assignments": remaining,
+        "entries": entries,
+        "placement_policy": "existing physical page/slot placement; assembled transform is not reapplied",
+        "catalog_policy": "validate all complete-manifest assets against a common catalog; no implicit catalog merge",
+    }
 
 
 def apply_layout_bindings(manifest, patch):

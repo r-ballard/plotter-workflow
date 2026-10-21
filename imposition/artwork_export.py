@@ -80,6 +80,15 @@ def build_artwork_job(layout, template):
         or len({v["id"] for v in layers}) != len(layers)
     ):
         raise ValueError("template requires unique safe logical layer IDs")
+    palette = parameters["curve_layer_ids"]
+    declared = {v["id"] for v in layers}
+    if (
+        not isinstance(palette, list)
+        or not palette
+        or any(not isinstance(v, str) or v not in declared for v in palette)
+        or len(set(palette)) != len(palette)
+    ):
+        raise ValueError("curve_layer_ids requires unique declared logical layer IDs")
     x, y, w, h = layout.window
     parameters.update(
         coordinate_frame="composition",

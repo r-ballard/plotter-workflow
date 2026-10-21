@@ -80,7 +80,7 @@ Once you have a complete valid bundle and booklet manifest:
 
 ```powershell
 & $python scripts/booklet_impose.py output/complete-booklet --manifest booklet.json `
-  --sheet-size letter --margin-mm 0 --gutter-mm 0 --output output/booklet.imposed.svg
+  --sheet-size letter --page-margin-mm 0 --gutter-mm 0 --output output/booklet.imposed.svg
 ```
 
 Use the existing [booklet reference](../reference/booklet-imposition.md) and

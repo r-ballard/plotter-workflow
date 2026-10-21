@@ -136,3 +136,32 @@ def test_failed_commit_preserves_original_if_rollback_also_fails(tmp_path, monke
     assert (
         len(backups) == 1 and (backups[0] / "artwork-job.json").read_bytes() == before
     )
+
+
+@pytest.mark.parametrize(
+    "palette", ["curve", ["not-declared"], ["curve", "curve"], [3]]
+)
+def test_export_rejects_invalid_curve_palette(palette):
+    from imposition.artwork_export import build_artwork_job
+
+    recipe = template()
+    recipe["passes"][0]["parameters"]["curve_layer_ids"] = palette
+    layout = resolve_booklet_spread(
+        sheet_size="letter", pages=(8, 1), margin_mm=0, gutter_mm=0
+    )
+    with pytest.raises(ValueError, match="curve_layer_ids"):
+        build_artwork_job(layout, recipe)
+
+
+def test_validation_output_can_be_atomically_replaced(tmp_path):
+    from imposition.artwork_io import atomic_directory
+
+    destination = tmp_path / "validation"
+    destination.mkdir()
+    (destination / "validation.json").write_text("{}")
+    atomic_directory(
+        destination,
+        lambda stage: (stage / "validation.json").write_text('{"fresh": true}'),
+        overwrite=True,
+    )
+    assert json.loads((destination / "validation.json").read_text()) == {"fresh": True}

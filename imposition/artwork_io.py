@@ -73,7 +73,8 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
     if dest.exists() and (not overwrite or not dest.is_dir()):
         raise ValueError("output exists; explicit overwrite required")
     if dest.exists() and not any(
-        (dest / name).is_file() for name in ("layout-handoff.json", "design.json")
+        (dest / name).is_file()
+        for name in ("layout-handoff.json", "design.json", "validation.json")
     ):
         raise ValueError("overwrite requires a recognized artwork export directory")
     dest.parent.mkdir(parents=True, exist_ok=True)

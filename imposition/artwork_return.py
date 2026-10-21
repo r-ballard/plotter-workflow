@@ -18,6 +18,7 @@ from .artwork_io import (
     check_destination,
 )
 from .artwork_export import build_artwork_job, SVG_NS
+from .artwork_bindings import build_layout_bindings
 
 
 def _subset(expected, actual):
@@ -234,6 +235,21 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         (stage / "producer-design.json").write_bytes(audit_data)
         (stage / "layout-handoff.json").write_bytes(json_bytes(report))
         (stage / "design.json").write_bytes(json_bytes(derivative))
+        bindings = build_layout_bindings(
+            layout, {p.panel_id: f"surfaces/{p.panel_id}.svg" for p in layout.panels}
+        )
+        (stage / "bindings.json").write_bytes(json_bytes(bindings))
+        (stage / "asset-preparation.json").write_bytes(
+            json_bytes(
+                dict(
+                    schema_version=1,
+                    adapter=derivative["schema"],
+                    provenance=derivative["adapter_provenance"],
+                    panels=report["panels"],
+                    complete_imposition_manifest=bindings["complete"],
+                )
+            )
+        )
         staged_manifest = load_logical_layer_manifest(stage / "design.json")
         for name, _, _ in prepared:
             validate_surface_against_manifest(stage / name, staged_manifest)

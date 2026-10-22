@@ -64,8 +64,8 @@ Set up the plotting project:
 ```bash
 cd "$PLOTTER_REPO"
 uv python install 3.12
-uv sync
-uv run python -m pytest -q
+uv sync --locked
+uv run --locked python -m pytest -q
 ```
 
 ## 1. Add the placement manifest
@@ -101,7 +101,7 @@ guide:
 ```bash
 mkdir -p output/cootie-production
 
-uv run python scripts/cootie_impose.py "$BUNDLE_DIR" \
+uv run --locked python scripts/cootie_impose.py "$BUNDLE_DIR" \
   --manifest cootie.json \
   --sheet-size letter \
   --square-position left \
@@ -158,9 +158,16 @@ contracts, but generic SVG sources are flattened to one logical output layer.
 
 The current `viz_virtualserver` cootie-catcher example produces generic
 per-surface SVGs. Its imposed artwork is therefore a single-pen job and does
-not need a pen-plan JSON. The converter will use `SP1` and finish with `SP0`.
+not need a user-authored pen-plan JSON. The converter resolves an `artwork`
+channel to `SP1`, finishes with `SP0`, and writes a schema-3 resolved pen plan.
 
-If a future bundle uses strict `pen-N` layers, create an adjacent input plan
+Neutral `viz-logical-layers/v1` bundles are also supported: imposition preserves
+their declared pen channels rather than flattening them. Use the
+[neutral-layer walkthrough](neutral-logical-layer-plotting.md) for explicit
+logical-ID assignments and multiple physical passes. Do not mix neutral, generic,
+and strict `pen-N` contracts in one source set.
+
+For strict `pen-N` layered sources, create an adjacent input plan
 named after the imposed SVG, for example:
 
 ```text
@@ -193,7 +200,7 @@ at power-up.
 Convert the artwork:
 
 ```bash
-uv run python scripts/dpx3300_convert.py \
+uv run --locked python scripts/dpx3300_convert.py \
   --input-dir output/cootie-production \
   --output-dir output/cootie-production \
   --file cootie-artwork.imposed.svg \
@@ -216,11 +223,6 @@ Expected files for the current single-pen example:
 ```text
 output/cootie-production/cootie-artwork.imposed.hpgl
 output/cootie-production/cootie-artwork.imposed.placement.json
-```
-
-A strict layered job additionally creates:
-
-```text
 output/cootie-production/cootie-artwork.imposed.resolved.penplan.json
 ```
 
@@ -233,8 +235,11 @@ printf '\n'
 ```
 
 You should see ordinary commands such as `IN;`, `SP1;`, `PU`, `PD`, and a
-terminal `SP0;`. In lower-left Letter placement, coordinates normally lie in
-the negative ANSI-D Letter window documented in `README.md`.
+final pen selection `SP0;`. The validated output ends with `PU;SP0;IN;`,
+so the final instruction need not be the pen-selection command itself. In
+lower-left Letter placement, coordinates normally lie in the negative ANSI-D
+Letter window documented in the
+[paper-placement reference](../reference/hpgl-placement.md).
 
 If Git Bash prints many messages such as `IN: command not found` or
 `SP1: command not found`, the HP-GL filename was accidentally entered as a
@@ -247,23 +252,27 @@ not use PowerShell backticks in Git Bash.
 Run preflight without claiming that the carriage has been checked:
 
 ```bash
-uv run python scripts/job_preflight.py \
+uv run --locked python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl
 ```
 
 For the current single-pen bundle, expect `SP1 -> SP0`, placement `PASS`, and
 `READY TO SEND`. A multi-pen job initially reports
-`VALIDATED - OPERATOR CONFIRMATION REQUIRED`.
+`VALIDATED - OPERATOR CONFIRMATION REQUIRED`. The default single-pen example
+may also report `Carriage documentation: FAIL` because no physical tool label was
+supplied; that field does not block an unmanaged single-pen software preflight.
+It does not claim the actual carriage was inspected. The resolved plan and report
+keep this distinction explicit.
 
 Review the reported page profile, margin, coordinate mode, drawing bounds,
 pen order, and carriage table. Confirm that they match the intended sheet and
 tools.
 
-After physically checking every used carriage slot, write the audit report.
-For the single-pen example:
+The software-only audit can be written without physical confirmation. For the
+single-pen example:
 
 ```bash
-uv run python scripts/job_preflight.py \
+uv run --locked python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl \
   --write-report
 ```
@@ -272,7 +281,7 @@ For a multi-pen job, add `--confirm-pen-plan` only after loading and checking
 the printed carriage plan:
 
 ```bash
-uv run python scripts/job_preflight.py \
+uv run --locked python scripts/job_preflight.py \
   output/cootie-production/cootie-artwork.imposed.hpgl \
   --confirm-pen-plan \
   --write-report
@@ -310,7 +319,7 @@ near PAUSE and be ready to power off if motion leaves the expected area.
 List serial ports from Git Bash:
 
 ```bash
-uv run python scripts/send_hpgl.py --list-ports
+uv run --locked python scripts/send_hpgl.py --list-ports
 ```
 
 On Windows the result is typically `COM3` or another `COMN` name. Close any
@@ -321,7 +330,7 @@ other program holding that port.
 Replace `COM3` with the detected port. For the current single-pen example:
 
 ```bash
-uv run python scripts/send_hpgl.py \
+uv run --locked python scripts/send_hpgl.py \
   --port COM3 \
   output/cootie-production/cootie-artwork.imposed.hpgl
 ```
@@ -329,7 +338,7 @@ uv run python scripts/send_hpgl.py \
 For a multi-pen job, the sender requires the same physical confirmation:
 
 ```bash
-uv run python scripts/send_hpgl.py \
+uv run --locked python scripts/send_hpgl.py \
   --port COM3 \
   --confirm-pen-plan \
   output/cootie-production/cootie-artwork.imposed.hpgl
@@ -482,3 +491,9 @@ The remaining acceptance requires the operator and physical DPX-3300:
    CLEAR, power-cycle, indicators, and pen-pickup sequence; and
 7. update this guide and the orientation-validation record with every observed
    discrepancy before treating the workflow as independently operable.
+
+## Software validation record
+
+See the [2026-10-22 validation record](../validation/2026-10-22-polygon-guide-software.md)
+for generation, imposition, conversion and unconfirmed multipass preflight evidence.
+No serial connection, pen confirmation, or physical acceptance was performed.

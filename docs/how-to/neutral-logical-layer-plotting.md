@@ -18,7 +18,7 @@ Set paths in Git Bash, using forward slashes:
 export PLOTTER_REPO=/c/path/to/plotter-workflow
 export BUNDLE_DIR=/c/path/to/neutral-booklet-bundle
 cd "$PLOTTER_REPO"
-uv sync
+uv sync --locked
 test -f "$BUNDLE_DIR/design.json"
 ```
 
@@ -58,7 +58,7 @@ layer catalog are validated again during imposition; stop on any mismatch.
 
 ```bash
 mkdir -p output/neutral-booklet
-uv run python scripts/booklet_impose.py "$BUNDLE_DIR" \
+uv run --locked python scripts/booklet_impose.py "$BUNDLE_DIR" \
   --manifest booklet.json \
   --sheet-size letter \
   --guides \
@@ -99,7 +99,7 @@ For Letter landscape paper at the lower-left ANSI-D position, preview the
 commands and planned artifacts first:
 
 ```bash
-uv run python scripts/dpx3300_convert.py \
+uv run --locked python scripts/dpx3300_convert.py \
   --input-dir output/neutral-booklet \
   --output-dir output/neutral-booklet \
   --file booklet.imposed.svg \
@@ -115,7 +115,7 @@ profile, and intended physical slots. Stop if any differs from the plan.
 Run the same command without `--dry-run` to create the jobs:
 
 ```bash
-uv run python scripts/dpx3300_convert.py \
+uv run --locked python scripts/dpx3300_convert.py \
   --input-dir output/neutral-booklet \
   --output-dir output/neutral-booklet \
   --file booklet.imposed.svg \
@@ -140,21 +140,28 @@ Set `PASS_ID` to the first ID in the plan; repeat this section for each pass:
 ```bash
 export PASS_ID=warm
 export JOB="output/neutral-booklet/booklet.imposed.${PASS_ID}.hpgl"
-uv run python scripts/job_preflight.py "$JOB"
+uv run --locked python scripts/job_preflight.py "$JOB"
 ```
 
 Read the reported logical layers, physical carriage slots, actual HP-GL pen
 order, sheet profile, drawing bounds, and placement result. Preflight checks
 the current HP-GL against the resolved sidecar and placement report. It
-cannot recheck original bundle hashes from HP-GL alone. A pass using more
+cannot recheck original bundle hashes from HP-GL alone. For an offline validation,
+`--write-report` is allowed without `--confirm-pen-plan`: require pen-plan and
+placement `PASS`, but expect `VALIDATED - OPERATOR CONFIRMATION REQUIRED` and
+`ready_to_send:false` for a multi-pen pass. A successful command exit alone does
+not mean the send gate is satisfied. Stop here until physical preparation is
+possible; do not assert confirmation just to complete software validation. A pass using more
 than one physical pen requires operator confirmation. After checking the
 loaded slots against the displayed mapping, record the review:
 
 ```bash
-uv run python scripts/job_preflight.py "$JOB" --confirm-pen-plan --write-report
+uv run --locked python scripts/job_preflight.py "$JOB" --confirm-pen-plan --write-report
 ```
 
-For a single-pen pass, `--confirm-pen-plan` may be omitted. Proceed only when
+For a single-pen pass with unmanaged pen force, `--confirm-pen-plan` may be
+omitted. A requested force setup still requires operator confirmation even when
+only one pen is used; see the [pen-plan reference](../reference/pen-plan.md). Proceed only when
 the exact job reports `READY TO SEND` and placement `PASS`. If HP-GL or any
 sidecar is regenerated, run preflight again. See `docs/reference/job-preflight.md` for the
 report and confirmation rules.
@@ -168,7 +175,7 @@ listed by the resolved carriage plan. Load a sacrificial Letter sheet at the
 lower-left ANSI-D position and engage PAPER HOLD. Check the detected port:
 
 ```bash
-uv run python scripts/send_hpgl.py --list-ports
+uv run --locked python scripts/send_hpgl.py --list-ports
 ```
 
 Replace `COM3` and `PASS_ID` with the actual port and the first pass ID:
@@ -176,7 +183,7 @@ Replace `COM3` and `PASS_ID` with the actual port and the first pass ID:
 ```bash
 export PASS_ID=warm
 export JOB="output/neutral-booklet/booklet.imposed.${PASS_ID}.hpgl"
-uv run python scripts/send_hpgl.py --port COM3 --confirm-pen-plan "$JOB"
+uv run --locked python scripts/send_hpgl.py --port COM3 --confirm-pen-plan "$JOB"
 ```
 
 The sender runs a fresh preflight before opening the port. It requires

@@ -847,6 +847,10 @@ def impose(
     """Build an imposed physical SVG root and semantic render records."""
     if quantization_mm <= 0:
         raise ImpositionError("quantization_mm must be greater than zero.")
+    from imposition.cootie_neutral import has_neutral_sources, impose_neutral
+    if has_neutral_sources(entries):
+        return impose_neutral(entries, sheet_size=sheet_size, placement=placement,
+                              quantization_mm=quantization_mm)
     mode = source_mode(entries)
     quantization = _mm_to_px(quantization_mm)
     root = _new_physical_svg_root(sheet_size, placement)
@@ -1233,6 +1237,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             mode=mode,
             quantization_mm=args.quantization_mm,
         )
+        if mode == "neutral":
+            audit["logical_layer_contract"] = root.get("data-viz-layer-contract")
+            audit["logical_layers"] = [{"id": g.get("data-viz-layer-id"),
+                "ordinal": int(g.get("data-viz-layer-ordinal")), "label": g.get("data-viz-layer-label")}
+                for g in root if g.get("data-viz-layer-id") is not None]
         sidecar_path.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")
         if args.guides:
             _write_xml(

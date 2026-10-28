@@ -1,0 +1,19 @@
+{
+  "back_artwork": {
+    "blank_panels": [],
+    "mode": "independent",
+    "template": "back-recipe.json"
+  },
+  "faces": "back",
+  "flip": "left-right",
+  "guides": {
+    "cut": false,
+    "fold": false,
+    "registration": false
+  },
+  "margin_mm": 3,
+  "profile": "nac-jcard-8-panel-v1",
+  "safe_inset_mm": 1.5875,
+  "schema_version": 1,
+  "sheet": "a3"
+}

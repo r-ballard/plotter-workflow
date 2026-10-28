@@ -71,7 +71,7 @@ def test_single_back_and_both_identical(tmp_path):
         assets_by_face={"back": bundles["back"]},
         output_dir=tmp_path / "single",
     )
-    for name in ("design.svg", "design.json"):
+    for name in ("design.svg", "design.json", "design.imposition.json"):
         assert (pair / "back" / name).read_bytes() == (single / "back" / name).read_bytes()
     assert not (single / "front").exists()
     assert b'data-plotter-workflow-layout="preserve"' in (single / "back/design.svg").read_bytes()

@@ -36,3 +36,29 @@ def test_cli_roundtrip(tmp_path):
         == 0
     )
     assert (tmp_path / "imposed/back/design.svg").is_file()
+
+
+def test_imposed_face_is_accepted_by_converter(tmp_path):
+    from imposition.jcard_impose import impose_jcard
+
+    from scripts.dpx3300_convert import _neutral_context, build_vpype_command
+
+    config = configuration(tmp_path)
+    bundle = assets(tmp_path, config, "front")
+    out = impose_jcard(config, assets_by_face={"front": bundle}, output_dir=tmp_path / "out")
+    source = out / "front/design.svg"
+    contract, manifest_hash = _neutral_context(source)
+    assert len(contract.layers) == 2 and len(manifest_hash) == 64
+    command = build_vpype_command(
+        source,
+        tmp_path / "design.hpgl",
+        config_path=tmp_path / "vpype.toml",
+        device="dpx3300",
+        page_size="a3",
+        device_page_size="a3",
+        landscape=True,
+        margin="0mm",
+        velocity=None,
+        absolute=True,
+    )
+    assert "layout" not in command and "--center" not in command

@@ -110,10 +110,14 @@ not generate bleed. Artwork clips to trim, including internal continuous seams.
 
 Export writes selected `front/` and `back/` folders with `artwork-job.json`,
 `layout-handoff.json`, and `layout-preview.svg`. Root `jcard-export.json` records
-the selected faces and hashes. Prepared sources use the existing neutral bundle
+the selected faces and hashes. Each face also has `sheet-preview.svg`: a diagnostic
+of physical placement, panel labels, safe inset and enabled guide strokes. This
+preview contains text and diagnostic ink; do not plot it. Prepared sources use the existing neutral bundle
 format and crop-restoration workflow.
 
 Imposition writes selected face folders containing `design.svg` and `design.json`.
+Keep the accompanying `design.imposition.json` beside them: the converter uses it
+to validate the local authoritative catalog, manifest hash and physical sheet.
 Root `jcard-jobs.json` lists the separate jobs and hashes. Source dimensions must
 match the named profile within 0.000001 mm. Source, recipe, face, layout and
 manifest mismatches fail. Front and back can use different layer catalogs. Their

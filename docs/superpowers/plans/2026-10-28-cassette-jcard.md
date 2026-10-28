@@ -10,6 +10,24 @@
 
 **Spec:** [Eight-panel cassette J-card](../specs/2026-10-28-cassette-jcard-design.md).
 
+## Implementation evidence (2026-10-28)
+
+Native implementation and final review fixes are complete. The affected regression scope
+passed **277 tests in 3.17 seconds**. All changed Python files passed Ruff. No
+transport suite or full viz algorithm suite was run because neither subsystem was
+changed. One fresh branch review found converter metadata and preview gaps; both were fixed with failing regressions. Strict recipe validation was also fixed. The minor blank-source viewport gap is deferred to HAR-89.
+
+Actual producer revision `6f992ae112e34c5d462c9059263f53f686a71c3a` generated the
+continuous front and independent back examples. Both were restored and imposed.
+Single-face SVG/manifest bytes matched the paired outputs. Off-center top-bottom
+placement with all guide channels also succeeded. Inkscape renders of both
+production faces and the labeled flip diagram were inspected. Inline JSON,
+relative documentation links and documented invalid controls were checked.
+
+Examples and retained artifacts: `examples/jcard/`, `output/jcard-real/`.
+Physical acceptance is deferred to Linear **HAR-88**, linked to HAR-87. No hardware
+transmission occurred. The worktree and diagnostic artifacts are retained.
+
 ## Global Constraints
 
 - Work in the isolated plotter-workflow worktree `.worktrees/jcard-object`, branch feat/jcard-object, baseline 79d619d. The directory is under the viz workspace; it is a separate Git repository. Do not implement on the stale root checkout.
@@ -130,4 +148,4 @@ Use strict config schema_version=1 with keys `profile`, `faces`, `sheet`, `margi
 
 ## Self-review
 
-Checked spec coverage against six tasks: exact named geometry and strict selection; paired flips/guides; per-face handoff/restoration; exact-scale atomic imposition; CLI/real producer integration; self-contained operator documentation and deferred physical proof. Review Focus has tests in each owning task. Physical/native/producer coordinates are distinct, face identity is stable, and shared helper changes stay scoped. Blank handling is an explicit imposition mask, with all prepared source provenance retained. Native method and focused verification follow user preferences; wait for plan review before implementation.
+Checked spec coverage against six tasks: exact named geometry and strict selection; paired flips/guides; per-face handoff/restoration; exact-scale atomic imposition; CLI/real producer integration; self-contained operator documentation and deferred physical proof. Review Focus has tests in each owning task. Physical/native/producer coordinates are distinct, face identity is stable, and shared helper changes stay scoped. Blank handling is an explicit imposition mask, with all prepared source provenance retained. Native method and focused verification follow user preferences; implementation authorized by the user; use the evidence above and final review results to assess completion.

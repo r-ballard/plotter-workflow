@@ -200,7 +200,9 @@ python scripts/export_jcard_layout.py --config both.json --output-dir C:/art/jca
 ```
 
 Inspect `front/layout-preview.svg` and `back/layout-preview.svg`. Check the native
-panel order and which face uses continuous artwork. The exporter does not launch
+panel order and which face uses continuous artwork. Inspect each face's
+`sheet-preview.svg` for placement, flip, safe guides and enabled registration
+marks. This diagnostic includes text and is not a plot input. The exporter does not launch
 the generator. For a single face, use `front.json` or `back.json` and run only the
 corresponding steps below.
 
@@ -233,6 +235,9 @@ No opposite-face assets or empty second job are needed.
 The final inputs are `jobs/front/design.svg` and `jobs/back/design.svg`.
 `jobs/jcard-jobs.json` records the pair, hashes, flip and front-reference placement.
 Each face also has `design.json` with its catalog and source provenance. Artwork
+must remain beside `design.imposition.json`, which the converter requires. Keep
+all three files together. For custom sheets, configure a matching converter/device
+paper profile; J-card imposition does not create hardware paper profiles. Artwork
 keeps its physical size even when sparse or completely blank. Do not apply a
 fit-to-content operation in Inkscape or the plot conversion pipeline.
 

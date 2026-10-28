@@ -43,5 +43,34 @@ def test_native_export_and_restore(tmp_path, face, mode):
 def test_face_bytes_are_selection_independent(tmp_path, face):
     single = write_jcard_export(configuration(tmp_path, face), tmp_path / "single")
     both = write_jcard_export(configuration(tmp_path, "both"), tmp_path / "both")
-    for name in ("artwork-job.json", "layout-handoff.json", "layout-preview.svg"):
+    for name in (
+        "artwork-job.json",
+        "layout-handoff.json",
+        "layout-preview.svg",
+        "sheet-preview.svg",
+    ):
         assert (single / face / name).read_bytes() == (both / face / name).read_bytes()
+
+
+@pytest.mark.parametrize(
+    "bad", [{"passes": [None]}, {"coordinate_frame": False}, {"composition_mode": {}}]
+)
+def test_malformed_recipe_controls_are_rejected(tmp_path, bad):
+    layout = resolve_jcard_layout(configuration(tmp_path), "front")
+    recipe = template()
+    if "passes" in bad:
+        recipe.update(bad)
+    else:
+        recipe["passes"][0]["parameters"].update(bad)
+    with pytest.raises(ValueError):
+        build_jcard_artwork_job(layout, recipe, mode="independent")
+
+
+def test_export_contains_sheet_safe_and_registration_preview(tmp_path):
+    from dataclasses import replace
+
+    config = replace(configuration(tmp_path), guides=("registration",))
+    out = write_jcard_export(config, tmp_path / "out")
+    preview = (out / "front/sheet-preview.svg").read_text()
+    assert "safe" in preview and "registration" in preview
+    assert "front-panel-1" in preview

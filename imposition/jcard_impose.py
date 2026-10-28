@@ -1,6 +1,7 @@
 """Exact-scale native-face rendering and atomic paired job publication."""
 
 import hashlib
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
@@ -69,6 +70,8 @@ def render_face(config, face, bundle, placement):
             "height": f"{sheet.height_mm:.17g}mm",
             "viewBox": f"0 0 {sheet.width_mm * MM_TO_PX:.17g} {sheet.height_mm * MM_TO_PX:.17g}",
             booklet.LAYOUT_MARKER_ATTRIBUTE: booklet.LAYOUT_MARKER_VALUE,
+            "data-plotter-workflow-page-size": sheet.name,
+            "data-plotter-workflow-orientation": sheet.orientation,
             "data-viz-layer-contract": NEUTRAL_CONTRACT,
         },
     )
@@ -171,7 +174,12 @@ def render_face(config, face, bundle, placement):
         "profile": config.profile,
         "face": face,
         "flip": config.flip,
-        "sheet": {"width_mm": sheet.width_mm, "height_mm": sheet.height_mm},
+        "sheet": {
+            "name": sheet.name,
+            "orientation": sheet.orientation,
+            "width_mm": sheet.width_mm,
+            "height_mm": sheet.height_mm,
+        },
         "face_matrix_mm": matrix,
         "logical_layer_contract": NEUTRAL_CONTRACT,
         "logical_layers": catalog,
@@ -181,6 +189,15 @@ def render_face(config, face, bundle, placement):
         "panels": records,
         "requires_preserved_layout": True,
         "design_sha256": hashlib.sha256(svg).hexdigest(),
+        "surfaces": [
+            {
+                "surface_id": face,
+                "domain_id": face,
+                "path": "design.svg",
+                "sha256": hashlib.sha256(svg).hexdigest(),
+                "logical_layer_ids": [v["id"] for v in catalog],
+            }
+        ],
     }
     return svg, json_bytes(audit), catalog
 
@@ -198,6 +215,22 @@ def impose_jcard(config, *, assets_by_face, output_dir, overwrite=False):
             folder.mkdir()
             (folder / "design.svg").write_bytes(svg)
             (folder / "design.json").write_bytes(audit)
+            payload = json.loads(audit)
+            (folder / "design.imposition.json").write_bytes(
+                json_bytes(
+                    {
+                        "schema_version": 1,
+                        "source_mode": "neutral",
+                        "logical_layer_contract": NEUTRAL_CONTRACT,
+                        "source_manifest_path": "design.json",
+                        "source_manifest_sha256": digest(folder / "design.json"),
+                        "logical_layers": catalog,
+                        "logical_layer_ids": [v["id"] for v in catalog],
+                        "sheet": payload["sheet"],
+                        "requires_preserved_layout": True,
+                    }
+                )
+            )
             inspect_svg_contract(
                 folder / "design.svg",
                 catalog=tuple(
@@ -212,6 +245,8 @@ def impose_jcard(config, *, assets_by_face, output_dir, overwrite=False):
                     "design_sha256": digest(folder / "design.svg"),
                     "manifest": f"{face}/design.json",
                     "manifest_sha256": digest(folder / "design.json"),
+                    "imposition_audit": f"{face}/design.imposition.json",
+                    "imposition_audit_sha256": digest(folder / "design.imposition.json"),
                 }
             )
         p = placement.front_reference
@@ -221,6 +256,11 @@ def impose_jcard(config, *, assets_by_face, output_dir, overwrite=False):
                     "schema_version": 1,
                     "profile": config.profile,
                     "flip": config.flip,
+                    "sheet": {
+                        "name": config.sheet.name,
+                        "width_mm": config.sheet.width_mm,
+                        "height_mm": config.sheet.height_mm,
+                    },
                     "front_reference_mm": [p.x_mm, p.y_mm, p.width_mm, p.height_mm],
                     "faces": faces,
                 }

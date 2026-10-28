@@ -53,3 +53,33 @@ def test_guide_channels(tmp_path):
     assert len([g for g in guides if g.kind == "cut"]) == 1
     assert len([g for g in guides if g.kind == "fold"]) == 7
     assert len([g for g in guides if g.kind == "registration"]) == 6
+
+
+@pytest.mark.parametrize("flip", ["left-right", "top-bottom"])
+def test_all_physical_panel_corners_pair(tmp_path, flip):
+    from imposition.jcard_placement import transform
+    from imposition.objects.cassette_jcard import JCard
+
+    placement = resolve_jcard_placement(config(tmp_path, flip=flip))
+    front = {s.slot_id.removeprefix("front-"): s for s in JCard().slots}
+    for slot in JCard("back").slots:
+        physical = front[slot.slot_id.removeprefix("back-")]
+        front_points = [
+            transform(placement.face_matrix("front"), (x * 406.4, y * 101.6))
+            for x, y in physical.polygon
+        ]
+        flipped = {
+            (
+                round(500 - x if flip == "left-right" else x, 8),
+                round(y if flip == "left-right" else 250 - y, 8),
+            )
+            for x, y in front_points
+        }
+        back_points = {
+            tuple(
+                round(v, 8)
+                for v in transform(placement.face_matrix("back"), (x * 406.4, y * 101.6))
+            )
+            for x, y in slot.polygon
+        }
+        assert back_points == flipped

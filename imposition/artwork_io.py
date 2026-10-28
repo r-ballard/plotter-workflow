@@ -10,9 +10,7 @@ MAX_BYTES = 16 * 1024 * 1024
 
 
 def json_bytes(value):
-    return (json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n").encode(
-        "utf-8"
-    )
+    return (json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n").encode("utf-8")
 
 
 def read_json(path):
@@ -38,8 +36,7 @@ def read_json(path):
 def check_destination(destination, protected=()):
     raw = Path(destination).absolute()
     if any(
-        p.is_symlink() or getattr(p, "is_junction", lambda: False)()
-        for p in (raw, *raw.parents)
+        p.is_symlink() or getattr(p, "is_junction", lambda: False)() for p in (raw, *raw.parents)
     ):
         raise ValueError("output path cannot traverse symlinks/junctions")
     dest = raw.resolve()
@@ -47,11 +44,7 @@ def check_destination(destination, protected=()):
         raise ValueError("output cannot be a filesystem root")
     for original in protected:
         p = Path(original).resolve()
-        if (
-            p == dest
-            or p.is_relative_to(dest)
-            or (p.is_dir() and dest.is_relative_to(p))
-        ):
+        if p == dest or p.is_relative_to(dest) or (p.is_dir() and dest.is_relative_to(p)):
             raise ValueError("output must not overlap original inputs")
     return dest
 
@@ -74,7 +67,13 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
         raise ValueError("output exists; explicit overwrite required")
     if dest.exists() and not any(
         (dest / name).is_file()
-        for name in ("layout-handoff.json", "design.json", "validation.json")
+        for name in (
+            "layout-handoff.json",
+            "design.json",
+            "validation.json",
+            "jcard-export.json",
+            "jcard-jobs.json",
+        )
     ):
         raise ValueError("overwrite requires a recognized artwork export directory")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -86,10 +85,7 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
         if dest.exists():
             backup = Path(tempfile.mkdtemp(prefix=".artwork-backup-", dir=dest.parent))
             backup.rmdir()
-            if (
-                backup.resolve().parent != dest.parent
-                or dest.resolve().parent != dest.parent
-            ):
+            if backup.resolve().parent != dest.parent or dest.resolve().parent != dest.parent:
                 raise ValueError("unsafe rename target")
             os.replace(dest, backup)
         try:

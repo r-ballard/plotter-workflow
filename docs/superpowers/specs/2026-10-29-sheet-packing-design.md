@@ -1,6 +1,6 @@
 # HAR-91: Reusable exact-scale sheet packing
 
-Status: proposed production design. The user selected grid plus MaxRects, then
+Status: approved by the user on 2026-10-29. The user selected grid plus MaxRects, then
 selected conservative rectangular bounds first with polygon-aware nesting later.
 The [visual study](2026-10-29-sheet-packing-study.md) is a throwaway prototype.
 
@@ -261,7 +261,8 @@ coordinate/duplex diagrams and complete inline JSON/commands.
 ## Approval and follow-ups
 
 The selected approach and rectangular-first sequence are agreed. Proposed API
-names, limits, catalogue merge rules and the J-card-only initial CLI await review.
+names, limits, catalogue merge rules and the J-card-only initial CLI were approved
+with this design. Internal implementation factoring remains a builder choice.
 The fresh builder check reported no important unanswered questions.
 Physical fit/duplex registration remains HAR-88. Polygon nesting and additional
 object adapters are later features. No Linear writes are authorized as part of

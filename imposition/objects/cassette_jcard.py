@@ -1,12 +1,12 @@
 """Nominal eight-panel cassette geometry, independent of paper placement."""
 
 from dataclasses import dataclass
-from decimal import Decimal
+from fractions import Fraction
 
+from ..jcard_profiles import DEFAULT_PROFILE, get_jcard_profile
 from ..model import Guide, ObjectPlacement, OrientationTarget, Slot
 
-PROFILE = "nac-jcard-8-panel-v1"
-WIDTHS = tuple(float(Decimal(n) * Decimal("25.4") / 16) for n in (17, 8, 41, 40, 39, 38, 37, 36))
+PROFILE = DEFAULT_PROFILE
 
 
 @dataclass(frozen=True)
@@ -15,21 +15,34 @@ class JCard:
     profile: str = PROFILE
     object_id = "cassette-jcard"
     schema_version = 1
-    panel_widths_mm = WIDTHS
-    trim_size_mm = (406.4, 101.6)
 
     def __post_init__(self):
-        if self.face not in ("front", "back") or self.profile != PROFILE:
+        if self.face not in ("front", "back"):
             raise ValueError("Unsupported J-card face or profile")
+        get_jcard_profile(self.profile)
+
+    @property
+    def panel_widths_mm(self):
+        return get_jcard_profile(self.profile).panel_widths_mm
+
+    @property
+    def trim_size_mm(self):
+        return get_jcard_profile(self.profile).trim_size_mm
 
     @property
     def slots(self):
-        numbers = range(8) if self.face == "front" else range(7, -1, -1)
-        x = Decimal(0)
+        profile = get_jcard_profile(self.profile)
+        numbers = (
+            range(profile.panel_count)
+            if self.face == "front"
+            else range(profile.panel_count - 1, -1, -1)
+        )
+        x = Fraction(0)
+        total = sum(profile.widths_inch)
         slots = []
         for i in numbers:
-            end = x + Decimal(str(WIDTHS[i]))
-            left, right = float(x / Decimal("406.4")), float(end / Decimal("406.4"))
+            end = x + profile.widths_inch[i]
+            left, right = float(x / total), float(end / total)
             slots.append(
                 Slot(
                     f"{self.face}-panel-{i + 1}",

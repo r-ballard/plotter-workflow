@@ -32,7 +32,7 @@ def transform(matrix, point):
 
 def resolve_jcard_placement(config):
     sw, sh = config.sheet.width_mm, config.sheet.height_mm
-    w, h = JCard.trim_size_mm
+    w, h = JCard(profile=config.profile).trim_size_mm
     x, y = config.origin_mm if config.origin_mm is not None else ((sw - w) / 2, (sh - h) / 2)
     margin = config.margin_mm
     if x < margin or y < margin or x + w > sw - margin or y + h > sh - margin:
@@ -50,7 +50,7 @@ def resolve_jcard_placement(config):
         matrices.append((face, matrix))
         guides = [
             Guide(g.kind, tuple(transform(matrix, p) for p in g.points), g.closed)
-            for g in JCard(face).native_guides()
+            for g in JCard(face, config.profile).native_guides()
             if g.kind in config.guides
         ]
         if "registration" in config.guides:
@@ -72,7 +72,7 @@ def resolve_jcard_placement(config):
         plotted.append((face, tuple(guides)))
         safe = []
         inset = config.safe_inset_mm
-        for slot in JCard(face).slots:
+        for slot in JCard(face, config.profile).slots:
             left, right = slot.polygon[0][0] * w, slot.polygon[1][0] * w
             safe.append(
                 Guide(

@@ -1,0 +1,27 @@
+{
+  "faces": "front",
+  "flip": "left-right",
+  "front_artwork": {
+    "blank_panels": [
+      "front-panel-1",
+      "front-panel-2",
+      "front-panel-3",
+      "front-panel-4",
+      "front-panel-5",
+      "front-panel-6",
+      "front-panel-7"
+    ],
+    "mode": "continuous",
+    "template": "front-recipe.json"
+  },
+  "guides": {
+    "cut": true,
+    "fold": true,
+    "registration": true
+  },
+  "margin_mm": 3,
+  "profile": "standard-jcard-7-panel-v1",
+  "safe_inset_mm": 1.5875,
+  "schema_version": 1,
+  "sheet": "tabloid"
+}

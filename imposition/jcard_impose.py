@@ -53,8 +53,8 @@ def render_face(config, face, bundle, placement):
         raise ValueError("Producer recipe/catalog differs from prepared bundle")
     if {r["domain_id"] for r in manifest.raw["surfaces"]} != {
         p.panel_id for p in layout.panels
-    } or len(manifest.raw["surfaces"]) != 8:
-        raise ValueError("Prepared bundle requires exactly eight panels")
+    } or len(manifest.raw["surfaces"]) != len(layout.panels):
+        raise ValueError("Prepared bundle requires exactly the selected profile's panels")
     reserved = {
         "cut": "jcard-cut-guides",
         "fold": "jcard-fold-guides",

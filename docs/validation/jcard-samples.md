@@ -1,5 +1,34 @@
 ﻿# J-card physical sample plots
 
+## Standard Cassette 3–8-panel samples
+
+The follow-on samples are retained under `output/jcard-format-samples/standard-N/`.
+Each format contains `fit-proof/front/design.svg`, `artwork/front/design.svg`,
+and `artwork/back/design.svg`, with converter sidecars beside each SVG. The
+`export/` folder contains native and sheet previews for inspection, not plotting.
+
+| Format | Sheet | Trim width (mm) | Trim height (mm) |
+| --- | --- | ---: | ---: |
+| standard-3 | Letter landscape | 103.1875 | 101.6 |
+| standard-4 | A4 landscape | 168.275 | 101.6 |
+| standard-5 | Letter landscape | 230.1875 | 101.6 |
+| standard-6 | A3 landscape | 290.5125 | 101.6 |
+| standard-7 | Tabloid landscape | 349.25 | 101.6 |
+| standard-8 | A3 landscape | 406.4 | 101.6 |
+
+All use left-right flipping and construction ink enabled. Start with the
+guide-only proof. Measure trim/seams, cut and fold, then inspect stock and case
+fit. For paired artwork, complete the front, idle the arm, manually flip and
+register, then send the back as a separate job. Record results separately for
+each profile in HAR-88; one format's proof does not verify the others.
+
+The [complete configs, recipes and regeneration commands](../how-to/jcard-formats.md)
+are tracked in Git. Generated output is ignored and retained locally; merging
+does not copy it into a new checkout. Confirm the actual plotter usable area and
+pen mapping. No hardware transmission has been performed.
+
+## Original NAC eight-panel samples
+
 All three SVGs are A3 landscape (420 x 297 mm). Trim is exactly 406.4 x 101.6 mm.
 
 1. fit-proof/front/design.svg: guide-only cut/fold/registration proof. Plot on scrap, measure the 406.4 mm trim width and 101.6 mm height, cut, roll-fold extensions and check cassette case fit.

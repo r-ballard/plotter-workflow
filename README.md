@@ -6,10 +6,12 @@ placement, booklet and cootie-catcher imposition, pen assignment, conversion,
 and transport. [`viz_virtualserver`](https://github.com/r-ballard/viz_virtualserver)
 can produce neutral design bundles for this workflow.
 
-Eight-panel cassette inserts support front-only, back-only, and two-sided artwork.
+Cassette inserts support verified Standard Cassette 3–8-panel formats and the
+original NAC eight-panel format, with front-only, back-only, or two-sided artwork.
 Use the [J-card workflow and complete JSON examples](docs/how-to/cassette-jcard.md)
 and [dimension/parameter reference](docs/reference/cassette-jcard.md). Each face is
 a separate exact-scale plot job with an explicit manual paper flip between jobs.
+Use the [complete format examples](docs/how-to/jcard-formats.md) for smaller inserts.
 
 ## Redeploy on a workstation
 

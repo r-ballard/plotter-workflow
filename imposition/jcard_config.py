@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .artwork_layout import finite
+from .jcard_profiles import get_jcard_profile
 from .model import SheetSpec
 from .objects.cassette_jcard import PROFILE
 from .objects.cootie_catcher import SUPPORTED_SHEETS
@@ -62,12 +63,9 @@ def load_jcard_config(payload, *, base_dir):
         raise ValueError("schema_version must be 1")
     profile, faces = p.get("profile", PROFILE), p.get("faces", "front")
     flip = p.get("flip", "left-right")
-    if (
-        profile != PROFILE
-        or faces not in ("front", "back", "both")
-        or flip not in ("left-right", "top-bottom")
-    ):
+    if faces not in ("front", "back", "both") or flip not in ("left-right", "top-bottom"):
         raise ValueError("Unsupported profile, faces or flip")
+    descriptor = get_jcard_profile(profile)
     raw_sheet = p.get("sheet")
     if isinstance(raw_sheet, str):
         if raw_sheet not in SUPPORTED_SHEETS:
@@ -80,8 +78,9 @@ def load_jcard_config(payload, *, base_dir):
             raise ValueError("Sheet must have positive landscape dimensions <= 1e6 mm")
         sheet = SheetSpec("custom", width, height, "landscape")
     margin = finite(p.get("margin_mm", 0), "margin_mm")
-    inset = finite(p.get("safe_inset_mm", 1.5875), "safe_inset_mm")
-    if not 0 <= margin < min(sheet.width_mm, sheet.height_mm) / 2 or not 0 <= inset < 6.35:
+    inset = finite(p.get("safe_inset_mm", float(descriptor.safe_inset_mm)), "safe_inset_mm")
+    safe_limit = min(*descriptor.panel_widths_mm, descriptor.trim_size_mm[1]) / 2
+    if not 0 <= margin < min(sheet.width_mm, sheet.height_mm) / 2 or not 0 <= inset < safe_limit:
         raise ValueError("Margin or safe inset collapses drawable area")
     origin = None
     if "origin_mm" in p:
@@ -113,7 +112,8 @@ def load_jcard_config(payload, *, base_dir):
         if (
             not isinstance(blanks, list)
             or any(
-                not isinstance(v, str) or v not in {f"{face}-panel-{i}" for i in range(1, 9)}
+                not isinstance(v, str)
+                or v not in {f"{face}-panel-{i}" for i in range(1, descriptor.panel_count + 1)}
                 for v in blanks
             )
             or len(set(blanks)) != len(blanks)

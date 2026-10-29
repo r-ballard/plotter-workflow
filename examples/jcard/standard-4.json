@@ -1,0 +1,26 @@
+{
+  "back_artwork": {
+    "blank_panels": [],
+    "mode": "independent",
+    "template": "back-recipe.json"
+  },
+  "faces": "both",
+  "flip": "left-right",
+  "front_artwork": {
+    "blank_panels": [
+      "front-panel-2"
+    ],
+    "mode": "continuous",
+    "template": "front-recipe.json"
+  },
+  "guides": {
+    "cut": true,
+    "fold": true,
+    "registration": true
+  },
+  "margin_mm": 3,
+  "profile": "standard-jcard-4-panel-v1",
+  "safe_inset_mm": 1.5875,
+  "schema_version": 1,
+  "sheet": "a4"
+}

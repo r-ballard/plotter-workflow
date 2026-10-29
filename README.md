@@ -6,6 +6,11 @@ placement, booklet and cootie-catcher imposition, pen assignment, conversion,
 and transport. [`viz_virtualserver`](https://github.com/r-ballard/viz_virtualserver)
 can produce neutral design bundles for this workflow.
 
+Eight-panel cassette inserts support front-only, back-only, and two-sided artwork.
+Use the [J-card workflow and complete JSON examples](docs/how-to/cassette-jcard.md)
+and [dimension/parameter reference](docs/reference/cassette-jcard.md). Each face is
+a separate exact-scale plot job with an explicit manual paper flip between jobs.
+
 ## Redeploy on a workstation
 
 Install Python 3.12 and `uv`, then from this repository's root run:

@@ -1,0 +1,35 @@
+{
+  "domains": [],
+  "passes": [
+    {
+      "algorithm": "truchet",
+      "id": "tiles",
+      "logical_layers": [
+        {
+          "id": "curve"
+        },
+        {
+          "id": "fill"
+        }
+      ],
+      "parameters": {
+        "curve_layer_ids": [
+          "curve"
+        ],
+        "region_fills": {
+          "painted": {
+            "effect": "parallel-hatch",
+            "layer_id": "fill",
+            "parameters": {
+              "spacing": 12.0
+            }
+          }
+        },
+        "tile_size": 64.0
+      },
+      "target_domain_ids": []
+    }
+  ],
+  "schema_version": 1,
+  "seed": 67
+}

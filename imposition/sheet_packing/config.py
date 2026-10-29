@@ -36,6 +36,7 @@ class PackingConfig:
     strategy: str
     objects: tuple
     logical_layers: tuple | None
+    source_path: Path | None = None
 
 
 def _path(value, base_dir):

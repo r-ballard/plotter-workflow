@@ -73,6 +73,7 @@ def atomic_directory(destination, build, *, overwrite=False, protected=()):
             "validation.json",
             "jcard-export.json",
             "jcard-jobs.json",
+            "packing.json",
         )
     ):
         raise ValueError("overwrite requires a recognized artwork export directory")

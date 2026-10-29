@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from ..artwork_layout import _freeze
+from ..artwork_layout import _freeze, _thaw
 
 GUIDE_IDS = {
     "cut": "sheet-cut-guides",
@@ -41,7 +41,7 @@ def _catalog(value):
             raise ValueError("invalid or conflicting catalog IDs/ordinals/metadata")
         seen.add(v["id"])
         ordinals.add(v["ordinal"])
-        copied.append(_freeze(dict(v)))
+        copied.append(_freeze(_thaw(v)))
     if tuple(v["ordinal"] for v in copied) != tuple(range(1, len(copied) + 1)):
         raise ValueError("catalog ordinals must be contiguous in catalog order, starting at 1")
     return tuple(copied)

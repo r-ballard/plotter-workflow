@@ -1,5 +1,9 @@
 # Generate and plot a cassette J-card
 
+For the guide-only fit proof and paired artwork test sheets, use the
+[physical sample checklist](../validation/jcard-samples.md). Physical verification
+is tracked in HAR-88 and is separate from software merge acceptance.
+
 Run plotter commands from the plotter-workflow checkout. Use its Python environment.
 Run generator commands from a current viz_virtualserver checkout with its own
 Python environment. In the commands below, `python` means the Python for the

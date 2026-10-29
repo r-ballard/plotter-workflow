@@ -26,7 +26,7 @@ revision `6f992ae112e34c5d462c9059263f53f686a71c3a` generated both faces for all
 formats, restored/imposed with fit proofs under `output/jcard-format-samples/`.
 Smaller-profile off-center flips and distinct front/back catalogs were also
 checked. Physical sample plotting remains HAR-88; unrelated HAR-89 stays deferred.
-One final fresh branch review follows; no hardware transmission occurred.
+One fresh branch review found no production blockers. Its minor stale seam-count sentence was corrected in documentation. No hardware transmission occurred.
 
 ## Global Constraints
 
@@ -102,11 +102,11 @@ Consumes the resolved profile from Task 2. Existing public signatures
 
 ## Task 4: Reproducible examples, operator documentation and final verification
 
-- [ ] Add full JSON configuration examples for 3–7 panels using existing recipe files and complete inline recipes in the operator documentation. Show fitting smaller formats on Letter/A4, larger formats on A3/tabloid, both artwork modes, front/back/both, guide controls and blank assignments. Include exact per-profile table and labeled native/flip diagrams.
-- [ ] Run actual unchanged viz generation, restoration and imposition for each new format. Generate guide-only proofs and paired artwork samples, render/inspect SVGs, and check conversion dry runs without transmission. Use an off-center smaller profile for both flip conventions. Record both repository revisions and retained output paths.
-- [ ] Extend `docs/validation/jcard-samples.md` and HAR-88 with format-specific physical acceptance: measured trim/seams, stock/folds, orientation, duplex offset and case fit. Keep HAR-89 separate. Verify inline JSON, commands and local links; record that ignored output artifacts must be regenerated in another checkout.
-- [ ] Final test scope: all `tests/test_jcard_*.py`, `test_artwork_layout*.py`, `test_imposition_model.py`, `test_imposition_geometry.py`, `test_imposition_source.py`, `test_preserved_physical_layout.py`, `test_logical_layer_contract.py`, `test_booklet_impose.py`, `test_cootie_impose.py`, `test_cootie_object.py`, `test_cootie_object_integration.py`, `test_command_layout.py`. Broaden only for actual changed consumers, not a full transport/generator baseline.
-- [ ] Use existing plotter Python `C:/Users/hardcase/Documents/developer/codex-repos/plotter-workflow/.venv/Scripts/python.exe` and adjacent Ruff. Use a fresh retained output basetemp; elevated scoped runs may be necessary for observed Windows ACL failures. Record actual counts/durations/warnings. Run Ruff check/format for changed files and `git diff --check`.
+- [x] Add full JSON configuration examples for 3–7 panels using existing recipe files and complete inline recipes in the operator documentation. Show fitting smaller formats on Letter/A4, larger formats on A3/tabloid, both artwork modes, front/back/both, guide controls and blank assignments. Include exact per-profile table and labeled native/flip diagrams.
+- [x] Run actual unchanged viz generation, restoration and imposition for each new format. Generate guide-only proofs and paired artwork samples, render/inspect SVGs, and check conversion dry runs without transmission. Use an off-center smaller profile for both flip conventions. Record both repository revisions and retained output paths.
+- [x] Extend `docs/validation/jcard-samples.md` and HAR-88 with format-specific physical acceptance: measured trim/seams, stock/folds, orientation, duplex offset and case fit. Keep HAR-89 separate. Verify inline JSON, commands and local links; record that ignored output artifacts must be regenerated in another checkout.
+- [x] Final test scope: all `tests/test_jcard_*.py`, `test_artwork_layout*.py`, `test_imposition_model.py`, `test_imposition_geometry.py`, `test_imposition_source.py`, `test_preserved_physical_layout.py`, `test_logical_layer_contract.py`, `test_booklet_impose.py`, `test_cootie_impose.py`, `test_cootie_object.py`, `test_cootie_object_integration.py`, `test_command_layout.py`. Broaden only for actual changed consumers, not a full transport/generator baseline.
+- [x] Use existing plotter Python `C:/Users/hardcase/Documents/developer/codex-repos/plotter-workflow/.venv/Scripts/python.exe` and adjacent Ruff. Use a fresh retained output basetemp; elevated scoped runs may be necessary for observed Windows ACL failures. Record actual counts/durations/warnings. Run Ruff check/format for changed files and `git diff --check`.
 - [ ] One fresh whole-branch review after implementation, scoped regressions for material findings, then push and open a plotter-workflow PR against main. Update HAR-90 with evidence and HAR-88 physical follow-up. Do not merge; retain worktree/artifacts.
 
 ## Self-review

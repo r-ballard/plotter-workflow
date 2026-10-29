@@ -128,7 +128,7 @@ centers. This asymmetric three-corner arrangement helps identify a wrong flip.
 All cross extrema must fit the drawable sheet. The program fails instead of
 moving or shrinking them.
 
-Cut is one trim outline; folds are seven unique panel seams. Enabled guide
+Cut is one trim outline; folds are panel count minus one unique seams. Enabled guide
 channels are `jcard-cut-guides`, `jcard-fold-guides`, and `jcard-registration`.
 An enabled guide ID cannot duplicate an artwork layer ID. Guides are plotted ink;
 they do not operate a cutter or fold paper. Safe-inset diagnostics are not ink.

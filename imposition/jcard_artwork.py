@@ -8,20 +8,24 @@ from .artwork_export import _build_standard_artwork_job, write_layout_export
 from .artwork_io import atomic_directory, json_bytes, read_json
 from .artwork_layout import MM_TO_PX, ArtworkLayout, PanelLayout, layout_dict, rect
 from .jcard_placement import resolve_jcard_placement, transform
-from .objects.cassette_jcard import PROFILE, JCard
+from .jcard_profiles import get_jcard_profile
+from .objects.cassette_jcard import JCard
 
 
 def resolve_jcard_layout(config, face):
     if face not in config.selected_faces:
         raise ValueError("Face is not selected")
     card = JCard(face, config.profile)
+    descriptor = get_jcard_profile(config.profile)
+    total_width = float(sum(descriptor.widths_inch) * 96)
+    height = float(descriptor.height_inch * 96)
     panels = []
     # Use exact integer SVG widths (sixteenths of an inch are six pixels).
     x = 0
     for slot in card.slots:
         number = int(slot.slot_id.rsplit("-", 1)[1])
-        width = (17, 8, 41, 40, 39, 38, 37, 36)[number - 1] * 6
-        full = rect(0, 0, width, 384)
+        width = float(descriptor.widths_inch[number - 1] * 96)
+        full = rect(0, 0, width, height)
         panels.append(
             PanelLayout(
                 slot.slot_id,
@@ -30,7 +34,7 @@ def resolve_jcard_layout(config, face):
                 (1, 0, 0, 1, x, 0),
                 {
                     "kind": "jcard-slot",
-                    "profile": PROFILE,
+                    "profile": config.profile,
                     "face": face,
                     "physical_panel_id": f"panel-{number}",
                     "slot": slot.slot_id,
@@ -39,14 +43,14 @@ def resolve_jcard_layout(config, face):
         )
         x += width
     return ArtworkLayout(
-        f"{PROFILE}-{face}",
+        f"{config.profile}-{face}",
         "svg-px",
-        (0, 0, 1536, 384),
+        (0, 0, total_width, height),
         tuple(panels),
         "provisional",
         {
             "layout": "cassette-jcard",
-            "profile": PROFILE,
+            "profile": config.profile,
             "face": face,
             "mode": getattr(config, f"{face}_artwork").mode,
             "mm_to_px": MM_TO_PX,
@@ -59,14 +63,13 @@ def validate_jcard_layout(layout):
 
     settings = layout.settings
     face, mode = settings.get("face"), settings.get("mode")
-    if (
-        face not in ("front", "back")
-        or mode not in ("independent", "continuous")
-        or settings.get("profile") != PROFILE
-    ):
+    if face not in ("front", "back") or mode not in ("independent", "continuous"):
         raise ValueError("Invalid J-card layout identity")
+    descriptor = get_jcard_profile(settings.get("profile"))
     config = SimpleNamespace(
-        selected_faces=(face,), profile=PROFILE, **{f"{face}_artwork": SimpleNamespace(mode=mode)}
+        selected_faces=(face,),
+        profile=descriptor.profile_id,
+        **{f"{face}_artwork": SimpleNamespace(mode=mode)},
     )
     expected = resolve_jcard_layout(config, face)
     if json_bytes(layout_dict(expected)) != json_bytes(layout_dict(layout)):
@@ -137,8 +140,10 @@ def sheet_preview(config, face, placement):
         },
     )
     matrix = placement.face_matrix(face)
-    for slot in JCard(face).slots:
-        points = [transform(matrix, (x * 406.4, y * 101.6)) for x, y in slot.polygon]
+    card = JCard(face, config.profile)
+    width, height = card.trim_size_mm
+    for slot in card.slots:
+        points = [transform(matrix, (x * width, y * height)) for x, y in slot.polygon]
         ET.SubElement(
             root,
             f"{{{SVG_NS}}}polygon",

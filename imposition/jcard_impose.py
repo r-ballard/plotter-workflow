@@ -10,12 +10,10 @@ from logical_layer_contract import NEUTRAL_CONTRACT, LogicalLayerMetadata, inspe
 
 from scripts import booklet_impose as booklet
 
-from .artwork_io import atomic_directory, json_bytes, read_json
-from .artwork_layout import MM_TO_PX, bounds, layout_dict
-from .artwork_return import _load_handoff, _subset
-from .jcard_artwork import build_jcard_artwork_job, resolve_jcard_layout
+from .artwork_io import atomic_directory, json_bytes
+from .artwork_layout import MM_TO_PX, _thaw
+from .jcard_native import NativeFaceRequest, prepare_native_face
 from .jcard_placement import resolve_jcard_placement
-from .source import inspect_svg_source
 
 
 def digest(path):
@@ -23,44 +21,22 @@ def digest(path):
 
 
 def render_face(config, face, bundle, placement):
-    bundle = Path(bundle).resolve()
-    report, layout = _load_handoff(bundle / "layout-handoff.json")
-    expected = resolve_jcard_layout(config, face)
-    if json_bytes(layout_dict(layout)) != json_bytes(layout_dict(expected)):
-        raise ValueError("Prepared face/profile differs from selected native layout")
     recipe = getattr(config, f"{face}_artwork")
-    if (
-        build_jcard_artwork_job(expected, read_json(recipe.template), mode=recipe.mode)
-        != report["producer_request"]
-    ):
-        raise ValueError("Prepared artwork is stale relative to selected recipe")
-    entries = [SimpleNamespace(source=bundle / f"surfaces/{p.panel_id}.svg") for p in layout.panels]
-    mode, manifest = booklet._inspect_sources(entries)
-    if mode != "neutral" or manifest is None:
-        raise ValueError("J-card requires a prepared neutral bundle")
-    provenance = manifest.raw.get("adapter_provenance", {})
-    if (
-        manifest.raw.get("schema") != "plotter-workflow/assembled-artwork-assets/v1"
-        or provenance.get("handoff_sha256") != digest(bundle / "layout-handoff.json")
-        or provenance.get("producer_design_sha256") != digest(bundle / "producer-design.json")
-    ):
-        raise ValueError("Prepared bundle provenance/hash mismatch")
-    producer = read_json(bundle / "producer-design.json")
-    if (
-        not _subset(report["producer_request"], producer)
-        or producer.get("logical_layers") != manifest.raw["logical_layers"]
-    ):
-        raise ValueError("Producer recipe/catalog differs from prepared bundle")
-    if {r["domain_id"] for r in manifest.raw["surfaces"]} != {
-        p.panel_id for p in layout.panels
-    } or len(manifest.raw["surfaces"]) != len(layout.panels):
-        raise ValueError("Prepared bundle requires exactly the selected profile's panels")
+    native = prepare_native_face(
+        NativeFaceRequest(
+            config.profile, face, bundle, recipe.template, recipe.mode, recipe.blank_panels
+        )
+    )
+    bundle = Path(bundle).resolve()
+    layers = tuple(
+        SimpleNamespace(id=v["id"], ordinal=v["ordinal"], label=v["label"]) for v in native.catalog
+    )
     reserved = {
         "cut": "jcard-cut-guides",
         "fold": "jcard-fold-guides",
         "registration": "jcard-registration",
     }
-    if {reserved[k] for k in config.guides} & {layer.id for layer in manifest.layers}:
+    if {reserved[k] for k in config.guides} & {layer.id for layer in layers}:
         raise ValueError("Enabled guide ID collides with artwork layer")
     sheet = config.sheet
     root = ET.Element(
@@ -75,9 +51,9 @@ def render_face(config, face, bundle, placement):
             "data-viz-layer-contract": NEUTRAL_CONTRACT,
         },
     )
-    catalog = [dict(v) for v in manifest.raw["logical_layers"]]
+    catalog = [_thaw(v) for v in native.catalog]
     groups = {}
-    for layer in manifest.layers:
+    for layer in layers:
         groups[layer.id] = ET.SubElement(
             root,
             f"{{{booklet.SVG_NS}}}g",
@@ -92,54 +68,18 @@ def render_face(config, face, bundle, placement):
         )
     matrix = placement.face_matrix(face)
     a, _, _, d, tx, ty = matrix
-    records = []
-    for number, (panel, entry) in enumerate(zip(layout.panels, entries), 1):
-        source = entry.source
-        intrinsic = inspect_svg_source(source)
-        expected_bounds = bounds(panel.canvas_polygon)
-        if (
-            intrinsic is None
-            or len(intrinsic.polygon) != 4
-            or any(
-                abs(v - q) / MM_TO_PX > 1e-6
-                for point, expected_point in zip(intrinsic.polygon, panel.canvas_polygon)
-                for v, q in zip(point, expected_point)
-            )
-        ):
-            raise ValueError("Source canvas dimensions differ from exact panel size")
-        x0, y0, x1, y1 = expected_bounds
-        for layer_id, geometry, width, height in booklet._neutral_fragments(
-            source, number, 0.05 * MM_TO_PX
-        ):
-            if (
-                abs(width - (x1 - x0)) / MM_TO_PX > 1e-6
-                or abs(height - (y1 - y0)) / MM_TO_PX > 1e-6
-            ):
-                raise ValueError("Source viewport differs from exact panel size")
-            geometry.crop(x0, y0, x1, y1)
-            if panel.panel_id in recipe.blank_panels:
-                continue
-            geometry.translate(panel.assembled_matrix[4], panel.assembled_matrix[5])
-            geometry.scale(a, d)
-            geometry.translate(tx * MM_TO_PX, ty * MM_TO_PX)
-            if not booklet._line_collection_empty(geometry.lines):
-                wrapper = ET.SubElement(
-                    groups[layer_id],
-                    f"{{{booklet.SVG_NS}}}g",
-                    {"data-imposed-slot": panel.panel_id},
-                )
-                wrapper.append(geometry.svg)
-        records.append(
+    records = [_thaw(v) for v in native.panel_audit]
+    for fragment in native.fragments:
+        wrapper = ET.SubElement(
+            groups[fragment.layer_id],
+            f"{{{booklet.SVG_NS}}}g",
             {
-                "slot": panel.panel_id,
-                "physical_panel_id": panel.binding["physical_panel_id"],
-                "source": f"surfaces/{panel.panel_id}.svg",
-                "source_sha256": digest(source),
-                "blank": panel.panel_id in recipe.blank_panels,
-                "native_matrix_px": list(panel.assembled_matrix),
-            }
+                "data-imposed-slot": fragment.panel_id,
+                "transform": f"matrix({a} 0 0 {d} {tx * MM_TO_PX:.17g} {ty * MM_TO_PX:.17g})",
+            },
         )
-    next_ordinal = max(layer.ordinal for layer in manifest.layers) + 1
+        wrapper.append(ET.fromstring(fragment.svg_bytes))
+    next_ordinal = max(layer.ordinal for layer in layers) + 1
     for kind in ("cut", "fold", "registration"):
         if kind not in config.guides:
             continue

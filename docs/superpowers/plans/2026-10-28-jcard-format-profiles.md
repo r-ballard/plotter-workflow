@@ -107,7 +107,13 @@ Consumes the resolved profile from Task 2. Existing public signatures
 - [x] Extend `docs/validation/jcard-samples.md` and HAR-88 with format-specific physical acceptance: measured trim/seams, stock/folds, orientation, duplex offset and case fit. Keep HAR-89 separate. Verify inline JSON, commands and local links; record that ignored output artifacts must be regenerated in another checkout.
 - [x] Final test scope: all `tests/test_jcard_*.py`, `test_artwork_layout*.py`, `test_imposition_model.py`, `test_imposition_geometry.py`, `test_imposition_source.py`, `test_preserved_physical_layout.py`, `test_logical_layer_contract.py`, `test_booklet_impose.py`, `test_cootie_impose.py`, `test_cootie_object.py`, `test_cootie_object_integration.py`, `test_command_layout.py`. Broaden only for actual changed consumers, not a full transport/generator baseline.
 - [x] Use existing plotter Python `C:/Users/hardcase/Documents/developer/codex-repos/plotter-workflow/.venv/Scripts/python.exe` and adjacent Ruff. Use a fresh retained output basetemp; elevated scoped runs may be necessary for observed Windows ACL failures. Record actual counts/durations/warnings. Run Ruff check/format for changed files and `git diff --check`.
-- [ ] One fresh whole-branch review after implementation, scoped regressions for material findings, then push and open a plotter-workflow PR against main. Update HAR-90 with evidence and HAR-88 physical follow-up. Do not merge; retain worktree/artifacts.
+- [x] One fresh whole-branch review after implementation, scoped regressions for material findings, then push and open a plotter-workflow PR against main. Update HAR-90 with evidence and HAR-88 physical follow-up. Do not merge; retain worktree/artifacts.
+
+## Publication
+
+[plotter-workflow PR19](https://github.com/r-ballard/plotter-workflow/pull/19) is open
+against main. No merge or physical plot was performed. HAR-90 awaits user merge;
+HAR-88 and HAR-89 remain separate backlog items. Worktree/artifacts retained.
 
 ## Self-review
 

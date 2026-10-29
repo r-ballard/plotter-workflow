@@ -1,4 +1,4 @@
-"""Nominal eight-panel cassette geometry, independent of paper placement."""
+"""Verified cassette geometry, independent of paper placement."""
 
 from dataclasses import dataclass
 from fractions import Fraction

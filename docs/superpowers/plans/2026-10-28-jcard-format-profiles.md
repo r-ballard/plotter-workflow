@@ -10,6 +10,24 @@
 
 **Spec:** [Approved profile design](../specs/2026-10-28-jcard-format-profiles.md).
 
+## Execution evidence and rulings
+
+The user supplied https://standardcassette.com/templates and kept TLS verification
+strict. Six two-page PDFs downloaded with verification enabled; all twelve faces
+were rendered and visually checked. New records use `standard-jcard-3-panel-v1`
+through `standard-jcard-8-panel-v1`, preserving the NAC eight-panel default. The
+[source record](../../reference/jcard-profile-sources.md) contains exact dimensions,
+source hashes, rounded-label interpretation and guide allowance limitations.
+This explicitly supersedes the planned NAC names for the new records below.
+
+Native geometry/config and workflow tasks are committed at 30a13e2 and 555dc5f.
+Final affected scope: **336 tests passed in 5.41 seconds**. Real unchanged viz
+revision `6f992ae112e34c5d462c9059263f53f686a71c3a` generated both faces for all six
+formats, restored/imposed with fit proofs under `output/jcard-format-samples/`.
+Smaller-profile off-center flips and distinct front/back catalogs were also
+checked. Physical sample plotting remains HAR-88; unrelated HAR-89 stays deferred.
+One final fresh branch review follows; no hardware transmission occurred.
+
 ## Global Constraints
 
 - HAR-90; plotter-workflow branch `feat/jcard-format-profiles`, retained isolated worktree `viz_virtualserver/.worktrees/jcard-object`, merged base `e3f3cb0`; design commit `29df920`.
@@ -54,22 +72,22 @@ dimensions become resolved instance properties. Update class-level consumers.
 
 ## Task 1: Complete authoritative measurement evidence
 
-- [ ] Retrieve/render both faces for 3–7 panels using the official URLs in the spec. Keep normal TLS verification. Browser-hosted authoritative renders are acceptable when local downloads fail; record the retrieval method and absent hashes honestly. Do not add PDF tooling as an application dependency.
-- [ ] Visually compare labels with trim/fold/safe/bleed geometry and reverse face ordering. Record per-profile widths, height, allowances and source provenance in `docs/reference/jcard-profile-sources.md`. Cross-check sums against labeled total extents. Investigate any rounding discrepancy instead of averaging it into nominal constants.
-- [ ] Pin known distinctions: three-panel labels are `[1, 1/2, 41/16]` inches, totaling `103.1875 mm`; four-panel labels `[17/16,1/2,41/16,40/16]` total `168.275 mm`; five-panel labels `[17/16,1/2,41/16,40/16,39/16]` total `230.1875 mm`. Verify heights/allowances visually too. Six/seven individual widths are not yet verified; the seven-panel front labels total `13.75 × 4` inches, which is a cross-check, not a substitute for seam measurements.
-- [ ] Gate: the evidence document must contain an explicit checked record for every new profile before Task 2 fixes constants. If an authoritative template remains unreadable or contradicts labels, continue unaffected measurement work and report the specific missing evidence; do not silently ship guessed values or reduce scope.
-- [ ] Review evidence links and arithmetic; commit the verified source record. No pytest is needed for this research-only task.
+- [x] Retrieve/render both faces for 3–7 panels using the official URLs in the spec. Keep normal TLS verification. Browser-hosted authoritative renders are acceptable when local downloads fail; record the retrieval method and absent hashes honestly. Do not add PDF tooling as an application dependency.
+- [x] Visually compare labels with trim/fold/safe/bleed geometry and reverse face ordering. Record per-profile widths, height, allowances and source provenance in `docs/reference/jcard-profile-sources.md`. Cross-check sums against labeled total extents. Investigate any rounding discrepancy instead of averaging it into nominal constants.
+- [x] Pin known distinctions: three-panel labels are `[1, 1/2, 41/16]` inches, totaling `103.1875 mm`; four-panel labels `[17/16,1/2,41/16,40/16]` total `168.275 mm`; five-panel labels `[17/16,1/2,41/16,40/16,39/16]` total `230.1875 mm`. Verify heights/allowances visually too. Six/seven individual widths are not yet verified; the seven-panel front labels total `13.75 × 4` inches, which is a cross-check, not a substitute for seam measurements.
+- [x] Gate: the evidence document must contain an explicit checked record for every new profile before Task 2 fixes constants. If an authoritative template remains unreadable or contradicts labels, continue unaffected measurement work and report the specific missing evidence; do not silently ship guessed values or reduce scope.
+- [x] Review evidence links and arithmetic; commit the verified source record. No pytest is needed for this research-only task.
 
 ## Task 2: Profile registry, native geometry and physical controls
 
 Consumes Task 1's checked dimensions; produces `get_jcard_profile()` and the
 profile-driven existing `JCard`/configuration/placement interfaces above.
 
-- [ ] Add failing tests in `test_jcard_profiles.py` and existing object/config/placement files. Pin exact measured widths and totals from the evidence as literal expected values. Example: `JCard(profile="nac-jcard-3-panel-v1").trim_size_mm == (103.1875,101.6)` after height confirmation; ensure its first panel is `25.4 mm`, while eight-panel first panel remains `26.9875 mm`.
-- [ ] Cover all profile IDs and both faces: count, adjacency/no overlap, summed area, native IDs/roles and reversed back starts. Reject unknown IDs and nonexistent blank slots. Validate safe inset against the narrowest resolved panel and height. Test an off-center corner identity for every format and both flip axes.
-- [ ] Add Letter/A4 fitting cases and guide-extrema failures with the same trim; confirm no automatic sheet choice or scaling. Keep eight-panel Letter/A4 rejection.
-- [ ] Run the focused new nodes and observe unsupported-profile failures. Implement immutable checked records and derive geometry/validation/placement from them. Do not change generic booklet/cootie semantics.
-- [ ] Run `test_jcard_profiles.py`, `test_jcard_object.py`, `test_jcard_config.py`, `test_jcard_placement.py` plus `test_imposition_model.py` and `test_imposition_geometry.py`. Expected all pass; commit.
+- [x] Add failing tests in `test_jcard_profiles.py` and existing object/config/placement files. Pin exact measured widths and totals from the evidence as literal expected values. Example: `JCard(profile="nac-jcard-3-panel-v1").trim_size_mm == (103.1875,101.6)` after height confirmation; ensure its first panel is `25.4 mm`, while eight-panel first panel remains `26.9875 mm`.
+- [x] Cover all profile IDs and both faces: count, adjacency/no overlap, summed area, native IDs/roles and reversed back starts. Reject unknown IDs and nonexistent blank slots. Validate safe inset against the narrowest resolved panel and height. Test an off-center corner identity for every format and both flip axes.
+- [x] Add Letter/A4 fitting cases and guide-extrema failures with the same trim; confirm no automatic sheet choice or scaling. Keep eight-panel Letter/A4 rejection.
+- [x] Run the focused new nodes and observe unsupported-profile failures. Implement immutable checked records and derive geometry/validation/placement from them. Do not change generic booklet/cootie semantics.
+- [x] Run `test_jcard_profiles.py`, `test_jcard_object.py`, `test_jcard_config.py`, `test_jcard_placement.py` plus `test_imposition_model.py` and `test_imposition_geometry.py`. Expected all pass; commit.
 
 ## Task 3: Profile-aware artwork, restoration and plot outputs
 
@@ -77,10 +95,10 @@ Consumes the resolved profile from Task 2. Existing public signatures
 `resolve_jcard_layout`, `build_jcard_artwork_job`, `write_jcard_export` and
 `impose_jcard` remain unchanged.
 
-- [ ] Write failing export/return/impose/integration tests for each new profile: native full canvas sizes and composition window, exact selected panel coverage, profile/face binding metadata, and correct rigid transform. Use at least one pair with different catalogs. Assert cross-profile source rejection even when some local panel dimensions agree.
-- [ ] Pin face-alone versus paired bytes for request, handoff, native/sheet previews, final SVG, design.json and design.imposition.json. Test sparse/all-blank selected faces, invalid source/hash and stale request failures. A second-face build failure must leave prior paired outputs unchanged.
-- [ ] Observe RED, then replace eight-panel constants and panel counts in J-card layout validation, diagnostics and imposition with the selected record. Keep strict canonical reconstruction of profile bindings and source dimensions. Retain neutral request adapters and the source/catalog/hash validation chain.
-- [ ] Run affected J-card artwork/impose/integration files and all existing `test_artwork_layout*.py`, preserved-layout and logical-layer contract checks. Confirm the existing converter accepts new-format jobs and preserves physical sheet placement. Commit.
+- [x] Write failing export/return/impose/integration tests for each new profile: native full canvas sizes and composition window, exact selected panel coverage, profile/face binding metadata, and correct rigid transform. Use at least one pair with different catalogs. Assert cross-profile source rejection even when some local panel dimensions agree.
+- [x] Pin face-alone versus paired bytes for request, handoff, native/sheet previews, final SVG, design.json and design.imposition.json. Test sparse/all-blank selected faces, invalid source/hash and stale request failures. A second-face build failure must leave prior paired outputs unchanged.
+- [x] Observe RED, then replace eight-panel constants and panel counts in J-card layout validation, diagnostics and imposition with the selected record. Keep strict canonical reconstruction of profile bindings and source dimensions. Retain neutral request adapters and the source/catalog/hash validation chain.
+- [x] Run affected J-card artwork/impose/integration files and all existing `test_artwork_layout*.py`, preserved-layout and logical-layer contract checks. Confirm the existing converter accepts new-format jobs and preserves physical sheet placement. Commit.
 
 ## Task 4: Reproducible examples, operator documentation and final verification
 

@@ -2,7 +2,18 @@
 
 Date: 2026-10-28. Follow-on to merged plotter-workflow PR18, baseline
 `e3f3cb0`. Work branch: `feat/jcard-format-profiles` in the retained isolated
-`jcard-object` worktree. Status: proposed design; no product changes yet.
+`jcard-object` worktree. Status: approved and implemented, pending final branch review.
+
+## Source update during execution
+
+The user required strict TLS verification and supplied Standard Cassette as an
+alternative. All six Standard PDFs downloaded successfully with verified HTTPS;
+each contains front and back pages, both rendered and visually checked. The
+[checked source record](../../reference/jcard-profile-sources.md) supersedes the
+initial pending NAC measurements below for new records. New IDs therefore use
+`standard-jcard-3-panel-v1` through `standard-jcard-8-panel-v1`; existing
+`nac-jcard-8-panel-v1` remains unchanged. This source attribution is deliberate.
+No unverifiable NAC 3?7-panel records were added.
 
 ## Goal
 

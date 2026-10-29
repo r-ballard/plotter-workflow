@@ -1,5 +1,7 @@
 # Generate and plot a cassette J-card
 
+For 3?8-panel Standard Cassette formats, use the [complete format examples](jcard-formats.md). The examples below retain the original NAC eight-panel profile.
+
 For the guide-only fit proof and paired artwork test sheets, use the
 [physical sample checklist](../validation/jcard-samples.md). Physical verification
 is tracked in HAR-88 and is separate from software merge acceptance.

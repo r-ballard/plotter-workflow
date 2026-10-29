@@ -1,4 +1,34 @@
-# Eight-panel cassette J-card
+# Cassette J-card profiles
+
+Select a named manufacturer profile. All listed inserts are 101.6 mm high.
+Each physical panel can have front and back artwork; face selection is separate
+from panel count. Each face produces its own plot job. No scaling occurs.
+
+| Profile | Panels | Width (mm) | Example sheet |
+| --- | ---: | ---: | --- |
+| `standard-jcard-3-panel-v1` | 3 | 103.1875 | Letter |
+| `standard-jcard-4-panel-v1` | 4 | 168.275 | A4 |
+| `standard-jcard-5-panel-v1` | 5 | 230.1875 | Letter |
+| `standard-jcard-6-panel-v1` | 6 | 290.5125 | A3 |
+| `standard-jcard-7-panel-v1` | 7 | 349.25 | Tabloid |
+| `standard-jcard-8-panel-v1` | 8 | 406.4 | A3 |
+| `nac-jcard-8-panel-v1` (default) | 8 | 406.4 | A3 |
+
+The Standard three-panel flap is 25.4 mm wide; the first panel of the other
+Standard formats is 26.9875 mm. These are explicit verified records, not a
+truncated eight-panel template. The five-panel nominal total is 9.0625 inches;
+the source headline rounds it to 9.063. See the
+[checked dimensions, source PDFs and hashes](jcard-profile-sources.md) and
+[complete multi-format configs](../how-to/jcard-formats.md).
+
+Sheet fit includes configured margins and enabled registration marks. Smaller
+formats can fit Letter/A4; the table gives tested examples, not automatic paper
+selection. Converter support for a custom sheet still requires a device profile.
+Safe inset defaults to nominal 1.5875 mm, diagnostic only; bleed reference is
+3.175 mm, with no generated bleed artwork. The green source guide centers have
+small rounding differences described in the source record.
+
+## Eight-panel reference layout
 
 The `nac-jcard-8-panel-v1` profile describes one flat cassette insert. It has eight
 physical panels. Each panel can have front and back artwork, for up to sixteen
@@ -40,9 +70,9 @@ values. Recipe paths are relative to the configuration file.
 | Field | Values | Default / requirement |
 | --- | --- | --- |
 | `schema_version` | `1` | Required |
-| `profile` | `"nac-jcard-8-panel-v1"` | This profile |
+| `profile` | A profile ID from the table above | `"nac-jcard-8-panel-v1"` |
 | `faces` | `"front"`, `"back"`, `"both"` | `"front"` |
-| `sheet` | `"a3"`, `"tabloid"`, or width/height object | Required; named A4/letter fail fit |
+| `sheet` | `"letter"`, `"a4"`, `"a3"`, `"tabloid"`, or width/height object | Required; must fit selected trim and enabled marks |
 | `margin_mm` | Nonnegative number | `0`; keep trim and enabled marks inside this margin |
 | `origin_mm` | `[x, y]` in mm | Centered; explicit coordinates locate the front trim |
 | `flip` | `"left-right"`, `"top-bottom"` | `"left-right"` |
@@ -62,8 +92,7 @@ paper faces. The initial recipe adapter supports structured region-fill recipes
 for `truchet` and `truchet-multiscale`.
 
 Blank declarations suppress artwork during imposition. They do not remove a
-canvas, replace missing files, or change generation. Prepare all eight source
-panels, including blank ones. An all-blank face retains its full sheet size and
+canvas, replace missing files, or change generation. Prepare every selected profile panel, including blank ones. An all-blank face retains its full sheet size and
 catalog. No unused opposite-face job is emitted.
 
 ## Paper flip and registration
@@ -131,8 +160,8 @@ export/job directory. Output must not overlap input recipes or asset bundles.
 
 The nominal dimensions follow the [National Audio Company cassette templates](https://www.nationalaudiocompany.com/cassette-duplication/prepare-your-audio-and-your-album-art/cassette-art-templates/).
 The profile uses panel labels and nominal dimensions, not PDF page dimensions.
-Other manufacturer formats require separate measured profiles; do not truncate
-this eight-panel profile to create them. Physical stock, fold direction, case fit
+Standard Cassette formats have separately checked records linked above. Unlisted
+manufacturer formats still require independent measurement. Physical stock, fold direction, case fit
 and duplex registration remain unverified until a paper proof is completed.
 
 Reference PDF SHA-256 values (PDF files are not distributed here):

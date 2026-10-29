@@ -79,7 +79,8 @@ _RECORDS = (
         Decimal("1.5875"),
         Decimal("3.175"),
         tuple(
-            f"https://nationalaudiocompany.com/wp-content/uploads/2017/08/NAC_Jcard_8-Panel_{face}_Template_AI5.pdf"
+            "https://nationalaudiocompany.com/wp-content/uploads/2017/08/"
+            f"NAC_Jcard_8-Panel_{face}_Template_AI5.pdf"
             for face in ("FRONT", "BACK")
         ),
         (

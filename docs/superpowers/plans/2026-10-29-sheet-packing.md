@@ -1,6 +1,6 @@
 # Reusable Sheet Packing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Preserve the user's native execution preference; use one fresh final reviewer, not per-task agents.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking. Preserve the user's native execution preference; use one fresh final reviewer, not per-task agents.
 
 **Goal:** Pack complete J-card objects onto exact-scale single/paired sheets using a reusable rectangular packing core.
 
@@ -56,7 +56,7 @@ Follow these boundaries without restructuring unrelated imposition code. The pro
 
 **Interfaces:** In `geometry.py`, `effective_area(sheet: SheetArea) -> RectMM`, `front_matrix(footprint: ObjectFootprint, rotation: int, occupied_origin: tuple[float,float]) -> tuple`, `back_matrix(front: tuple, native_back_to_front: tuple, sheet: SheetArea) -> tuple`, `transform(matrix, point) -> tuple`, and `validate_placements(instances, result, sheet, gutter) -> None`. In `budget.py`, `PackingBudget.reserve(kind: str, count: int) -> None` checks integer nonnegative charges before mutation; live free-rectangle limits are checked before creating the next split record.
 
-- [ ] Write failing geometry tests with independently calculated expectations:
+- [x] Write failing geometry tests with independently calculated expectations:
 
 ```python
 def test_native_negative_bounds_retain_trim_datum():
@@ -71,20 +71,20 @@ def test_back_uses_native_panel_correspondence():
     assert back_matrix((1,0,0,1,20,30), (-1,0,0,1,406.4,0), sheet) == pytest.approx((1,0,0,1,73.6,30))
 ```
 
-- [ ] Add literal paired-area intersection cases for both flips and asymmetric usable rectangles/margins; reject empty intersections, outside-sheet inputs and collapsed margins. Check all physical panel corners at 0/90 degrees and both flips, unit determinant, unchanged edge lengths and no missing/duplicate instances.
-- [ ] Add frozen/copy validation, concave/holed outline metadata, conservative occupied bounds, malformed/nonfinite/Boolean geometry, and small injected work-limit failures. Reject an occupied box that excludes trim-region outer bounds; holes do not reduce the box.
-- [ ] Run `python -m pytest tests/test_sheet_packing_geometry.py -q -p no:cacheprovider`; expect missing-resource failures. Implement the records and exact quadrant matrices, avoiding trigonometric rounding for permitted angles. Reflection occurs in physical sheet coordinates.
-- [ ] Rerun the file; expect pass. Run Ruff on changed files and commit.
+- [x] Add literal paired-area intersection cases for both flips and asymmetric usable rectangles/margins; reject empty intersections, outside-sheet inputs and collapsed margins. Check all physical panel corners at 0/90 degrees and both flips, unit determinant, unchanged edge lengths and no missing/duplicate instances.
+- [x] Add frozen/copy validation, concave/holed outline metadata, conservative occupied bounds, malformed/nonfinite/Boolean geometry, and small injected work-limit failures. Reject an occupied box that excludes trim-region outer bounds; holes do not reduce the box.
+- [x] Run `python -m pytest tests/test_sheet_packing_geometry.py -q -p no:cacheprovider`; expect missing-resource failures. Implement the records and exact quadrant matrices, avoiding trigonometric rounding for permitted angles. Reflection occurs in physical sheet coordinates.
+- [x] Rerun the file; expect pass. Run Ruff on changed files and commit.
 
 ## Task 2: Grid and deterministic MaxRects
 
 **Interfaces:** `grid.pack_grid(instances, sheet, gutter, budget) -> PackingResult`, `maxrects.pack_maxrects(instances, sheet, gutter, budget) -> PackingResult`, `solver.pack(instances, sheet, gutter=0, strategy="auto", budget=None) -> PackingResult`. `auto` selects grid only for identical occupied dimensions and rotation policy; footprint origins/shapes can differ because each result retains its datum.
 
-- [ ] Write failing solver tests in `test_sheet_packing_solvers.py`: two 412.4x107.6 occupied boxes fit A3 with 3 mm margins and 4 mm gutter; seven 109.1875x107.6 boxes spill from a six-copy grid to sheet 2. Verify the chosen orientation, row-major order and literal coordinates, not only sheet counts.
-- [ ] Add hand-sized mixed fixtures exercising every free-rectangle split direction and containment pruning, a case requiring 90-degree rotation, forbidden-rotation failure, equal-score tie ordering, exact edge fits without a trailing gutter, and zero/nonzero gutters. Reversal of input order must preserve the full result. Explicit grid must reject incompatible sizes/rotation policies.
-- [ ] Add irregular shapes whose bounds are packed conservatively; use actual outlines only to verify containment/rigid edge lengths. Include multi-sheet overflow, impossible-item diagnostics, page/candidate/free-rectangle caps and no partial returned result. Probe limit failures with small injected budgets rather than creating huge fixtures.
-- [ ] Run the solver file and confirm missing implementations fail. Implement the design's area/max-side/ID sorting, existing-sheet order and short-side/long-side/Y/X/angle tie rules. Reserve candidate work before evaluating each free rectangle/orientation. Maintain the live free list within its cap, including temporary split records; fail instead of allocating an unbounded intermediate list.
-- [ ] Apply Task 1 final validation to every strategy result. Run geometry and solver files; expect pass. Run Ruff and commit.
+- [x] Write failing solver tests in `test_sheet_packing_solvers.py`: two 412.4x107.6 occupied boxes fit A3 with 3 mm margins and 4 mm gutter; seven 109.1875x107.6 boxes spill from a six-copy grid to sheet 2. Verify the chosen orientation, row-major order and literal coordinates, not only sheet counts.
+- [x] Add hand-sized mixed fixtures exercising every free-rectangle split direction and containment pruning, a case requiring 90-degree rotation, forbidden-rotation failure, equal-score tie ordering, exact edge fits without a trailing gutter, and zero/nonzero gutters. Reversal of input order must preserve the full result. Explicit grid must reject incompatible sizes/rotation policies.
+- [x] Add irregular shapes whose bounds are packed conservatively; use actual outlines only to verify containment/rigid edge lengths. Include multi-sheet overflow, impossible-item diagnostics, page/candidate/free-rectangle caps and no partial returned result. Probe limit failures with small injected budgets rather than creating huge fixtures.
+- [x] Run the solver file and confirm missing implementations fail. Implement the design's area/max-side/ID sorting, existing-sheet order and short-side/long-side/Y/X/angle tie rules. Reserve candidate work before evaluating each free rectangle/orientation. Maintain the live free list within its cap, including temporary split records; fail instead of allocating an unbounded intermediate list.
+- [x] Apply Task 1 final validation to every strategy result. Run geometry and solver files; expect pass. Run Ruff and commit.
 
 ## Task 3: Native J-card assets, strict config and layer policy
 
@@ -92,35 +92,35 @@ def test_back_uses_native_panel_correspondence():
 
 **Interfaces:** `config.load_packing_config(payload, *, base_dir) -> PackingConfig`; `jcard.prepare_objects(config, budget) -> tuple[PreparedPackingObject,...]`; `layers.resolve_catalog(objects, requested_catalog) -> ResolvedCatalog`. A `PreparedPackingObject` binds the spec ID, quantity, footprint, native faces, native back correspondence, physical guide records and layer maps. The solver consumes only its expanded `PackingInstance` records.
 
-- [ ] Record representative existing single-J-card geometry/catalog/audit snapshots before extraction. Write failing native-preparer tests using `tests.test_jcard_impose.assets` and existing small producer fixtures. Cover valid front/back profiles, stale recipe/mode/hash, swapped face/profile, missing/extra panels, malformed native canvas and blank source with a wrong viewport even when no geometry group exists.
-- [ ] Extract common preparation from `render_face`. Existing `impose_jcard` delegates to it and preserves geometry, single-back versus paired-back equality, catalogs and audits. Validate source viewport independently of iteration over nonempty logical layers. Do not weaken provenance guards or use a dummy sheet to prepare native artwork.
-- [ ] Add failing config tests for every field from the design, default/inapplicable controls, duplicate object IDs/JSON keys, integer quantities, rotations, exact face selection, path resolution, all proposed limits and immutable output. Use `front`/`back` object fields; unknown single-card physical placement fields fail.
-- [ ] Implement config parsing with existing bounded JSON readers. Expand IDs before sorting: `album-0001`, `album-0002`. Objects and face asset bindings are independent of list order. The allowed face modes/blank physical panel IDs retain existing J-card rules.
-- [ ] Derive trim and fold geometry from verified profiles. Registration marks are the existing three shared front-native centers with their actual arms; map those same physical marks to native back coordinates. Union actual selected-face guide bounds, trim and requested bleed allowance before packing. Do not reuse the study's uniform 3 mm assumption.
-- [ ] Add layer tests: identical complete catalogs use identity; otherwise require explicit output catalog and complete per-face source-to-output maps. Explicit target metadata is authoritative under a supplied map; conflicting source metadata blocks implicit identity. Reject unknown/missing targets, duplicate ordinals/IDs and enabled reserved-guide collisions. Multiple source IDs may merge only through explicit maps.
-- [ ] Run native/config/J-card tests plus existing `test_jcard_impose.py`, `test_jcard_artwork.py`, `test_jcard_config.py`, `test_jcard_placement.py`, `test_jcard_profiles.py`, `test_jcard_profile_workflow.py`. Compare the pre-extraction geometry/catalog/audit snapshots. Expect pass; run Ruff and commit.
+- [x] Record representative existing single-J-card geometry/catalog/audit snapshots before extraction. Write failing native-preparer tests using `tests.test_jcard_impose.assets` and existing small producer fixtures. Cover valid front/back profiles, stale recipe/mode/hash, swapped face/profile, missing/extra panels, malformed native canvas and blank source with a wrong viewport even when no geometry group exists.
+- [x] Extract common preparation from `render_face`. Existing `impose_jcard` delegates to it and preserves geometry, single-back versus paired-back equality, catalogs and audits. Validate source viewport independently of iteration over nonempty logical layers. Do not weaken provenance guards or use a dummy sheet to prepare native artwork.
+- [x] Add failing config tests for every field from the design, default/inapplicable controls, duplicate object IDs/JSON keys, integer quantities, rotations, exact face selection, path resolution, all proposed limits and immutable output. Use `front`/`back` object fields; unknown single-card physical placement fields fail.
+- [x] Implement config parsing with existing bounded JSON readers. Expand IDs before sorting: `album-0001`, `album-0002`. Objects and face asset bindings are independent of list order. The allowed face modes/blank physical panel IDs retain existing J-card rules.
+- [x] Derive trim and fold geometry from verified profiles. Registration marks are the existing three shared front-native centers with their actual arms; map those same physical marks to native back coordinates. Union actual selected-face guide bounds, trim and requested bleed allowance before packing. Do not reuse the study's uniform 3 mm assumption.
+- [x] Add layer tests: identical complete catalogs use identity; otherwise require explicit output catalog and complete per-face source-to-output maps. Explicit target metadata is authoritative under a supplied map; conflicting source metadata blocks implicit identity. Reject unknown/missing targets, duplicate ordinals/IDs and enabled reserved-guide collisions. Multiple source IDs may merge only through explicit maps.
+- [x] Run native/config/J-card tests plus existing `test_jcard_impose.py`, `test_jcard_artwork.py`, `test_jcard_config.py`, `test_jcard_placement.py`, `test_jcard_profiles.py`, `test_jcard_profile_workflow.py`. Compare the pre-extraction geometry/catalog/audit snapshots. Expect pass; run Ruff and commit.
 
 ## Task 4: Rigid composition, atomic jobs and CLI
 
 **Interfaces:** `render.render_sheet_face(config, prepared_objects, result, sheet_index, face, catalog, budget) -> RenderedFace` returns immutable SVG/audit bytes and catalog. `export.pack_impositions(config, *, output_dir, overwrite=False) -> Path` owns preparation, packing, full-job staging and publication. `scripts.pack_impositions.main(argv=None) -> int` loads the strict config, protects all inputs and prints root audit plus plot-job paths. No command invokes generation, conversion or sending implicitly.
 
-- [ ] Write failing export tests in `test_sheet_packing_export.py` with real prepared assets: identical and different artwork, mixed profiles, 90-degree instances, front-only/paired, both flips and asymmetric back usable limits. Compare physical panel corners and transformed path geometry with independently transformed native fixtures. Ensure rendering does not mutate cached fragments across copies/faces.
-- [ ] Include repeated source XML IDs/reference fixtures. Namespace copied SVG IDs and their references deterministically by instance/face/panel; assert unique IDs, valid references and instance-to-artwork provenance. Preserve native face panel IDs as metadata without treating them as globally unique XML IDs.
-- [ ] Render one root neutral group per resolved layer, separate reserved guide groups and full affine wrappers in px. Apply `F*M*C` to back-native fragments; do not independently mirror per-panel artwork. Transform guides in mm, then convert to px once. Validate full output SVG contracts and actual plotted bounds.
-- [ ] Write `packing.json`, diagnostic `placement-preview.svg` and numbered `sheet-001/front|back/` plot folders, each with `design.svg`, `design.json`, `design.imposition.json`. Root job records include hashes, native/placed transforms, IDs, mappings, footprints, strategies, area accounting and work usage. SVG roots identify preserved physical layout and resolved known paper/orientation or custom dimensions.
-- [ ] Charge composed vertices before duplicating fragments and serialized SVG bytes before accumulation/write. Count repeated copies, not only unique assets. Fail atomically at small injected vertex/byte limits. Support reserved empty layers/catalog entries consistently with the existing neutral contract.
-- [ ] Use `atomic_directory` once for the complete job and recognize `packing.json` as its overwrite marker. Add tests for overlapping inputs/config paths, unsupported overwrite roots, first-write failure, and failure injected after sheet 1 or the second face. Entire prior output must remain byte-identical; no final directory on first-write failure.
-- [ ] Implement CLI parity with existing scripts: explicit overwrite, relative input paths and actionable parser errors. Add CLI tests for valid jobs and failure codes without sending hardware commands.
-- [ ] Verify a generated packed SVG through the existing converter with explicit pen mapping and preserved layout. Assert no relayout/centering, layer-to-pen choices unchanged and guide channels separate. Unsupported custom device/page conversion remains an explicit operator error, not silent fit.
-- [ ] Run export tests plus `test_preserved_physical_layout.py`, `test_logical_layer_contract.py`, `test_empty_pen_layers.py`, `test_svg_pen_contract.py`, `test_hpgl_pen_mapping.py`, `test_pen_plan_sidecar_paths.py`, `test_jcard_integration.py` and `test_jcard_impose.py`. Expect pass; Ruff/diff checks, then commit.
+- [x] Write failing export tests in `test_sheet_packing_export.py` with real prepared assets: identical and different artwork, mixed profiles, 90-degree instances, front-only/paired, both flips and asymmetric back usable limits. Compare physical panel corners and transformed path geometry with independently transformed native fixtures. Ensure rendering does not mutate cached fragments across copies/faces.
+- [x] Include repeated source XML IDs/reference fixtures. Namespace copied SVG IDs and their references deterministically by instance/face/panel; assert unique IDs, valid references and instance-to-artwork provenance. Preserve native face panel IDs as metadata without treating them as globally unique XML IDs.
+- [x] Render one root neutral group per resolved layer, separate reserved guide groups and full affine wrappers in px. Apply `F*M*C` to back-native fragments; do not independently mirror per-panel artwork. Transform guides in mm, then convert to px once. Validate full output SVG contracts and actual plotted bounds.
+- [x] Write `packing.json`, diagnostic `placement-preview.svg` and numbered `sheet-001/front|back/` plot folders, each with `design.svg`, `design.json`, `design.imposition.json`. Root job records include hashes, native/placed transforms, IDs, mappings, footprints, strategies, area accounting and work usage. SVG roots identify preserved physical layout and resolved known paper/orientation or custom dimensions.
+- [x] Charge composed vertices before duplicating fragments and serialized SVG bytes before accumulation/write. Count repeated copies, not only unique assets. Fail atomically at small injected vertex/byte limits. Support reserved empty layers/catalog entries consistently with the existing neutral contract.
+- [x] Use `atomic_directory` once for the complete job and recognize `packing.json` as its overwrite marker. Add tests for overlapping inputs/config paths, unsupported overwrite roots, first-write failure, and failure injected after sheet 1 or the second face. Entire prior output must remain byte-identical; no final directory on first-write failure.
+- [x] Implement CLI parity with existing scripts: explicit overwrite, relative input paths and actionable parser errors. Add CLI tests for valid jobs and failure codes without sending hardware commands.
+- [x] Verify a generated packed SVG through the existing converter with explicit pen mapping and preserved layout. Assert no relayout/centering, layer-to-pen choices unchanged and guide channels separate. Unsupported custom device/page conversion remains an explicit operator error, not silent fit.
+- [x] Run export tests plus `test_preserved_physical_layout.py`, `test_logical_layer_contract.py`, `test_empty_pen_layers.py`, `test_svg_pen_contract.py`, `test_hpgl_pen_mapping.py`, `test_pen_plan_sidecar_paths.py`, `test_jcard_integration.py` and `test_jcard_impose.py`. Expect pass; Ruff/diff checks, then commit.
 
 ## Task 5: Complete documentation, samples and final validation
 
-- [ ] Add `sheet-packing.md` with the complete parameter table, native datum/occupied-bounds/gutter diagram, paired usable-area and `F*M*C` diagram, deterministic solver rules, limits, audits and irregular-bounds limitation. State the actual production guide reservation instead of the study's illustrative envelope.
-- [ ] Add `pack-jcards.md` with complete inline source recipes, native preparation config, generate/prepare commands and packing JSON. Include two eight-panel copies on A3, mixed profiles/overflow, different artwork, explicit catalog maps and separate front/back plot jobs. Put matching runnable files under `examples/sheet-packing/`; do not make readers infer fields from another document. Keep physical plotting in HAR-88.
-- [ ] Run all changed complete recipes through their actual consumers and generate retained output under `output/sheet-packing-production/`. Render readable front/back and multi-sheet previews. Include a pure-core irregular-object diagnostic clearly distinguished from the J-card-only production CLI. Inspect all changed visual artifacts.
-- [ ] Before handoff run the five new packing files, all `tests/test_jcard*.py`, changed atomic/artwork return consumers, `test_imposition_geometry.py`, logical-layer/SVG/empty-layer/preserved-layout and converter pen-mapping tests. Record the exact file selection, counts, time, warnings and omitted scope in this plan. Run affected Ruff and `git diff --check`.
-- [ ] Use 30–60 second waits for long tests. Do not repeat passing scopes without invalidating changes. If Windows atomic rename or sandbox temp permissions fail, record the failure and retry only the affected node in a new checked temp directory; do not alter product retry policy to mask the environment.
+- [x] Add `sheet-packing.md` with the complete parameter table, native datum/occupied-bounds/gutter diagram, paired usable-area and `F*M*C` diagram, deterministic solver rules, limits, audits and irregular-bounds limitation. State the actual production guide reservation instead of the study's illustrative envelope.
+- [x] Add `pack-jcards.md` with complete inline source recipes, native preparation config, generate/prepare commands and packing JSON. Include two eight-panel copies on A3, mixed profiles/overflow, different artwork, explicit catalog maps and separate front/back plot jobs. Put matching runnable files under `examples/sheet-packing/`; do not make readers infer fields from another document. Keep physical plotting in HAR-88.
+- [x] Run all changed complete recipes through their actual consumers and generate retained output under `output/sheet-packing-production/`. Render readable front/back and multi-sheet previews. Include a pure-core irregular-object diagnostic clearly distinguished from the J-card-only production CLI. Inspect all changed visual artifacts.
+- [x] Before handoff run the five new packing files, all `tests/test_jcard*.py`, changed atomic/artwork return consumers, `test_imposition_geometry.py`, logical-layer/SVG/empty-layer/preserved-layout and converter pen-mapping tests. Record the exact file selection, counts, time, warnings and omitted scope in this plan. Run affected Ruff and `git diff --check`.
+- [x] Use 30â€“60 second waits for long tests. Do not repeat passing scopes without invalidating changes. If Windows atomic rename or sandbox temp permissions fail, record the failure and retry only the affected node in a new checked temp directory; do not alter product retry policy to mask the environment.
 - [ ] Request one fresh final whole-branch reviewer using the native execution skill and the Review Focus list above. Fix Important/Critical findings with failing regressions and affected checks; record deferred minors and all rulings. No redundant full-suite baseline or per-task review agents.
 - [ ] Commit execution evidence and preserve the worktree, study and production outputs. Use finishing-a-development-branch for the user's integration choice; no merge/push or external ticket writes are implied by this plan.
 
@@ -130,4 +130,34 @@ The spec's footprint/datum/duplex rules map to Task 1; solver/determinism to Tas
 
 ## Execution evidence
 
-Pending user plan review. Production implementation has not started.
+Tasks 1?4 are committed as `182ea43`, `cfc831e`, `7d9cee8`, and `10fbec6`.
+Task 5 generated all three recipes through the actual viz domain-bundle consumer,
+restored four native bundles and packed both complete configurations. Two eight-panel
+cards use one grid sheet; mixed profiles use two MaxRects sheets. All six plot
+faces, two placement previews and the production-core irregular diagnostic were
+rendered with Inkscape and visually inspected. Generated outputs remain under
+`output/sheet-packing-production/`; they are ignored by Git.
+
+Final affected verification: **377 passed, 1 Windows atomic-rename permission
+failure in 6.56 s**. Only the failed node,
+`test_sheet_packing_export.py::test_multi_object_duplex_contract_and_local_references[left-right]`,
+was retried with a fresh basetemp: **1 passed in 0.62 s**. Total selected cases:
+378. No test warnings reported. Ruff check and format check passed for 23 changed
+Python files; `git diff --check` passed. No dependency additions or unrelated
+full-suite run. Hardware acceptance remains HAR-88.
+
+Exact selection: the five `tests/test_sheet_packing*.py` files; all eight
+`tests/test_jcard*.py` files; `test_artwork_layout_return.py`,
+`test_artwork_layout_export.py`, `test_artwork_layout_integration.py`,
+`test_imposition_geometry.py`, `test_logical_layer_contract.py`,
+`test_svg_pen_contract.py`, `test_empty_pen_layers.py`,
+`test_preserved_physical_layout.py`, `test_hpgl_pen_mapping.py`,
+`test_pen_plan_sidecar_paths.py`.
+
+Ruling: Native PowerShell bookkeeping substitutes unavailable Bash skill helpers
+? preserves ledger and task gates ? requires manual bookkeeping care.
+
+Ruling: Use the approved affected-scope testing policy, not generic full-suite
+skill clauses ? user preference ? unrelated tests outside validation.
+
+Final independent review pending.

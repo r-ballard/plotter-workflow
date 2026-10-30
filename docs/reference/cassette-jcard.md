@@ -34,7 +34,7 @@ The `nac-jcard-8-panel-v1` profile describes one flat cassette insert. It has ei
 physical panels. Each panel can have front and back artwork, for up to sixteen
 artwork surfaces. The software exports each selected face as a separate plot job.
 
-The trim size is **406.4 × 101.6 mm**. The program does not shrink the insert to fit
+The trim size is **406.4 Ã— 101.6 mm**. The program does not shrink the insert to fit
 the paper. Use A3, tabloid, or a custom sheet with sufficient space. A4 and letter
 do not fit at this scale. Confirm your plotter's usable area separately.
 
@@ -97,7 +97,7 @@ catalog. No unused opposite-face job is emitted.
 
 ## Paper flip and registration
 
-Let the sheet be `Sx × Sy`, with front trim origin `(X,Y)` and trim `W × H`.
+Let the sheet be `Sx Ã— Sy`, with front trim origin `(X,Y)` and trim `W Ã— H`.
 Both sides use the same front-reference origin. Do not independently center or
 fit the back artwork.
 
@@ -172,3 +172,10 @@ Reference PDF SHA-256 values (PDF files are not distributed here):
 | NAC_Jcard_8-Panel_BACK_Template_AI5.pdf | `8552dd0c28befa0c4fc2d435df7691e2d4df10e9ae00560c63340c008d6fad0b` |
 
 See the [complete JSON and operator workflow](../how-to/cassette-jcard.md).
+
+## Several cards on one sheet
+
+Use the [complete packing workflow](../how-to/pack-jcards.md) to place identical
+or mixed J-card profiles on exact-scale sheets. The [packing reference](sheet-packing.md)
+explains reserved guide bounds, deterministic strategies and paired faces. Each
+card retains its native panel artwork and folds.

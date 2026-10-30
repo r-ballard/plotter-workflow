@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "sheet_mm": [
+    420,
+    297
+  ],
+  "usable_front_mm": [
+    0,
+    0,
+    420,
+    297
+  ],
+  "usable_back_mm": [
+    0,
+    0,
+    420,
+    297
+  ],
+  "margins_mm": [
+    3,
+    3,
+    3,
+    3
+  ],
+  "gutter_mm": 4,
+  "strategy": "auto",
+  "faces": "both",
+  "flip": "left-right",
+  "objects": [
+    {
+      "id": "long",
+      "type": "jcard",
+      "profile": "standard-jcard-8-panel-v1",
+      "quantity": 1,
+      "rotations": [
+        0,
+        90
+      ],
+      "guides": {
+        "cut": true,
+        "fold": true,
+        "registration": true
+      },
+      "front": {
+        "assets": "../../output/sheet-packing-production/prepared-eight/front",
+        "template": "front-recipe.json",
+        "mode": "continuous",
+        "layer_map": {
+          "curve": "art"
+        }
+      },
+      "back": {
+        "assets": "../../output/sheet-packing-production/prepared-eight/back",
+        "template": "back-recipe.json",
+        "mode": "continuous",
+        "layer_map": {
+          "curve": "art"
+        }
+      }
+    },
+    {
+      "id": "short",
+      "type": "jcard",
+      "profile": "standard-jcard-3-panel-v1",
+      "quantity": 5,
+      "rotations": [
+        0,
+        90
+      ],
+      "guides": {
+        "cut": true,
+        "fold": true,
+        "registration": true
+      },
+      "front": {
+        "assets": "../../output/sheet-packing-production/prepared-three/front",
+        "template": "front-alt-recipe.json",
+        "mode": "continuous",
+        "layer_map": {
+          "curve": "art"
+        }
+      },
+      "back": {
+        "assets": "../../output/sheet-packing-production/prepared-three/back",
+        "template": "back-recipe.json",
+        "mode": "continuous",
+        "layer_map": {
+          "curve": "art"
+        }
+      }
+    }
+  ],
+  "logical_layers": [
+    {
+      "id": "art",
+      "ordinal": 1,
+      "label": "Artwork"
+    }
+  ]
+}

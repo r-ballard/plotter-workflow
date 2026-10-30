@@ -1,0 +1,40 @@
+{
+  "schema_version": 3,
+  "policy": "explicit",
+  "passes": [
+    {
+      "id": "artwork",
+      "assignments": [
+        {
+          "layer_ids": [
+            "art"
+          ],
+          "physical_slot": 1
+        }
+      ]
+    },
+    {
+      "id": "guides",
+      "assignments": [
+        {
+          "layer_ids": [
+            "sheet-cut-guides"
+          ],
+          "physical_slot": 2
+        },
+        {
+          "layer_ids": [
+            "sheet-fold-guides"
+          ],
+          "physical_slot": 3
+        },
+        {
+          "layer_ids": [
+            "sheet-registration"
+          ],
+          "physical_slot": 4
+        }
+      ]
+    }
+  ]
+}

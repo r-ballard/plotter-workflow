@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "seed": 73,
+  "domains": [],
+  "passes": [
+    {
+      "id": "tiles",
+      "algorithm": "truchet",
+      "target_domain_ids": [],
+      "parameters": {
+        "curve_layer_ids": [
+          "curve"
+        ],
+        "tile_size": 64,
+        "region_fills": {}
+      },
+      "logical_layers": [
+        {
+          "id": "curve"
+        }
+      ]
+    }
+  ]
+}

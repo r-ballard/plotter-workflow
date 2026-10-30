@@ -10,6 +10,7 @@ Start with the repository [README](../README.md) for deployment and the
 - [Patchwork example](how-to/patchwork-example.md)
 - [Voronoi space filling](how-to/voronoi-space-filling.md)
 - [Polygon bundle to plot](how-to/impose-and-plot-polygon-bundle.md)
+- [Pack several J-cards](how-to/pack-jcards.md)
 - [Assembled artwork handoff](how-to/assembled-artwork-handoff.md)
 - [Neutral logical-layer booklet](how-to/neutral-logical-layer-plotting.md)
 - [Physical logical-layer acceptance](how-to/physical-logical-layer-acceptance.md)
@@ -20,6 +21,8 @@ Start with the repository [README](../README.md) for deployment and the
 - [SVG pen layers](reference/svg-pen-contract.md)
 - [Pen plans](reference/pen-plan.md)
 - [Job preflight](reference/job-preflight.md)
+- [Exact-scale sheet packing](reference/sheet-packing.md)
+- [Cassette J-card profiles](reference/cassette-jcard.md)
 - [Booklet imposition](reference/booklet-imposition.md)
 - [Cootie-catcher imposition](reference/cootie-catcher-imposition.md)
 

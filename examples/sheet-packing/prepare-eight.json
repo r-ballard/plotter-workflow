@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "profile": "standard-jcard-8-panel-v1",
+  "faces": "both",
+  "sheet": "a3",
+  "margin_mm": 3,
+  "guides": {
+    "cut": true,
+    "fold": true,
+    "registration": true
+  },
+  "front_artwork": {
+    "template": "front-recipe.json",
+    "mode": "continuous"
+  },
+  "back_artwork": {
+    "template": "back-recipe.json",
+    "mode": "continuous"
+  }
+}

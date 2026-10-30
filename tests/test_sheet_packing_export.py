@@ -137,6 +137,38 @@ def test_output_budgets_fail_without_publication(tmp_path, monkeypatch, limit):
     assert not out.exists()
 
 
+@pytest.mark.parametrize("location", ["artwork", "definition"])
+def test_retained_off_canvas_path_vertices_are_charged_before_duplication(
+    tmp_path, monkeypatch, location
+):
+    import hashlib
+
+    from imposition.sheet_packing import export
+    from imposition.sheet_packing.budget import PackingBudget
+
+    _, config = job(tmp_path, paired=False)
+    bundle = config.objects[0].faces[0].request.assets
+    file = bundle / "surfaces/front-panel-1.svg"
+    tree = ET.parse(file)
+    layer = next(e for e in tree.getroot() if e.get("data-viz-layer-id") == "curve")
+    path = next(e for e in layer.iter() if e.tag.endswith("}path"))
+    if location == "definition":
+        defs = ET.SubElement(layer, "{http://www.w3.org/2000/svg}defs")
+        path = ET.SubElement(defs, "{http://www.w3.org/2000/svg}path", id="unused-retained-path")
+    path.set("d", "M1,1 L2,2 M10000,10000 " + " ".join(f"L{10001 + i},10000" for i in range(1000)))
+    tree.write(file, encoding="utf-8", xml_declaration=True)
+    manifest_file = bundle / "design.json"
+    manifest = json.loads(manifest_file.read_text())
+    record = next(v for v in manifest["surfaces"] if v["domain_id"] == "front-panel-1")
+    record["sha256"] = hashlib.sha256(file.read_bytes()).hexdigest()
+    manifest_file.write_text(json.dumps(manifest))
+    monkeypatch.setattr(export, "PackingBudget", lambda: PackingBudget(limits={"vertices": 500}))
+    out = tmp_path / "packed"
+    with pytest.raises(ValueError, match="vertices"):
+        pack_impositions(config, output_dir=out)
+    assert not out.exists()
+
+
 def test_cli_and_input_overlap(tmp_path):
     from scripts.pack_impositions import main
 

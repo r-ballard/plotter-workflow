@@ -26,6 +26,24 @@ def sheet(w=420, h=297, margin=3):
     return SheetArea(w, h, RectMM(0, 0, w, h), margins=(margin,) * 4)
 
 
+@pytest.mark.parametrize("origins", [((20, 0), (0, 20)), ((0, 0), (20, 20))])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_final_validator_rejects_gutter_violations_at_all_diagonal_corners(origins, reverse):
+    from imposition.sheet_packing.geometry import front_matrix
+    from imposition.sheet_packing.model import PackedInstance, PackingResult
+
+    source = items([(10, 10)] * 2)
+    records = tuple(
+        PackedInstance(i.instance_id, 0, 0, front_matrix(i.footprint, 0, xy), RectMM(*xy, 10, 10))
+        for i, xy in zip(source, origins)
+    )
+    result = PackingResult("maxrects", records[::-1] if reverse else records, 1)
+    with pytest.raises(ValueError, match="gutter"):
+        validate_placements(source, result, sheet(100, 100, 0), 15)
+    # The exact 10 mm rectangular gap is valid, without a trailing gutter.
+    validate_placements(source, result, sheet(100, 100, 0), 10)
+
+
 def test_two_envelopes_fit_a3_without_rescaling():
     result = pack(items([(412.4, 107.6)] * 2), sheet(), gutter=4)
     assert result.strategy == "grid" and result.sheet_count == 1

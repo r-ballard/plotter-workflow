@@ -17,9 +17,9 @@ def number(value, name):
     return float(value)
 
 
-def identifier(value):
-    if not isinstance(value, str) or not value.strip() or len(value) > 200:
-        raise ValueError("object/instance ID requires 1..200 nonblank characters")
+def identifier(value, max_length=200):
+    if not isinstance(value, str) or not value.strip() or len(value) > max_length:
+        raise ValueError(f"object/instance ID requires 1..{max_length} nonblank characters")
     return value
 
 
@@ -131,7 +131,7 @@ class PackingInstance:
     footprint: ObjectFootprint
 
     def __post_init__(self):
-        identifier(self.instance_id)
+        identifier(self.instance_id, max_length=205)
         if not isinstance(self.footprint, ObjectFootprint):
             raise ValueError("instance requires ObjectFootprint")
 
@@ -184,7 +184,7 @@ class PackedInstance:
     occupied_bounds: RectMM
 
     def __post_init__(self):
-        identifier(self.instance_id)
+        identifier(self.instance_id, max_length=205)
         if type(self.sheet_index) is not int or self.sheet_index < 0:
             raise ValueError("invalid sheet index")
         if type(self.rotation) is not int or self.rotation not in (0, 90):

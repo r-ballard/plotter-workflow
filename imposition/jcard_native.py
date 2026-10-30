@@ -1,6 +1,8 @@
 """Validated immutable native J-card fragments, independent of sheet placement."""
 
+import copy
 import hashlib
+import io
 import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -88,6 +90,30 @@ def _validate_viewport(source, expected):
         raise ValueError("Source viewport differs from exact panel size")
 
 
+def _retained_vertices(geometry, width, height):
+    """Count copied paths, including off-viewport and definition geometry.
+
+    Presence lines have already been cropped. The XML retains the full paths,
+    so counting those lines alone would undercharge repeated output copies.
+    This separate count does not change the artwork or its clipping.
+    """
+    namespace = f"{{{booklet.SVG_NS}}}"
+    root = ET.Element(namespace + "svg", width=str(width), height=str(height))
+    fragment = copy.deepcopy(geometry.svg)
+    for node in fragment.iter():
+        if node.tag.rsplit("}", 1)[-1] in ("defs", "clipPath"):
+            node.tag = namespace + "g"
+        for key in ("clip-path", "display", "visibility", "opacity", "style"):
+            node.attrib.pop(key, None)
+    root.append(fragment)
+    lines, _, _ = booklet._require_vpype().read_svg(
+        io.StringIO(ET.tostring(root, encoding="unicode")),
+        quantization=0.05 * MM_TO_PX,
+        crop=False,
+    )
+    return max(sum(len(line) for line in lines), sum(len(line) for line in geometry.lines))
+
+
 def prepare_native_face(request):
     face = request.face
     recipe = SimpleNamespace(
@@ -165,7 +191,7 @@ def prepare_native_face(request):
                         layer_id,
                         panel.panel_id,
                         ET.tostring(geometry.svg, encoding="utf-8"),
-                        sum(len(line) for line in geometry.lines),
+                        _retained_vertices(geometry, width, height),
                     )
                 )
         records.append(

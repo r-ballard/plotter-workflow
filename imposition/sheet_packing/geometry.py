@@ -102,13 +102,12 @@ def validate_placements(instances, result, sheet, gutter):
             raise ValueError("invalid rigid placement or out-of-bounds footprint")
         expanded = RectMM(b.x, b.y, b.width + g, b.height + g)
         for other in records[index + 1 :]:
-            if other.sheet_index == p.sheet_index and (
-                expanded.intersects(other.occupied_bounds)
-                or RectMM(
+            if other.sheet_index == p.sheet_index and expanded.intersects(
+                RectMM(
                     other.occupied_bounds.x,
                     other.occupied_bounds.y,
                     other.occupied_bounds.width + g,
                     other.occupied_bounds.height + g,
-                ).intersects(b)
+                )
             ):
                 raise ValueError("packed footprints overlap or violate gutter")

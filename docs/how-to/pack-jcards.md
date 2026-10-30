@@ -486,11 +486,13 @@ pens. These plans preserve separate artwork and guide passes.
 
 Use the converter's schema-3 `--pen-plan` option for these neutral SVGs. Do not
 use `--pen-map`. The imposition metadata preserves the physical A3 layout; do not
-fit or centre the visible strokes. Convert each sheet/face as a separate job
+fit or centre the visible strokes. Use `--margin 3mm` to match these packing
+configs; the converter defaults to 10 mm and rejects strokes inside that larger
+margin. Convert each sheet/face as a separate job
 with the matching pen plan. For example, convert the first front without sending:
 
 ```powershell
-python scripts/dpx3300_convert.py --input-dir output/sheet-packing-production/two-eight-panel/sheet-001/front --file design.svg --output-dir output/sheet-packing-production/hpgl-two-front --page-size a3 --landscape --pen-plan examples/sheet-packing/pens-two.json
+python scripts/dpx3300_convert.py --input-dir output/sheet-packing-production/two-eight-panel/sheet-001/front --file design.svg --output-dir output/sheet-packing-production/hpgl-two-front --page-size a3 --landscape --margin 3mm --pen-plan examples/sheet-packing/pens-two.json
 ```
 
 For the mixed sample use `pens-mixed.json` and its sheet/face directory.

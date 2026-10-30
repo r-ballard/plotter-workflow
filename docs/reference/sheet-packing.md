@@ -27,7 +27,7 @@ Unknown fields, duplicate IDs, null controls and Boolean/string numbers are erro
 | `strategy` | `auto`, `grid`, `maxrects` | `auto` |
 | `faces` | `front`, `both` | `front` |
 | `flip` | `left-right`, `top-bottom`; paired jobs only | `left-right` for `both` |
-| `objects` | List of 1?128 object definitions below | Required |
+| `objects` | List of 1 to 128 object definitions below | Required |
 | `logical_layers` | Explicit output catalog; nonempty list | Omit for identical source catalogs |
 
 | Object field | Values or shape | Default / requirement |
@@ -35,7 +35,7 @@ Unknown fields, duplicate IDs, null controls and Boolean/string numbers are erro
 | `id` | Unique nonblank string, at most 200 characters | Required |
 | `type` | `jcard` | Required |
 | `profile` | `standard-jcard-3-panel-v1` through `standard-jcard-8-panel-v1`, or `nac-jcard-8-panel-v1` | Required |
-| `quantity` | Integer 1?1000; total across definitions <=1000 | `1` |
+| `quantity` | Integer 1 to 1000; total across definitions <=1000 | `1` |
 | `rotations` | Nonempty unique subset of `[0,90]` | `[0]` |
 | `bleed_allowance_mm` | Nonnegative trim allowance used to reserve space | `0` |
 | `guides` | Object with Boolean `cut`, `fold`, `registration` fields | Each `false` |
@@ -74,7 +74,8 @@ fold strokes lie on trim/seam geometry. Registration uses three cross centres at
 `(-2,-2)`, `(width+2,-2)`, `(-2,height+2)`, with 1 mm arms. Thus registration adds
 3 mm on each side of the trim bounds. The eight-panel trim is 406.4 by 101.6 mm;
 with registration and no larger bleed allowance its occupied rectangle is
-`[-3,-3,412.4,107.6]`. Gutter is additional space between occupied rectangles.
+`[-3,-3,412.4,107.6]`. Gutter is additional rectangular clearance: at least one axis must separate
+each pair of occupied rectangles by the configured distance.
 No trailing gutter is required outside the usable sheet.
 
 ## Paired sheets
@@ -132,8 +133,8 @@ at conversion; the packing config does not select pens.
 | `packing.json` | Strategy, effective area, sources/hashes, transforms, instances, layer catalog, area totals and work counters |
 | `placement-preview.svg` | Front-side occupied rectangles on all sheets; diagnostic, not a plot input |
 | `sheet-001/front/design.svg` | Exact-scale neutral plot input; corresponding back folder for paired jobs |
-| `design.json` beside each SVG | Neutral catalog, dimensions and SVG hash |
-| `design.imposition.json` beside each SVG | Source provenance, panel audit and instance transforms |
+| `design.json` beside each SVG | Neutral catalog, dimensions, SVG hash, source provenance, panel audit and instance transforms |
+| `design.imposition.json` beside each SVG | Converter link to the adjacent manifest and its hash |
 
 Keep each plot SVG with both JSON sidecars. The complete multi-sheet job replaces
 an old generated job only after all faces pass validation. Input/output overlap
@@ -153,6 +154,7 @@ gutters and does not estimate polygon nesting efficiency.
 
 Limits fail before the corresponding additional allocation/work. Repeated copies
 count toward output limits. Geometric comparisons use 0.0000001 mm tolerance.
+Retained off-canvas paths and SVG definitions count toward the vertex budget.
 Library callers can provide smaller `PackingBudget` limits for their own jobs.
 A custom physical page can be packed, but the converter/device must also support
 that page. Software checks do not establish paper registration, stock clearance,

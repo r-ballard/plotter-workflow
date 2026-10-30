@@ -120,9 +120,9 @@ def test_back_uses_native_panel_correspondence():
 - [x] Add `pack-jcards.md` with complete inline source recipes, native preparation config, generate/prepare commands and packing JSON. Include two eight-panel copies on A3, mixed profiles/overflow, different artwork, explicit catalog maps and separate front/back plot jobs. Put matching runnable files under `examples/sheet-packing/`; do not make readers infer fields from another document. Keep physical plotting in HAR-88.
 - [x] Run all changed complete recipes through their actual consumers and generate retained output under `output/sheet-packing-production/`. Render readable front/back and multi-sheet previews. Include a pure-core irregular-object diagnostic clearly distinguished from the J-card-only production CLI. Inspect all changed visual artifacts.
 - [x] Before handoff run the five new packing files, all `tests/test_jcard*.py`, changed atomic/artwork return consumers, `test_imposition_geometry.py`, logical-layer/SVG/empty-layer/preserved-layout and converter pen-mapping tests. Record the exact file selection, counts, time, warnings and omitted scope in this plan. Run affected Ruff and `git diff --check`.
-- [x] Use 30â€“60 second waits for long tests. Do not repeat passing scopes without invalidating changes. If Windows atomic rename or sandbox temp permissions fail, record the failure and retry only the affected node in a new checked temp directory; do not alter product retry policy to mask the environment.
-- [ ] Request one fresh final whole-branch reviewer using the native execution skill and the Review Focus list above. Fix Important/Critical findings with failing regressions and affected checks; record deferred minors and all rulings. No redundant full-suite baseline or per-task review agents.
-- [ ] Commit execution evidence and preserve the worktree, study and production outputs. Use finishing-a-development-branch for the user's integration choice; no merge/push or external ticket writes are implied by this plan.
+- [x] Use 30Ã¢â‚¬â€œ60 second waits for long tests. Do not repeat passing scopes without invalidating changes. If Windows atomic rename or sandbox temp permissions fail, record the failure and retry only the affected node in a new checked temp directory; do not alter product retry policy to mask the environment.
+- [x] Request one fresh final whole-branch reviewer using the native execution skill and the Review Focus list above. Fix Important/Critical findings with failing regressions and affected checks; record deferred minors and all rulings. No redundant full-suite baseline or per-task review agents.
+- [x] Commit execution evidence and preserve the worktree, study and production outputs. Use finishing-a-development-branch for the user's integration choice; no merge/push or external ticket writes are implied by this plan.
 
 ## Plan self-review
 
@@ -160,4 +160,18 @@ Ruling: Native PowerShell bookkeeping substitutes unavailable Bash skill helpers
 Ruling: Use the approved affected-scope testing policy, not generic full-suite
 skill clauses ? user preference ? unrelated tests outside validation.
 
-Final independent review pending.
+Additional real offline conversion consumed both complete schema-3 sample pen
+plans through installed vpype. The first attempts correctly rejected the
+converter's default 10 mm margin; the documented command now sets `--margin 3mm`
+to match the packing configs. Both actual conversions passed, producing separate
+artwork/guide HP-GL files without sending hardware commands.
+
+Final independent review completed; all three Important findings reproduced and
+fixed with RED-to-GREEN regressions. Final affected selection: 382 passed and
+three Windows rename failures in 6.96 s; those three nodes passed fresh retry in
+0.69 s. Total 385 cases. Ruff and diff checks clean. Detailed findings, exact
+retry nodes, all rulings and deferred minor are recorded in the
+[final review/disposition](../specs/2026-10-29-sheet-packing-final-review.md).
+Both real sample jobs were regenerated with corrected work accounting and their
+plot SVGs remained byte-identical to the inspected/offline-converted versions.
+Worktree and generated outputs are retained. Integration remains the user's choice.

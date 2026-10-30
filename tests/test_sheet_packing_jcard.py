@@ -89,3 +89,34 @@ def test_real_registration_extents_and_stable_instance_ids(tmp_path):
     assert (box.x, box.y, box.width, box.height) == (-3, -3, 412.4, 107.6)
     assert [i.instance_id for i in instances(prepared)] == ["album-0001", "album-0002"]
     assert len(prepared[0].physical_guides) == 6
+
+
+def test_maximum_object_id_survives_expansion_and_packing():
+    from types import SimpleNamespace
+
+    from imposition.sheet_packing.config import load_packing_config
+    from imposition.sheet_packing.jcard import instances
+    from imposition.sheet_packing.model import ObjectFootprint, RectMM, SheetArea
+    from imposition.sheet_packing.solver import pack
+
+    key = "a" * 200
+    config = load_packing_config(
+        dict(
+            schema_version=1,
+            sheet_mm=[420, 297],
+            objects=[
+                dict(
+                    id=key,
+                    type="jcard",
+                    profile="standard-jcard-3-panel-v1",
+                    quantity=2,
+                    front=dict(assets="prepared", template="recipe.json"),
+                )
+            ],
+        ),
+        base_dir=".",
+    )
+    footprint = ObjectFootprint(config.objects[0].object_id, (), RectMM(0, 0, 10, 10), (0,))
+    expanded = tuple(instances((SimpleNamespace(object_id=key, quantity=2, footprint=footprint),)))
+    result = pack(expanded, SheetArea(100, 100, RectMM(0, 0, 100, 100)))
+    assert [p.instance_id for p in result.placements] == [key + "-0001", key + "-0002"]

@@ -27,3 +27,23 @@ validation does not establish physical folded adjacency or reading orientation.
 Use the labeled net to check assembly, closure, state order, and seam continuity;
 correct the declared profiles before treating a composed image as physically
 validated. Continuous transitions remain deferred.
+
+## PR readiness and physical handoff
+
+The feature branch was rebased onto current main (`d2a6d7c`, including sheet
+packing). The combined full suite passed: **797 tests**, with changed-file Ruff
+checks and diff whitespace checks passing. Independent review found no
+remaining important issues.
+
+Prepared physical-inspection output is retained separately in
+`output/kaleidocycle-physical-inspection/`, with a local ZIP beside it. It includes
+two diagnostic impositions, separate cut/fold construction proofs with blank
+glue tabs, A-D reference views, observation template, pen plans, and four
+converted HP-GL jobs. All four passed pen-plan and placement preflight. No
+transmission occurred. Generated output stays ignored; the generator and
+instructions are committed for reproducibility.
+
+Physical inspection is a separate backlog item:
+[HAR-179](https://linear.app/hardcase/issue/HAR-179/physically-inspect-kaleidocycle-diagnostic-plots).
+Profiles remain provisional until that inspection establishes folded adjacency,
+reading orientation, closure and seam continuity. It does not gate the software PR.

@@ -1,5 +1,14 @@
 # One-sheet booklet imposition
 
+The physical layout is declared by `imposition.objects.pocketmod8.PocketMod8`:
+eight normalized slots, up/right reading frames, facing spreads, full-sheet
+placement, cell transforms, and construction guides. The existing
+`scripts/booklet_impose.py` CLI delegates to that object and retains its public
+layout constants as compatibility aliases. Reading-spread composition uses
+`imposition/booklet_artwork.py`, with the previous artwork-layout entry point
+retained. Source contracts, plotting behavior and command-line options are
+unchanged. See the [shared diagnostic fixtures](../../tests/fixtures/imposition/README.md).
+
 `scripts/booklet_impose.py` prepares plotter-ready SVG artwork for the single-sheet,
 eight-page mini-book / PocketMod-style fold. Imposition belongs in
 `plotter-workflow` because it maps logical artwork onto physical media; it does

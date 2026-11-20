@@ -161,52 +161,11 @@ class ArtworkLayout:
 
 
 def resolve_booklet_spread(*, sheet_size, pages, margin_mm, gutter_mm):
-    from scripts.booklet_impose import ALLOWED_SPREADS, SHEET_SIZES_MM
+    """Compatibility entry point for object-backed reading-spread composition."""
+    from .booklet_artwork import resolve_booklet_spread as resolve
 
-    if sheet_size not in SHEET_SIZES_MM:
-        raise ValueError("unsupported sheet size")
-    if (
-        not isinstance(pages, (tuple, list))
-        or len(pages) != 2
-        or any(type(p) is not int for p in pages)
-        or tuple(pages) not in ALLOWED_SPREADS
-    ):
-        raise ValueError("unsupported reading spread")
-    margin = finite(margin_mm, "margin_mm")
-    gutter = finite(gutter_mm, "gutter_mm")
-    if min(margin, gutter) < 0:
-        raise ValueError("margins/gutter must be nonnegative")
-    sw, sh = SHEET_SIZES_MM[sheet_size]
-    W = sw / 4 * MM_TO_PX
-    H = sh / 2 * MM_TO_PX
-    M = margin * MM_TO_PX
-    G = gutter * MM_TO_PX
-    full = rect(0.0, 0.0, W, H)
-    crops = (rect(M, M, W - G / 2, H - M), rect(G / 2, M, W - M, H - M))
-    panels = tuple(
-        PanelLayout(
-            f"page-{page}",
-            full,
-            crops[i],
-            (1.0, 0.0, 0.0, 1.0, i * W, 0.0),
-            {"kind": "booklet-page", "page": page},
-        )
-        for i, page in enumerate(pages)
-    )
-    return ArtworkLayout(
-        f"pocketmod8-{pages[0]}-{pages[1]}",
-        "svg-px",
-        (0.0, 0.0, 2 * W, H),
-        panels,
-        "validated",
-        {
-            "layout": "booklet-spread",
-            "sheet_size": sheet_size,
-            "pages": list(pages),
-            "margin_mm": margin,
-            "gutter_mm": gutter,
-            "mm_to_px": MM_TO_PX,
-        },
+    return resolve(
+        sheet_size=sheet_size, pages=pages, margin_mm=margin_mm, gutter_mm=gutter_mm
     )
 
 

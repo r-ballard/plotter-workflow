@@ -1,5 +1,6 @@
 import json
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import pytest
 
@@ -9,11 +10,19 @@ from scripts.generate_kaleidocycle_orientation_fixture import generate_fixture
 
 def test_diagnostic_nets_use_real_imposition_and_plotter_safe_labels(tmp_path):
     output = generate_fixture(tmp_path / "diagnostics")
-    for mode in ("panel-orientation", "state-continuity"):
+    fixture = json.loads(
+        (
+            Path(__file__).parent / "fixtures/imposition/kaleidocycle/expected.json"
+        ).read_text()
+    )
+    for mode in fixture["diagnostic_modes"]:
         sheet = output / mode / "sheet" / "design.svg"
         root = ET.parse(sheet).getroot()
         assert not list(root.iter("{http://www.w3.org/2000/svg}text"))
-        assert len([g for g in root.iter() if g.get("data-imposed-slot")]) == 32
+        assert (
+            len([g for g in root.iter() if g.get("data-imposed-slot")])
+            == fixture["expected_panel_count"]
+        )
         contract, _ = _neutral_context(sheet)
         assert [layer.id for layer in contract.layers] == ["diagnostic"]
         materialized = _materialize_neutral_layers(sheet)
@@ -27,7 +36,7 @@ def test_diagnostic_nets_use_real_imposition_and_plotter_safe_labels(tmp_path):
         assert len(construction) == len(
             [g for g in original_guides if g.get("data-guide-kind") in ("cut", "fold")]
         )
-    for state in "ABCD":
+    for state in fixture["states"]:
         reference = ET.parse(
             output / "state-continuity" / f"expected-{state}.svg"
         ).getroot()

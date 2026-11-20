@@ -1,4 +1,4 @@
-"""J-card native-face adapter; the solvers never import this module."""
+"""Native-object adapter dispatch and J-card preparation, separate from solvers."""
 
 from dataclasses import dataclass
 
@@ -26,6 +26,15 @@ def prepare_objects(config, budget):
     result = []
     cache = {}
     for spec in config.objects:
+        if spec.kind == "kaleidocycle":
+            from ..kaleidocycle_native import prepare_native_kaleidocycle
+            from .kaleidocycle import prepare_object
+
+            request = spec.faces[0].request
+            if request not in cache:
+                cache[request] = prepare_native_kaleidocycle(request)
+            result.append(prepare_object(spec, cache[request]))
+            continue
         card = JCard(profile=spec.profile)
         w, h = card.trim_size_mm
         faces = []

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "sheet_mm": [279.4, 215.9],
+  "margins_mm": [5, 5, 5, 5],
+  "gutter_mm": 5,
+  "objects": [{
+    "id": "ring", "type": "kaleidocycle", "quantity": 2,
+    "width_mm": 269.4, "rotations": [0],
+    "guides": {"cut": true, "fold": true},
+    "states": {
+      "A": "../../output/hardware-acceptance/kaleidocycle-letter-packing/full-size/panel-orientation/A/assets",
+      "B": "../../output/hardware-acceptance/kaleidocycle-letter-packing/full-size/panel-orientation/B/assets",
+      "C": "../../output/hardware-acceptance/kaleidocycle-letter-packing/full-size/panel-orientation/C/assets",
+      "D": "../../output/hardware-acceptance/kaleidocycle-letter-packing/full-size/panel-orientation/D/assets"
+    }
+  }]
+}

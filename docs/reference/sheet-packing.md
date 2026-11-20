@@ -1,7 +1,7 @@
 # Exact-scale sheet packing
 
-Pack whole imposition objects without changing their size. The first CLI adapter
-supports J-cards. The Python packing core also accepts polygon footprints and
+Pack whole imposition objects without changing their size. CLI adapters support
+J-cards and front-only kaleidocycles. The Python packing core accepts polygon footprints and
 packs their rectangular bounds. It does not nest polygons into unused corners
 or holes. Booklet and cootie-catcher adapters are future work.
 
@@ -33,14 +33,28 @@ Unknown fields, duplicate IDs, null controls and Boolean/string numbers are erro
 | Object field | Values or shape | Default / requirement |
 | --- | --- | --- |
 | `id` | Unique nonblank string, at most 200 characters | Required |
-| `type` | `jcard` | Required |
-| `profile` | `standard-jcard-3-panel-v1` through `standard-jcard-8-panel-v1`, or `nac-jcard-8-panel-v1` | Required |
+| `type` | `jcard` or `kaleidocycle` | Required |
+| `profile` | `standard-jcard-3-panel-v1` through `standard-jcard-8-panel-v1`, or `nac-jcard-8-panel-v1` | J-card only; required for J-card |
 | `quantity` | Integer 1 to 1000; total across definitions <=1000 | `1` |
 | `rotations` | Nonempty unique subset of `[0,90]` | `[0]` |
 | `bleed_allowance_mm` | Nonnegative trim allowance used to reserve space | `0` |
 | `guides` | Object with Boolean `cut`, `fold`, `registration` fields | Each `false` |
-| `front` | Face definition below | Required |
-| `back` | Face definition below | Required for `both`; forbidden for `front` |
+| `front` | Face definition below | J-card only; required for J-card |
+| `back` | Face definition below | J-card only; required for `both`, forbidden for `front` |
+
+Kaleidocycle-only fields:
+
+| Field | Values or shape | Requirement |
+| --- | --- | --- |
+| `width_mm` | Finite numeric value, greater than 0 and at most 10000 | Required; exact physical width including glue tabs |
+| `states` | Object with exactly `A`, `B`, `C`, `D` prepared state directory paths | Required; each handoff must match width |
+| `layer_map` | Complete source logical-ID to output logical-ID mapping | Required with an explicit output catalog |
+
+Kaleidocycles accept quantity, 0/90 rotations, bleed allowance and cut/fold guides.
+They reject paired/duplex jobs, `profile`, `front`, `back` and enabled registration
+guides. All triangle and blank-tab polygons remain in the footprint when guides
+are disabled. Packed cut/fold guides omit duplicate diagnostic glue outlines.
+See the [reproducible Letter examples](../how-to/pack-kaleidocycles.md).
 
 | Face field | Values or shape | Default / requirement |
 | --- | --- | --- |

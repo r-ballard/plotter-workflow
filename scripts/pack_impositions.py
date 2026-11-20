@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack exact-scale prepared J-card objects into separate sheet/face plot jobs."""
+"""Pack exact-scale prepared J-card or kaleidocycle objects into sheet plot jobs."""
 
 import argparse
 import json
@@ -24,10 +24,14 @@ def main(argv=None):
     try:
         check_destination(args.output_dir, (args.config,))
         config = replace(
-            load_packing_config(read_json(args.config), base_dir=args.config.resolve().parent),
+            load_packing_config(
+                read_json(args.config), base_dir=args.config.resolve().parent
+            ),
             source_path=args.config.resolve(),
         )
-        out = pack_impositions(config, output_dir=args.output_dir, overwrite=args.overwrite)
+        out = pack_impositions(
+            config, output_dir=args.output_dir, overwrite=args.overwrite
+        )
     except (ValueError, OSError, TypeError) as exc:
         parser.error(str(exc))
     print(out / "packing.json")

@@ -13,6 +13,7 @@ Start with the repository [README](../README.md) for deployment and the
 - [Pack several J-cards](how-to/pack-jcards.md)
 - [Assembled artwork handoff](how-to/assembled-artwork-handoff.md)
 - [Kaleidocycle composition and imposition](how-to/kaleidocycle.md)
+- [Corner placement and packed kaleidocycles](how-to/pack-kaleidocycles.md)
 - [Neutral logical-layer booklet](how-to/neutral-logical-layer-plotting.md)
 - [Physical logical-layer acceptance](how-to/physical-logical-layer-acceptance.md)
 

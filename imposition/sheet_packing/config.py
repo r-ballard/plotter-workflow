@@ -14,7 +14,7 @@ from .model import ObjectFootprint, RectMM, SheetArea, identifier, number
 @dataclass(frozen=True)
 class FaceSpec:
     face: str
-    request: NativeFaceRequest
+    request: object
     layer_map: tuple | None
 
 
@@ -27,6 +27,7 @@ class ObjectSpec:
     bleed_allowance_mm: float
     guides: tuple
     faces: tuple
+    kind: str = "jcard"
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,11 @@ def load_packing_config(payload, *, base_dir):
         if "usable_front_mm" in p
         else RectMM(0, 0, w, h)
     )
-    back = _rectangle(p["usable_back_mm"], "usable_back_mm") if "usable_back_mm" in p else None
+    back = (
+        _rectangle(p["usable_back_mm"], "usable_back_mm")
+        if "usable_back_mm" in p
+        else None
+    )
     sheet = SheetArea(
         w,
         h,
@@ -119,6 +124,9 @@ def load_packing_config(payload, *, base_dir):
                 "guides",
                 "front",
                 "back",
+                "width_mm",
+                "states",
+                "layer_map",
             ),
             "object",
         )
@@ -126,9 +134,11 @@ def load_packing_config(payload, *, base_dir):
         if key in seen:
             raise ValueError("object IDs must be unique")
         seen.add(key)
-        if obj.get("type") != "jcard":
-            raise ValueError("initial packing adapter requires type=jcard")
-        profile = get_jcard_profile(obj.get("profile"))
+        kind = obj.get("type")
+        if kind not in ("jcard", "kaleidocycle"):
+            raise ValueError("object type must be jcard or kaleidocycle")
+        if kind == "jcard" and {"width_mm", "states", "layer_map"} & obj.keys():
+            raise ValueError("inactive kaleidocycle controls on J-card")
         quantity = obj.get("quantity", 1)
         if type(quantity) is not int or not 1 <= quantity <= 1000:
             raise ValueError("quantity requires integer 1..1000")
@@ -141,17 +151,56 @@ def load_packing_config(payload, *, base_dir):
         bleed = number(obj.get("bleed_allowance_mm", 0), "bleed_allowance_mm")
         if bleed < 0:
             raise ValueError("bleed allowance must be nonnegative")
-        guide_fields = record(obj.get("guides", {}), ("cut", "fold", "registration"), "guides")
+        guide_fields = record(
+            obj.get("guides", {}), ("cut", "fold", "registration"), "guides"
+        )
         if any(type(v) is not bool for v in guide_fields.values()):
             raise ValueError("guide values require booleans")
-        guides = tuple(k for k in ("cut", "fold", "registration") if guide_fields.get(k, False))
+        guides = tuple(
+            k for k in ("cut", "fold", "registration") if guide_fields.get(k, False)
+        )
+        if kind == "kaleidocycle":
+            from ..kaleidocycle_native import KaleidocycleRequest
+
+            if (
+                faces != "front"
+                or {"profile", "front", "back"} & obj.keys()
+                or "registration" in guides
+            ):
+                raise ValueError(
+                    "kaleidocycle supports front-only cut/fold guides and state assets"
+                )
+            state_paths = record(obj.get("states"), tuple("ABCD"), "states")
+            if set(state_paths) != set("ABCD"):
+                raise ValueError("kaleidocycle requires exactly states A-D")
+            request = KaleidocycleRequest(
+                obj.get("width_mm"),
+                tuple((s, _path(value, base_dir)) for s, value in state_paths.items()),
+            )
+            mapping = _layer_map(obj["layer_map"]) if "layer_map" in obj else None
+            objects.append(
+                ObjectSpec(
+                    key,
+                    "kaleidocycle",
+                    quantity,
+                    rotations,
+                    bleed,
+                    guides,
+                    (FaceSpec("front", request, mapping),),
+                    kind,
+                )
+            )
+            continue
+        profile = get_jcard_profile(obj.get("profile"))
         selected = ("front", "back") if faces == "both" else ("front",)
         if "back" in obj and faces == "front":
             raise ValueError("back artwork requires paired faces")
         entries = []
         for face in selected:
             entry = record(
-                obj.get(face), ("assets", "template", "mode", "blank_panels", "layer_map"), face
+                obj.get(face),
+                ("assets", "template", "mode", "blank_panels", "layer_map"),
+                face,
             )
             request = NativeFaceRequest(
                 profile.profile_id,
@@ -172,7 +221,15 @@ def load_packing_config(payload, *, base_dir):
                 mapping = tuple(sorted(value.items()))
             entries.append(FaceSpec(face, request, mapping))
         objects.append(
-            ObjectSpec(key, profile.profile_id, quantity, rotations, bleed, guides, tuple(entries))
+            ObjectSpec(
+                key,
+                profile.profile_id,
+                quantity,
+                rotations,
+                bleed,
+                guides,
+                tuple(entries),
+            )
         )
     catalog = p.get("logical_layers")
     if "logical_layers" in p and (not isinstance(catalog, list) or not catalog):
@@ -184,3 +241,12 @@ def load_packing_config(payload, *, base_dir):
         tuple(sorted(objects, key=lambda o: o.object_id)),
         None if catalog is None else tuple(_freeze(v) for v in catalog),
     )
+
+
+def _layer_map(value):
+    if not isinstance(value, dict) or any(
+        not isinstance(k, str) or not k or not isinstance(v, str) or not v
+        for k, v in value.items()
+    ):
+        raise ValueError("layer_map requires nonempty string IDs")
+    return tuple(sorted(value.items()))

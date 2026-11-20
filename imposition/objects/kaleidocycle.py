@@ -72,7 +72,7 @@ class Kaleidocycle:
         return tuple(((x - x0) * width, (y - y0) * height) for x, y in slot.polygon)
 
     def resolve_placement(self, sheet, options):
-        if set(options) - {"width_mm", "margin_mm"}:
+        if set(options) - {"width_mm", "margin_mm", "position"}:
             raise ValueError("unknown kaleidocycle placement option")
         sw = _positive(sheet.width_mm, "sheet width")
         sh = _positive(sheet.height_mm, "sheet height")
@@ -82,6 +82,11 @@ class Kaleidocycle:
         if width > maximum + 1e-9:
             raise ValueError("kaleidocycle does not fit sheet with margins")
         height = width / self.aspect_ratio
+        position = options.get("position", "center")
+        if position not in ("center", "top-left"):
+            raise ValueError("position must be center or top-left")
+        if position == "top-left":
+            return ObjectPlacement(sheet, margin, margin, width, height)
         return ObjectPlacement(
             sheet, (sw - width) / 2, (sh - height) / 2, width, height
         )

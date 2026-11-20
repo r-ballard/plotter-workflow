@@ -16,6 +16,7 @@ from .artwork_return import _load_handoff
 from .geometry import map_normalized_polygon
 from .kaleidocycle_artwork import validate_kaleidocycle_layout
 from .model import SheetSpec
+from .native_artwork import _validate_viewport
 from .objects.kaleidocycle import Kaleidocycle
 from .source import inspect_svg_source
 
@@ -39,41 +40,32 @@ def _sheet_root(sheet):
     )
 
 
-def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
-    config_path = Path(config_path).resolve()
-    config = read_json(config_path)
-    if (
-        not isinstance(config, dict)
-        or set(config)
-        - {"schema_version", "width_mm", "sheet_size", "margin_mm", "states"}
-        or type(config.get("schema_version")) is not int
-        or config["schema_version"] != 1
-        or not isinstance(config.get("states"), dict)
-        or set(config["states"]) != set("ABCD")
-    ):
-        raise ValueError("expected version 1 config with exactly states A-D")
-    name = config.get("sheet_size", "letter")
-    if name not in booklet.SHEET_SIZES_MM:
-        raise ValueError("unsupported sheet size")
-    sheet = SheetSpec(name, *booklet.SHEET_SIZES_MM[name], "landscape")
-    obj = Kaleidocycle()
-    placement = obj.resolve_placement(
-        sheet, {k: config[k] for k in ("width_mm", "margin_mm") if k in config}
-    )
-    root = _sheet_root(sheet)
-    root.set("data-viz-layer-contract", NEUTRAL_CONTRACT)
-    groups, catalog, records, protected = {}, None, [], [config_path]
-    slots = {s.slot_id: s for s in obj.slots}
-    for state, relative in config["states"].items():
+def resolve_state_paths(states, base_dir):
+    result = {}
+    for state, relative in states.items():
         if (
             not isinstance(relative, str)
             or not relative
             or Path(relative).is_absolute()
         ):
             raise ValueError("state asset directories must be relative to config")
-        bundle = (config_path.parent / relative).resolve()
-        if not bundle.is_relative_to(config_path.parent):
+        bundle = (Path(base_dir) / relative).resolve()
+        if not bundle.is_relative_to(Path(base_dir).resolve()):
             raise ValueError("state asset directory escapes config directory")
+        result[state] = bundle
+    return result
+
+
+def render_kaleidocycle(states, placement):
+    """Validate and render one net in a supplied physical frame, in memory."""
+    sheet = placement.sheet
+    obj = Kaleidocycle()
+    root = _sheet_root(sheet)
+    root.set("data-viz-layer-contract", NEUTRAL_CONTRACT)
+    groups, catalog, records, protected = {}, None, [], []
+    slots = {s.slot_id: s for s in obj.slots}
+    for state, path in states.items():
+        bundle = Path(path).resolve()
         protected.append(bundle)
         _, layout = _load_handoff(bundle / "layout-handoff.json")
         validate_kaleidocycle_layout(layout)
@@ -140,6 +132,7 @@ def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
             ):
                 raise ValueError("source canvas differs from prepared panel")
             slot = slots[panel.panel_id]
+            _validate_viewport(source, bounds(panel.canvas_polygon))
             polygon_mm = map_normalized_polygon(slot.polygon, placement)
             polygon_px = tuple((x * MM_TO_PX, y * MM_TO_PX) for x, y in polygon_mm)
             tx, ty = bounds(polygon_px)[:2]
@@ -184,6 +177,42 @@ def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
                     "handoff_sha256": _digest(bundle / "layout-handoff.json"),
                 }
             )
+    return root, catalog, records, protected
+
+
+def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
+    config_path = Path(config_path).resolve()
+    config = read_json(config_path)
+    if (
+        not isinstance(config, dict)
+        or set(config)
+        - {
+            "schema_version",
+            "width_mm",
+            "sheet_size",
+            "margin_mm",
+            "states",
+            "position",
+        }
+        or type(config.get("schema_version")) is not int
+        or config["schema_version"] != 1
+        or not isinstance(config.get("states"), dict)
+        or set(config["states"]) != set("ABCD")
+    ):
+        raise ValueError("expected version 1 config with exactly states A-D")
+    name = config.get("sheet_size", "letter")
+    if name not in booklet.SHEET_SIZES_MM:
+        raise ValueError("unsupported sheet size")
+    sheet = SheetSpec(name, *booklet.SHEET_SIZES_MM[name], "landscape")
+    obj = Kaleidocycle()
+    placement = obj.resolve_placement(
+        sheet,
+        {k: config[k] for k in ("width_mm", "margin_mm", "position") if k in config},
+    )
+    root, catalog, records, protected = render_kaleidocycle(
+        resolve_state_paths(config["states"], config_path.parent), placement
+    )
+    protected.append(config_path)
     guides = _sheet_root(sheet)
     guides.set("data-imposition-artifact", "construction-guides")
     for guide in obj.guides(placement):

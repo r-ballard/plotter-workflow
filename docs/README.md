@@ -12,6 +12,7 @@ Start with the repository [README](../README.md) for deployment and the
 - [Polygon bundle to plot](how-to/impose-and-plot-polygon-bundle.md)
 - [Pack several J-cards](how-to/pack-jcards.md)
 - [Assembled artwork handoff](how-to/assembled-artwork-handoff.md)
+- [Kaleidocycle composition and imposition](how-to/kaleidocycle.md)
 - [Neutral logical-layer booklet](how-to/neutral-logical-layer-plotting.md)
 - [Physical logical-layer acceptance](how-to/physical-logical-layer-acceptance.md)
 
@@ -33,6 +34,7 @@ Start with the repository [README](../README.md) for deployment and the
 - [Pocketmod8 fixture](validation/pocketmod8-fixture.md)
 - [Cootie-catcher fixture](validation/cootie-catcher-fixture.md)
 - [Cootie-catcher orientation fixture](validation/cootie-catcher-orientation-fixture.md)
+- [Kaleidocycle orientation fixtures](validation/kaleidocycle-orientation-fixture.md)
 
 The Qwen worker notes and logical-layer handoff records remain in this
 directory as development history.

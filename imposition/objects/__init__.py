@@ -10,6 +10,7 @@ from .cootie_catcher import (
     CootieCatcher,
     CootieCatcherError,
 )
+from .kaleidocycle import Kaleidocycle
 
 __all__ = [
     "COOTIE_CATCHER",
@@ -20,4 +21,5 @@ __all__ = [
     "SUPPORTED_SHEETS",
     "CootieCatcher",
     "CootieCatcherError",
+    "Kaleidocycle",
 ]

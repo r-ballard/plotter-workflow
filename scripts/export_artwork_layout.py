@@ -16,9 +16,13 @@ from imposition.assembled_profiles import load_cootie_assembled_profile
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
-        "--layout", choices=["booklet-spread", "cootie-folded-outer"], required=True
+        "--layout",
+        choices=["booklet-spread", "cootie-folded-outer", "kaleidocycle-state"],
+        required=True,
     )
     p.add_argument("--sheet-size")
+    p.add_argument("--state", choices=list("ABCD"))
+    p.add_argument("--width-mm", type=float)
     p.add_argument("--spread", nargs=2, type=int)
     p.add_argument("--margin-mm", type=float)
     p.add_argument("--gutter-mm", type=float)
@@ -29,7 +33,36 @@ def main(argv=None):
     p.add_argument("--overwrite", action="store_true")
     a = p.parse_args(argv)
     try:
-        if a.layout == "booklet-spread":
+        if a.layout == "kaleidocycle-state":
+            from imposition.kaleidocycle_artwork import resolve_kaleidocycle_state
+
+            if any(
+                v is not None
+                for v in (
+                    a.sheet_size,
+                    a.spread,
+                    a.margin_mm,
+                    a.gutter_mm,
+                    a.square_size_mm,
+                )
+            ):
+                raise ValueError("inactive controls for kaleidocycle state")
+            if a.profile:
+                from imposition.artwork_layout import parse_layout
+                from imposition.kaleidocycle_artwork import validate_kaleidocycle_layout
+
+                layout = parse_layout(read_json(a.profile))
+                validate_kaleidocycle_layout(layout)
+                if (
+                    a.state != layout.settings["state"]
+                    or a.width_mm != layout.settings["width_mm"]
+                ):
+                    raise ValueError("profile state/width differs from CLI request")
+            else:
+                layout = resolve_kaleidocycle_state(a.state, width_mm=a.width_mm)
+        elif a.state is not None or a.width_mm is not None:
+            raise ValueError("state/width require kaleidocycle layout")
+        elif a.layout == "booklet-spread":
             if a.profile is not None or a.square_size_mm is not None:
                 raise ValueError("profile/square size require folded layout")
             if a.spread is None:

@@ -10,7 +10,11 @@ def _safe_asset(value):
     if not isinstance(value, str) or not value or "\\" in value or ":" in value:
         raise ValueError("asset path must be safe relative SVG path")
     p = PurePosixPath(value)
-    if p.is_absolute() or any(x in ("..", ".") for x in p.parts) or p.suffix.lower() != ".svg":
+    if (
+        p.is_absolute()
+        or any(x in ("..", ".") for x in p.parts)
+        or p.suffix.lower() != ".svg"
+    ):
         raise ValueError("asset path must be safe relative SVG path")
     return str(p)
 
@@ -28,7 +32,11 @@ def build_layout_bindings(layout, asset_paths):
         entries = []
         for p in layout.panels:
             page = p.binding.get("page")
-            if type(page) is not int or page not in range(1, 9) or p.panel_id != f"page-{page}":
+            if (
+                type(page) is not int
+                or page not in range(1, 9)
+                or p.panel_id != f"page-{page}"
+            ):
                 raise ValueError("invalid logical page binding")
             entries.append(
                 {
@@ -48,15 +56,32 @@ def build_layout_bindings(layout, asset_paths):
             if slot not in EXPECTED_SLOTS or slot != p.panel_id:
                 raise ValueError("invalid cootie slot binding")
             entries.append(
-                {"slot": slot, "source": paths[p.panel_id], "fit": "contain", "margin_mm": 0.0}
+                {
+                    "slot": slot,
+                    "source": paths[p.panel_id],
+                    "fit": "contain",
+                    "margin_mm": 0.0,
+                }
             )
+    elif kinds == {"kaleidocycle-slot"}:
+        from .kaleidocycle_artwork import validate_kaleidocycle_layout
+        from .objects.kaleidocycle import Kaleidocycle
+
+        validate_kaleidocycle_layout(layout)
+        kind = "kaleidocycle"
+        all_ids = {s.slot_id for s in Kaleidocycle().slots}
+        entries = [
+            {"slot": p.panel_id, "source": paths[p.panel_id]} for p in layout.panels
+        ]
     elif kinds == {"jcard-slot"}:
         from .jcard_artwork import validate_jcard_layout
 
         validate_jcard_layout(layout)
         kind = "jcard"
         all_ids = {p.panel_id for p in layout.panels}
-        entries = [{**dict(p.binding), "source": paths[p.panel_id]} for p in layout.panels]
+        entries = [
+            {**dict(p.binding), "source": paths[p.panel_id]} for p in layout.panels
+        ]
     else:
         raise ValueError("unsupported layout binding family")
     remaining = sorted(all_ids - set(paths))
@@ -120,7 +145,7 @@ def apply_layout_bindings(manifest, patch):
         if seen != set(replacements):
             raise ValueError("manifest missing selected page assignment")
         result["pages"] = output
-    elif kind in ("cootie", "jcard"):
+    elif kind in ("cootie", "jcard", "kaleidocycle"):
         rows = result.get("panels")
         if not isinstance(rows, list):
             raise ValueError("cootie manifest requires panels")

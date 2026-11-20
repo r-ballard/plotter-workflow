@@ -93,13 +93,25 @@ class PanelLayout:
             raise ValueError("invalid panel ID")
         for name in ("canvas_polygon", "crop_polygon"):
             raw = getattr(self, name)
-            if not isinstance(raw, (list, tuple)) or len(raw) != 4:
-                raise ValueError("canvas/crop must be rectangular")
+            if not isinstance(raw, (list, tuple)) or not 3 <= len(raw) <= 64:
+                raise ValueError("canvas/crop requires 3..64 vertices")
+            if any(not isinstance(p, (tuple, list)) or len(p) != 2 for p in raw):
+                raise ValueError("invalid polygon point")
             polygon = tuple(tuple(finite(c, name) for c in p) for p in raw)
-            if any(len(p) != 2 for p in polygon) or polygon != rect(*bounds(polygon)):
-                raise ValueError(
-                    "canvas/crop corners must be ordered rectangular points"
-                )
+            if name == "canvas_polygon" and polygon != rect(*bounds(polygon)):
+                raise ValueError("canvas corners must be ordered rectangular points")
+            if name == "crop_polygon":
+                # A consistent strict turn at every edge excludes degenerate,
+                # concave and self-intersecting crops (check all other vertices).
+                for i, a in enumerate(polygon):
+                    b = polygon[(i + 1) % len(polygon)]
+                    crosses = [
+                        (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+                        for j, p in enumerate(polygon)
+                        if j not in (i, (i + 1) % len(polygon))
+                    ]
+                    if not (all(v > 0 for v in crosses) or all(v < 0 for v in crosses)):
+                        raise ValueError("crop must be strictly convex")
             object.__setattr__(self, name, polygon)
         cx0, cy0, cx1, cy1 = bounds(self.canvas_polygon)
         x0, y0, x1, y1 = bounds(self.crop_polygon)

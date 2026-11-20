@@ -12,10 +12,16 @@ ET.register_namespace("", SVG_NS)
 
 
 def build_artwork_job(layout, template):
+    if layout.settings.get("layout") == "kaleidocycle-state":
+        from .kaleidocycle_artwork import validate_kaleidocycle_layout
+
+        validate_kaleidocycle_layout(layout)
     if layout.settings.get("layout") == "cassette-jcard":
         from .jcard_artwork import build_jcard_artwork_job
 
-        return build_jcard_artwork_job(layout, template, mode=layout.settings.get("mode"))
+        return build_jcard_artwork_job(
+            layout, template, mode=layout.settings.get("mode")
+        )
     return _build_standard_artwork_job(layout, template)
 
 
@@ -59,7 +65,9 @@ def _build_standard_artwork_job(layout, template):
         "truchet-multiscale",
     ) or not ID_RE.fullmatch(p.get("id", "")):
         raise ValueError("template requires Truchet pass with safe ID")
-    if any(p.get(k) for k in ("depends_on", "group_context_ids", "relation_context_ids")):
+    if any(
+        p.get(k) for k in ("depends_on", "group_context_ids", "relation_context_ids")
+    ):
         raise ValueError("template cannot retain pass dependencies")
     parameters = p.get("parameters")
     if (
@@ -67,7 +75,9 @@ def _build_standard_artwork_job(layout, template):
         or not isinstance(parameters.get("region_fills"), dict)
         or not parameters.get("curve_layer_ids")
     ):
-        raise ValueError("template requires structured region_fills and curve_layer_ids")
+        raise ValueError(
+            "template requires structured region_fills and curve_layer_ids"
+        )
     if (
         parameters.get("coordinate_frame", "composition") != "composition"
         or parameters.get("composition_mode", "continuous") != "continuous"
@@ -77,7 +87,10 @@ def _build_standard_artwork_job(layout, template):
     if (
         not isinstance(layers, list)
         or not layers
-        or any(not isinstance(v, dict) or not ID_RE.fullmatch(v.get("id", "")) for v in layers)
+        or any(
+            not isinstance(v, dict) or not ID_RE.fullmatch(v.get("id", ""))
+            for v in layers
+        )
         or len({v["id"] for v in layers}) != len(layers)
     ):
         raise ValueError("template requires unique safe logical layer IDs")
@@ -101,10 +114,12 @@ def _build_standard_artwork_job(layout, template):
         "schema_version": 1,
         "seed": template["seed"],
         "domains": [
-            {"id": v.panel_id, "vertices": [list(q) for q in v.crop_polygon]} for v in layout.panels
+            {"id": v.panel_id, "vertices": [list(q) for q in v.crop_polygon]}
+            for v in layout.panels
         ],
         "composition_transforms": [
-            {"domain_id": v.panel_id, "matrix": list(v.assembled_matrix)} for v in layout.panels
+            {"domain_id": v.panel_id, "matrix": list(v.assembled_matrix)}
+            for v in layout.panels
         ],
         "passes": [p],
     }
@@ -155,8 +170,8 @@ def layout_preview(layout):
         a, b = affine(
             panel.assembled_matrix,
             (
-                (panel.canvas_polygon[0][0] + panel.canvas_polygon[2][0]) / 2,
-                (panel.canvas_polygon[0][1] + panel.canvas_polygon[2][1]) / 2,
+                sum(p[0] for p in panel.crop_polygon) / len(panel.crop_polygon),
+                sum(p[1] for p in panel.crop_polygon) / len(panel.crop_polygon),
             ),
         )
         ET.SubElement(
@@ -172,7 +187,9 @@ def layout_preview(layout):
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def write_layout_export(layout, template, output_dir, *, overwrite=False, protected_paths=()):
+def write_layout_export(
+    layout, template, output_dir, *, overwrite=False, protected_paths=()
+):
     job = build_artwork_job(layout, template)
     data = json_bytes(job)
     report = {
@@ -204,4 +221,6 @@ def write_layout_export(layout, template, output_dir, *, overwrite=False, protec
         for name, content in files.items():
             (stage / name).write_bytes(content)
 
-    return atomic_directory(output_dir, write, overwrite=overwrite, protected=protected_paths)
+    return atomic_directory(
+        output_dir, write, overwrite=overwrite, protected=protected_paths
+    )

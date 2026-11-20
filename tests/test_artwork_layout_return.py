@@ -15,7 +15,7 @@ from logical_layer_contract import (
 from tests.test_artwork_layout_export import template
 
 
-def producer_fixture(tmp_path, blank=False, layout=None):
+def producer_fixture(tmp_path, blank=False, layout=None, stroke="M 1 2 L 3 4"):
     layout = layout or resolve_booklet_spread(
         sheet_size="letter", pages=(8, 1), margin_mm=3.0, gutter_mm=2.0
     )
@@ -41,7 +41,9 @@ def producer_fixture(tmp_path, blank=False, layout=None):
                 "data-viz-canvas-coordinate-system": "svg-y-down",
                 "data-viz-canvas-up-anchor": "edge:0",
                 "data-viz-canvas-up-vector": "0,-1",
-                "data-viz-canvas-polygon": f"0,0 {w},0 {w},{h} 0,{h}",
+                "data-viz-canvas-polygon": " ".join(
+                    f"{x - x0},{y - y0}" for x, y in panel.crop_polygon
+                ),
                 "data-viz-canvas-clip-id": "crop",
             },
         )
@@ -51,7 +53,9 @@ def producer_fixture(tmp_path, blank=False, layout=None):
             {"id": "crop"},
         )
         E.SubElement(
-            clip, f"{{{SVG_NS}}}rect", {"x": "0", "y": "0", "width": str(w), "height": str(h)}
+            clip,
+            f"{{{SVG_NS}}}rect",
+            {"x": "0", "y": "0", "width": str(w), "height": str(h)},
         )
         if not blank:
             g = E.SubElement(
@@ -71,7 +75,7 @@ def producer_fixture(tmp_path, blank=False, layout=None):
                 g,
                 f"{{{SVG_NS}}}path",
                 {
-                    "d": "M 1 2 L 3 4",
+                    "d": stroke,
                     "data-viz-path-id": panel.panel_id + ":stroke",
                     "data-viz-domain-id": panel.panel_id,
                     "data-viz-feature-role": "truchet-curve",

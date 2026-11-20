@@ -19,7 +19,7 @@ from .artwork_io import (
     json_bytes,
     read_json,
 )
-from .artwork_layout import bounds, parse_layout, rect
+from .artwork_layout import bounds, parse_layout
 from .source import inspect_svg_source
 
 
@@ -94,10 +94,10 @@ def _restore_svg(data, panel, source):
     x0, y0, x1, y1 = bounds(panel.crop_polygon)
     cw = x1 - x0
     ch = y1 - y0
-    expected = rect(0.0, 0.0, cw, ch)
+    expected = tuple((x - x0, y - y0) for x, y in panel.crop_polygon)
     if (
         canvas is None
-        or len(canvas.polygon) != 4
+        or len(canvas.polygon) != len(expected)
         or any(
             abs(a - b) > 1e-7
             for p, q in zip(canvas.polygon, expected)

@@ -102,4 +102,9 @@ order and reading frame, and verify a continuous motif across closure seams.
 The four built-in states cover each artwork panel once. Transitions such as
 A-to-B remain deferred; their IDs can be referenced by a later transition model.
 
-The eight-page book object refactor remains a separate backlog item.
+The eight-page book is implemented as a separate PocketMod8 object; see the
+[booklet reference](../reference/booklet-imposition.md).
+
+For corner-aligned single nets or repeated copies, use the
+[corner placement and packing guide](pack-kaleidocycles.md). It includes
+committed one-, two- and three-copy Letter configs and a regeneration command.

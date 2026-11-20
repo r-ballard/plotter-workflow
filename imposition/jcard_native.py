@@ -1,9 +1,5 @@
 """Validated immutable native J-card fragments, independent of sheet placement."""
 
-import copy
-import hashlib
-import io
-import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +12,14 @@ from .artwork_layout import MM_TO_PX, _freeze, bounds, layout_dict
 from .artwork_return import _load_handoff, _subset
 from .jcard_artwork import build_jcard_artwork_job, resolve_jcard_layout
 from .jcard_profiles import get_jcard_profile
+from .native_artwork import (
+    NativeFragment,
+    PreparedNativeFace,
+    _retained_vertices,
+    _validate_viewport,
+    digest,
+)
 from .source import inspect_svg_source
-
-
-def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -34,7 +33,10 @@ class NativeFaceRequest:
 
     def __post_init__(self):
         p = get_jcard_profile(self.profile)
-        if self.face not in ("front", "back") or self.mode not in ("independent", "continuous"):
+        if self.face not in ("front", "back") or self.mode not in (
+            "independent",
+            "continuous",
+        ):
             raise ValueError("invalid native face/mode")
         if (
             not isinstance(self.blank_panels, (tuple, list))
@@ -49,69 +51,6 @@ class NativeFaceRequest:
         object.__setattr__(self, "blank_panels", tuple(self.blank_panels))
         object.__setattr__(self, "assets", Path(self.assets).resolve())
         object.__setattr__(self, "template", Path(self.template).resolve())
-
-
-@dataclass(frozen=True)
-class NativeFragment:
-    layer_id: str
-    panel_id: str
-    svg_bytes: bytes
-    vertices: int
-
-
-@dataclass(frozen=True)
-class PreparedNativeFace:
-    profile: str
-    face: str
-    width_mm: float
-    height_mm: float
-    catalog: tuple
-    fragments: tuple
-    panel_audit: tuple
-    provenance: object
-
-
-def _validate_viewport(source, expected):
-    root = ET.parse(source).getroot()
-    try:
-        width, height = float(root.get("width", "")), float(root.get("height", ""))
-        view = tuple(float(v) for v in root.get("viewBox", "").split())
-    except ValueError as exc:
-        raise ValueError("Source viewport requires canonical native pixel dimensions") from exc
-    x0, y0, x1, y1 = expected
-    want = (x0, y0, x1 - x0, y1 - y0)
-    if (
-        len(view) != 4
-        or not all(math.isfinite(v) for v in (width, height, *view))
-        or abs(width - want[2]) / MM_TO_PX > 1e-6
-        or abs(height - want[3]) / MM_TO_PX > 1e-6
-        or any(abs(a - b) / MM_TO_PX > 1e-6 for a, b in zip(view, want))
-    ):
-        raise ValueError("Source viewport differs from exact panel size")
-
-
-def _retained_vertices(geometry, width, height):
-    """Count copied paths, including off-viewport and definition geometry.
-
-    Presence lines have already been cropped. The XML retains the full paths,
-    so counting those lines alone would undercharge repeated output copies.
-    This separate count does not change the artwork or its clipping.
-    """
-    namespace = f"{{{booklet.SVG_NS}}}"
-    root = ET.Element(namespace + "svg", width=str(width), height=str(height))
-    fragment = copy.deepcopy(geometry.svg)
-    for node in fragment.iter():
-        if node.tag.rsplit("}", 1)[-1] in ("defs", "clipPath"):
-            node.tag = namespace + "g"
-        for key in ("clip-path", "display", "visibility", "opacity", "style"):
-            node.attrib.pop(key, None)
-    root.append(fragment)
-    lines, _, _ = booklet._require_vpype().read_svg(
-        io.StringIO(ET.tostring(root, encoding="unicode")),
-        quantization=0.05 * MM_TO_PX,
-        crop=False,
-    )
-    return max(sum(len(line) for line in lines), sum(len(line) for line in geometry.lines))
 
 
 def prepare_native_face(request):
@@ -134,7 +73,10 @@ def prepare_native_face(request):
         != report["producer_request"]
     ):
         raise ValueError("Prepared artwork is stale relative to selected recipe")
-    entries = [SimpleNamespace(source=bundle / f"surfaces/{p.panel_id}.svg") for p in layout.panels]
+    entries = [
+        SimpleNamespace(source=bundle / f"surfaces/{p.panel_id}.svg")
+        for p in layout.panels
+    ]
     mode, manifest = booklet._inspect_sources(entries)
     if mode != "neutral" or manifest is None:
         raise ValueError("J-card requires a prepared neutral bundle")
@@ -142,7 +84,8 @@ def prepare_native_face(request):
     if (
         manifest.raw.get("schema") != "plotter-workflow/assembled-artwork-assets/v1"
         or provenance.get("handoff_sha256") != digest(bundle / "layout-handoff.json")
-        or provenance.get("producer_design_sha256") != digest(bundle / "producer-design.json")
+        or provenance.get("producer_design_sha256")
+        != digest(bundle / "producer-design.json")
     ):
         raise ValueError("Prepared bundle provenance/hash mismatch")
     producer = read_json(bundle / "producer-design.json")
@@ -154,7 +97,9 @@ def prepare_native_face(request):
     if {r["domain_id"] for r in manifest.raw["surfaces"]} != {
         p.panel_id for p in layout.panels
     } or len(manifest.raw["surfaces"]) != len(layout.panels):
-        raise ValueError("Prepared bundle requires exactly the selected profile's panels")
+        raise ValueError(
+            "Prepared bundle requires exactly the selected profile's panels"
+        )
     records = []
     fragments = []
     for number, (panel, entry) in enumerate(zip(layout.panels, entries), 1):
@@ -166,7 +111,9 @@ def prepare_native_face(request):
             or len(intrinsic.polygon) != 4
             or any(
                 abs(v - q) / MM_TO_PX > 1e-6
-                for point, expected_point in zip(intrinsic.polygon, panel.canvas_polygon)
+                for point, expected_point in zip(
+                    intrinsic.polygon, panel.canvas_polygon
+                )
                 for v, q in zip(point, expected_point)
             )
         ):
@@ -215,10 +162,10 @@ def prepare_native_face(request):
         tuple(fragments),
         tuple(_freeze(v) for v in records),
         _freeze(
-            dict(
-                source_manifest_sha256=digest(bundle / "design.json"),
-                handoff_sha256=digest(bundle / "layout-handoff.json"),
-                producer_design_sha256=digest(bundle / "producer-design.json"),
-            )
+            {
+                "source_manifest_sha256": digest(bundle / "design.json"),
+                "handoff_sha256": digest(bundle / "layout-handoff.json"),
+                "producer_design_sha256": digest(bundle / "producer-design.json"),
+            }
         ),
     )

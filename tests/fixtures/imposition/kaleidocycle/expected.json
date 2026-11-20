@@ -1,0 +1,12 @@
+{
+  "fixture_schema_version": 1,
+  "layout": "kaleidocycle",
+  "orientation_validation": "provisional",
+  "expected_panel_count": 32,
+  "columns": 8,
+  "states": ["A", "B", "C", "D"],
+  "diagnostic_modes": ["panel-orientation", "state-continuity"],
+  "sheet_size": "letter",
+  "width_mm": 240,
+  "physical_inspection_issue": "HAR-179"
+}

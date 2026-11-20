@@ -32,6 +32,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if __package__ in (None, "") and str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from imposition.objects.pocketmod8 import (
+    ALLOWED_SPREADS,
+    POCKETMOD8,
+    POCKETMOD8_CELLS,
+    SHEET_SIZES_MM,
+    SUPPORTED_SHEETS,
+)
 from logical_layer_contract import (
     NEUTRAL_CONTRACT,
     InputMode,
@@ -47,31 +54,11 @@ SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
 
 MM_TO_PX = 96.0 / 25.4
-LAYOUT_NAME = "pocketmod8"
+LAYOUT_NAME = POCKETMOD8.object_id
 LAYOUT_MARKER_ATTRIBUTE = "data-plotter-workflow-layout"
 LAYOUT_MARKER_VALUE = "preserve"
 
-SHEET_SIZES_MM: dict[str, tuple[float, float]] = {
-    "letter": (279.4, 215.9),
-    "a4": (297.0, 210.0),
-    "a3": (420.0, 297.0),
-    "tabloid": (431.8, 279.4),
-}
-
-# SVG row 0 is the physical top of the landscape sheet.
-# row, column, clockwise rotation in degrees
-POCKETMOD8_CELLS: dict[int, tuple[int, int, int]] = {
-    1: (1, 3, 0),
-    2: (0, 3, 180),
-    3: (0, 2, 180),
-    4: (0, 1, 180),
-    5: (0, 0, 180),
-    6: (1, 0, 0),
-    7: (1, 1, 0),
-    8: (1, 2, 0),
-}
-
-ALLOWED_SPREADS = {(2, 3), (4, 5), (6, 7), (8, 1)}
+# Imported object constants remain public aliases for existing callers.
 FIT_MODES = {"contain", "cover"}
 UNSUPPORTED_SVG_TAGS = {"image", "text", "use", "foreignObject"}
 DRAWABLE_SVG_TAGS = {"path", "line", "polyline", "polygon", "rect", "circle", "ellipse"}
@@ -575,12 +562,7 @@ def _fit_collection(
 
 
 def _place_in_cell(lines: Any, page: int, cell_width: float, cell_height: float) -> None:
-    row, column, rotation = POCKETMOD8_CELLS[page]
-    if rotation == 180:
-        # x,y -> cell_width-x, cell_height-y
-        lines.scale(-1.0, -1.0)
-        lines.translate(cell_width, cell_height)
-    lines.translate(column * cell_width, row * cell_height)
+    POCKETMOD8.place_in_cell(lines, page, cell_width, cell_height)
 
 
 def _render_single(
@@ -758,7 +740,8 @@ def render_booklet(
     mode, manifest = _inspect_sources(entries)
     catalog = manifest.layers if manifest is not None else ()
     manifest_hash = hashlib.sha256(manifest.path.read_bytes()).hexdigest() if manifest else None
-    width_mm, height_mm = SHEET_SIZES_MM[sheet_name]
+    placement = POCKETMOD8.resolve_placement(SUPPORTED_SHEETS[sheet_name], {})
+    width_mm, height_mm = placement.width_mm, placement.height_mm
     width_px = _mm_to_px(width_mm)
     height_px = _mm_to_px(height_mm)
     cell_width = width_px / 4.0
@@ -1084,17 +1067,16 @@ def write_guide_svg(path: Path, *, sheet_name: str) -> Path:
         f"{{{SVG_NS}}}g",
         {"data-generation": "1", "data-guide-kind": "fold"},
     )
-    for x in (width / 4.0, width / 2.0, 3.0 * width / 4.0):
-        _guide_path(fold, [(x, 0.0), (x, height)])
-    _guide_path(fold, [(0.0, height / 2.0), (width / 4.0, height / 2.0)])
-    _guide_path(fold, [(3.0 * width / 4.0, height / 2.0), (width, height / 2.0)])
 
     cut = ET.SubElement(
         pen,
         f"{{{SVG_NS}}}g",
         {"data-generation": "2", "data-guide-kind": "cut"},
     )
-    _guide_path(cut, [(width / 4.0, height / 2.0), (3.0 * width / 4.0, height / 2.0)])
+    placement = POCKETMOD8.resolve_placement(SUPPORTED_SHEETS[sheet_name], {})
+    for guide in POCKETMOD8.guides(placement):
+        group = fold if guide.kind == 'fold' else cut
+        _guide_path(group, [(_mm_to_px(x), _mm_to_px(y)) for x, y in guide.points])
 
     path.parent.mkdir(parents=True, exist_ok=True)
     tree = ET.ElementTree(root)

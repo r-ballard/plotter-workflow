@@ -7,7 +7,10 @@ $python = '../../.venv/Scripts/python.exe' # linked worktree; otherwise .venv/Sc
 & $python scripts/generate_kaleidocycle_orientation_fixture.py
 ```
 
-The default destination is `output/kaleidocycle_orientation_validation`.
+The default destination is `output/hardware-acceptance/kaleidocycle/`, alongside
+the existing physical object proofs. Its tracked semantic fixture lives in
+`tests/fixtures/imposition/kaleidocycle/`; see the
+[object diagnostic index](../../tests/fixtures/imposition/README.md).
 Use `--width-mm` to choose another net width and `--overwrite` to deliberately
 regenerate the set. Default width is 240 mm on landscape Letter. These fixtures
 use deterministic vector paths, including the existing cootie diagnostic glyphs;
@@ -56,7 +59,7 @@ Each net includes `sheet/design.penplan.json`, assigning its one `diagnostic`
 logical layer to physical slot 1. From the feature checkout:
 
 ```powershell
-$root = 'output/kaleidocycle_orientation_validation'
+$root = 'output/hardware-acceptance/kaleidocycle'
 foreach ($mode in @('panel-orientation', 'state-continuity')) {
   & $python scripts/dpx3300_convert.py --input-dir "$root/$mode/sheet" `
     --output-dir "$root/$mode/sheet" --file design.svg `
@@ -119,13 +122,16 @@ regeneration with explicit overwrite. Physical fold acceptance remains pending.
 
 ## Prepared inspection jobs
 
-A fresh retained set is in `output/kaleidocycle-physical-inspection/`. It contains
+A retained copy of the prepared set is now in
+`output/hardware-acceptance/kaleidocycle/` in the original repository checkout,
+beside the existing booklet physical proofs. It contains
 both diagnostic impositions, four A-D references, an observation template, and
 two preflighted jobs per sheet: `design.diagnostic.hpgl` and `construction.hpgl`.
 All four jobs passed pen-plan and placement checks; construction tool
-documentation also passed. The original diagnostic folder remains available.
-To regenerate this set, add `--output-dir output/kaleidocycle-physical-inspection`
-to the generator command and use that root in the conversion commands.
+documentation also passed. `inspection-pack.zip` preserves the exact HAR-179
+attachment. Original output folders and the Linear Resources attachment remain
+available. The generator now uses this organized location by default; generated
+files are local to the checkout in which the command runs.
 
 Keep the sheet registered while plotting artwork and construction as separate
 jobs. Inspect the SVGs, intended slot-1 pen and paper placement before sending.

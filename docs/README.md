@@ -29,6 +29,7 @@ Start with the repository [README](../README.md) for deployment and the
 
 ## Validation records
 
+- [Object diagnostic fixture index](../tests/fixtures/imposition/README.md)
 - [Hardware validation](validation/hardware-validation.md)
 - [Hilbert fixture](validation/hilbert-fixture.md)
 - [Pocketmod8 fixture](validation/pocketmod8-fixture.md)

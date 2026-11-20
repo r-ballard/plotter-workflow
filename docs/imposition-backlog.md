@@ -12,11 +12,12 @@ Later enhancement: directed transitions reference stable endpoint state IDs,
 such as `from: A, to: B` (display label `AB`). Intermediate geometry requires
 a separate motion model and is outside the initial implementation.
 
-## Eight-page book object refactor
+## Eight-page book object refactor: implemented and software verified
 
-Extract `pocketmod8` layout from `scripts/booklet_impose.py` into a declarative
-object in `imposition/objects/`, reusing shared slots, orientation, placement,
-guides, and assembled composition mechanisms. Retain the existing CLI and
-manifest behavior, page order and rotations, supported spreads, sheet sizing,
-logical layers, provenance, and output contracts. Verify equivalence against
-the existing booklet fixtures. This remains separate backlog work.
+`imposition/objects/pocketmod8.py` now owns slots, orientation frames, placement,
+guides and facing-spread semantics. `imposition/booklet_artwork.py` composes
+reading spreads using the object. The CLI delegates while keeping existing
+entry points and aliases. Initial verification reproduced all 12 baseline
+artwork/audit/guide artifacts across four sheet sizes byte for byte. Full suite:
+812 tests passed; independent review found no important issues. Evidence is in
+the implementation plan. These changes are on the `feat/booklet-object` branch.

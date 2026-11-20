@@ -365,7 +365,7 @@ def main(argv=None):
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/kaleidocycle_orientation_validation"),
+        default=Path("output/hardware-acceptance/kaleidocycle"),
     )
     parser.add_argument("--width-mm", type=float, default=240)
     parser.add_argument("--overwrite", action="store_true")

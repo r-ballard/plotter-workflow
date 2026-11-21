@@ -63,21 +63,26 @@ def _build_standard_artwork_job(layout, template):
     if p.get("algorithm") not in (
         "truchet",
         "truchet-multiscale",
+        "truchet-triangular",
+        "truchet-triangular-multiscale",
     ) or not ID_RE.fullmatch(p.get("id", "")):
         raise ValueError("template requires Truchet pass with safe ID")
     if any(
         p.get(k) for k in ("depends_on", "group_context_ids", "relation_context_ids")
     ):
         raise ValueError("template cannot retain pass dependencies")
+    triangular = p["algorithm"] in (
+        "truchet-triangular",
+        "truchet-triangular-multiscale",
+    )
+    curve_key = "curve_layer_id" if triangular else "curve_layer_ids"
     parameters = p.get("parameters")
     if (
         not isinstance(parameters, dict)
         or not isinstance(parameters.get("region_fills"), dict)
-        or not parameters.get("curve_layer_ids")
+        or not parameters.get(curve_key)
     ):
-        raise ValueError(
-            "template requires structured region_fills and curve_layer_ids"
-        )
+        raise ValueError(f"template requires structured region_fills and {curve_key}")
     if (
         parameters.get("coordinate_frame", "composition") != "composition"
         or parameters.get("composition_mode", "continuous") != "continuous"
@@ -94,7 +99,9 @@ def _build_standard_artwork_job(layout, template):
         or len({v["id"] for v in layers}) != len(layers)
     ):
         raise ValueError("template requires unique safe logical layer IDs")
-    palette = parameters["curve_layer_ids"]
+    if triangular and "curve_layer_ids" in parameters:
+        raise ValueError("triangular recipes use curve_layer_id, not curve_layer_ids")
+    palette = [parameters[curve_key]] if triangular else parameters[curve_key]
     declared = {v["id"] for v in layers}
     if (
         not isinstance(palette, list)
@@ -102,7 +109,7 @@ def _build_standard_artwork_job(layout, template):
         or any(not isinstance(v, str) or v not in declared for v in palette)
         or len(set(palette)) != len(palette)
     ):
-        raise ValueError("curve_layer_ids requires unique declared logical layer IDs")
+        raise ValueError(f"{curve_key} requires unique declared logical layer IDs")
     x, y, w, h = layout.window
     parameters.update(
         coordinate_frame="composition",

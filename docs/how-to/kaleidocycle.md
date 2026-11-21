@@ -108,3 +108,39 @@ The eight-page book is implemented as a separate PocketMod8 object; see the
 For corner-aligned single nets or repeated copies, use the
 [corner placement and packing guide](pack-kaleidocycles.md). It includes
 committed one-, two- and three-copy Letter configs and a regeneration command.
+
+
+## Three triangular Truchet samples on Letter
+
+The artwork adapter accepts `truchet-triangular` and
+`truchet-triangular-multiscale` recipes using a singular `curve_layer_id`.
+Declare that ID in `logical_layers`, and supply `region_fills` (use `{}` for
+curves only). Triangular fill keys are `vertex` and `interstitial`.
+
+Generate curves-only, lightly filled, and multiscale samples with the sibling
+viz_virtualserver checkout and its existing Python environment:
+
+```powershell
+uv run python scripts/generate_triangular_kaleidocycle_samples.py --viz-repo ../viz_virtualserver --output-dir output/triangle-review
+```
+
+Use `--viz-python PATH` to select a different producer environment. An existing
+recognized sample directory requires `--overwrite`; unrelated destinations are
+refused. Keep the output outside the producer repository.
+
+Each sample exports four A–D handoffs, runs the producer, validates returned
+assets, and imposes all 32 panels. All states share the same three artwork
+layers, including empty fill layers in curves-only samples. Glue tabs stay blank.
+The lightly filled recipe bounds its physical pen and clearance settings across
+the affine panel maps for a nominal 0.3 mm pen.
+
+`sheet-artwork/sheet-001/front/design.svg` contains the three nets without
+construction guides; `sheet-proof/sheet-001/front/design.svg` includes separate
+cut and fold layers. The Letter landscape sheet uses 5 mm margins and gutters.
+Each occupied net is 213.531 × 65.30 mm, including glue tabs. Print at 100%.
+Individual nets, recipes, producer bundles, handoffs, and packing audits remain
+under the output directory; `samples.json` records completion.
+
+These samples use the existing **provisional** square-fan profiles. They do not
+establish physical folded continuity or replace the sacrificial folding check
+described above. Guide layers do not distinguish mountain and valley folds.

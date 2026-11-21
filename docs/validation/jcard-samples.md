@@ -1,4 +1,4 @@
-﻿# J-card physical sample plots
+# J-card physical sample plots
 
 ## Standard Cassette 3–8-panel samples
 
@@ -51,3 +51,88 @@ To regenerate, follow docs/how-to/cassette-jcard.md with examples/jcard/both.jso
 
 Record measured trim size, fold positions, duplex offset, stock thickness and cassette-case fit in HAR-88. Physical plotting is deferred and does not block the software PR merge.
 
+
+## Consolidated HAR-88 inspection pack
+
+The current local handoff is `output/hardware-acceptance/jcard-inspection/`
+in the plotter-workflow checkout. It contains all 21 jobs, `jobs.json`,
+`verification.json`, and `physical-inspection.template.json`. Each job keeps
+its authoritative SVG, manifest and imposition audit beside the explicit pen
+plan, HP-GL, resolved plan, placement report and preflight report. Generated
+files remain local; Linear records observations and links to repository
+instructions. An archive upload is not required.
+
+Start with `standard-3/fit-proof/front/design.svg` and its
+`design.proof.hpgl`: Letter landscape, expected trim 103.1875 x 101.6 mm.
+Copy the measurement template to an observations file, then record measured
+trim/fold positions, stock, pen, case fit, duplex offset and photographs in
+HAR-88. Inspect each profile separately. The prepared jobs cover left-right
+flips; top-bottom/off-center coverage from HAR-88 remains outstanding.
+
+### Prepare a regenerated job's proof plan
+
+Regenerate the original samples using the instructions above. Keep the three
+`design.*` source files together and preserve their bytes when collecting jobs
+in the consolidated directory. From the repository root, run this Python
+snippet with the virtual environment after setting `source` to one face SVG.
+Repeat for each fit/front/back job. It uses the same drawable-layer inspector
+as the converter: a catalog entry or SVG group can exist without drawable ink.
+Assigning such an inactive layer to the proof pass fails preflight.
+
+```python
+import json
+from pathlib import Path
+from pen_plan import inspect_plan_layers
+from scripts.dpx3300_convert import _neutral_context
+
+source = Path("output/hardware-acceptance/jcard-inspection/standard-3/fit-proof/front/design.svg")
+contract, _ = _neutral_context(source)
+layers = inspect_plan_layers(source, catalog=contract.layers)
+active = [layer.id for layer in layers if layer.active]
+assert active, "No drawable layers in proof"
+plan = {
+    "schema_version": 3,
+    "policy": "explicit",
+    "passes": [{"id": "proof", "assignments": [
+        {"layer_ids": active, "physical_slot": 1}
+    ]}],
+    "slots": [{"slot": 1, "tool": "Inspection marking pen",
+               "label": "Single-pen paper proof"}],
+    "omitted_layers": [layer.id for layer in layers if not layer.active],
+    "repeated_layers": [],
+    "notes": "Verify actual pen and sheet registration. Guides are marking ink. Force unmanaged.",
+}
+source.with_suffix(".penplan.json").write_text(
+    json.dumps(plan, indent=2) + "\n", encoding="utf-8"
+)
+```
+
+Confirm the actual marking pen occupies slot 1. Guide channels are ink;
+this plan supplies no cutting, scoring or force setting.
+
+### Convert and recheck the retained pack
+
+Run from the repository root with the virtual environment activated (including
+its converter dependencies on `PATH`). `jobs.json` supplies each job's sheet
+size; preserve landscape orientation and scale. The explicit 3 mm margin
+accommodates the existing registration marks on the widest A3 samples. The
+`--overwrite` flag replaces generated conversion outputs in each job folder.
+
+```powershell
+$packRoot = (Resolve-Path output/hardware-acceptance/jcard-inspection).Path
+$inspectionJobs = Get-Content "$packRoot/jobs.json" -Raw | ConvertFrom-Json
+foreach ($job in $inspectionJobs.jobs) {
+    $jobFolder = Join-Path $packRoot $job.folder
+    python scripts/dpx3300_convert.py --input-dir $jobFolder --output-dir $jobFolder --file design.svg --page-size $job.sheet --landscape --paper-position lower-left --margin 3mm --absolute --overwrite
+    if ($LASTEXITCODE -ne 0) { throw "Conversion failed: $($job.folder)" }
+    python scripts/job_preflight.py "$jobFolder/design.proof.hpgl" --write-report
+    if ($LASTEXITCODE -ne 0) { throw "Preflight failed: $($job.folder)" }
+}
+```
+
+These commands convert and inspect files; they do not send them. Recheck after
+any artifact or pen-plan change and before an attended plot. All 21 retained
+jobs passed conversion and pen-plan, placement and intended-tool documentation
+preflight during preparation on 2026-11-20. No serial connection or plotter
+transmission occurred. Physical trim, folding, case fit and duplex registration
+remain unverified.

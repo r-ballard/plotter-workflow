@@ -32,6 +32,7 @@ Start with the repository [README](../README.md) for deployment and the
 
 - [Object diagnostic fixture index](../tests/fixtures/imposition/README.md)
 - [Hardware validation](validation/hardware-validation.md)
+- [J-card physical samples and inspection handoff](validation/jcard-samples.md)
 - [Hilbert fixture](validation/hilbert-fixture.md)
 - [Pocketmod8 fixture](validation/pocketmod8-fixture.md)
 - [Cootie-catcher fixture](validation/cootie-catcher-fixture.md)

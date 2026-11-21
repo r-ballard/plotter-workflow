@@ -144,3 +144,6 @@ under the output directory; `samples.json` records completion.
 These samples use the existing **provisional** square-fan profiles. They do not
 establish physical folded continuity or replace the sacrificial folding check
 described above. Guide layers do not distinguish mountain and valley folds.
+
+For the complete DPX-3300 command sequence, use
+[Plot the three triangular Truchet kaleidocycles](plot-triangular-kaleidocycles.md).

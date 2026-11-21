@@ -1,0 +1,38 @@
+{
+  "schema_version": 3,
+  "passes": [
+    {
+      "id": "sample",
+      "assignments": [
+        {
+          "layer_ids": [
+            "curve"
+          ],
+          "physical_slot": 1
+        },
+        {
+          "layer_ids": [
+            "vertex-fill"
+          ],
+          "physical_slot": 2
+        },
+        {
+          "layer_ids": [
+            "interstitial-fill"
+          ],
+          "physical_slot": 3
+        },
+        {
+          "layer_ids": [
+            "sheet-cut-guides",
+            "sheet-fold-guides"
+          ],
+          "physical_slot": 4
+        }
+      ]
+    }
+  ],
+  "omitted_layers": [],
+  "repeated_layers": [],
+  "policy": "explicit"
+}

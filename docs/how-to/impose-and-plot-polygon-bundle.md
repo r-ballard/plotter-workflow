@@ -497,3 +497,6 @@ The remaining acceptance requires the operator and physical DPX-3300:
 See the [2026-10-22 validation record](../validation/2026-10-22-polygon-guide-software.md)
 for generation, imposition, conversion and unconfirmed multipass preflight evidence.
 No serial connection, pen confirmation, or physical acceptance was performed.
+
+For the retained job, preview command and a fill-in physical session record, see
+[HAR-8 offline handoff](../validation/har8-offline-handoff.md).

@@ -1,4 +1,4 @@
-"""Algorithm-neutral resolved layout export with a small Truchet job adapter."""
+"""Resolved layout export with Truchet and ball-and-stick job adapters."""
 
 import copy
 import hashlib
@@ -65,8 +65,10 @@ def _build_standard_artwork_job(layout, template):
         "truchet-multiscale",
         "truchet-triangular",
         "truchet-triangular-multiscale",
+        "ball-stick",
+        "ball-stick-3d",
     ) or not ID_RE.fullmatch(p.get("id", "")):
-        raise ValueError("template requires Truchet pass with safe ID")
+        raise ValueError("template requires a supported artwork pass with safe ID")
     if any(
         p.get(k) for k in ("depends_on", "group_context_ids", "relation_context_ids")
     ):
@@ -77,9 +79,11 @@ def _build_standard_artwork_job(layout, template):
     )
     curve_key = "curve_layer_id" if triangular else "curve_layer_ids"
     parameters = p.get("parameters")
-    if (
-        not isinstance(parameters, dict)
-        or not isinstance(parameters.get("region_fills"), dict)
+    truchet = p["algorithm"].startswith("truchet")
+    if not isinstance(parameters, dict):
+        raise ValueError("template requires structured parameters")  # noqa: TRY004 -- export validation API
+    if truchet and (
+        not isinstance(parameters.get("region_fills"), dict)
         or not parameters.get(curve_key)
     ):
         raise ValueError(f"template requires structured region_fills and {curve_key}")
@@ -99,23 +103,26 @@ def _build_standard_artwork_job(layout, template):
         or len({v["id"] for v in layers}) != len(layers)
     ):
         raise ValueError("template requires unique safe logical layer IDs")
-    if triangular and "curve_layer_ids" in parameters:
-        raise ValueError("triangular recipes use curve_layer_id, not curve_layer_ids")
-    palette = [parameters[curve_key]] if triangular else parameters[curve_key]
-    declared = {v["id"] for v in layers}
-    if (
-        not isinstance(palette, list)
-        or not palette
-        or any(not isinstance(v, str) or v not in declared for v in palette)
-        or len(set(palette)) != len(palette)
-    ):
-        raise ValueError(f"{curve_key} requires unique declared logical layer IDs")
-    x, y, w, h = layout.window
-    parameters.update(
-        coordinate_frame="composition",
-        composition_mode="continuous",
-        composition_window={"x": x, "y": y, "width": w, "height": h},
-    )
+    parameters["coordinate_frame"] = "composition"
+    if truchet:
+        if triangular and "curve_layer_ids" in parameters:
+            raise ValueError(
+                "triangular recipes use curve_layer_id, not curve_layer_ids"
+            )
+        palette = [parameters[curve_key]] if triangular else parameters[curve_key]
+        declared = {v["id"] for v in layers}
+        if (
+            not isinstance(palette, list)
+            or not palette
+            or any(not isinstance(v, str) or v not in declared for v in palette)
+            or len(set(palette)) != len(palette)
+        ):
+            raise ValueError(f"{curve_key} requires unique declared logical layer IDs")
+        x, y, w, h = layout.window
+        parameters.update(
+            composition_mode="continuous",
+            composition_window={"x": x, "y": y, "width": w, "height": h},
+        )
     p["target_domain_ids"] = [v.panel_id for v in layout.panels]
     job = {
         "schema_version": 1,

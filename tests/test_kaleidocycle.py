@@ -9,11 +9,14 @@ from imposition.objects.kaleidocycle import Kaleidocycle
 
 
 def test_net_has_32_stable_triangles_and_four_states_cover_every_panel():
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(tetrahedron_count=8)
     assert len(obj.slots) == 32
     assert len({s.slot_id for s in obj.slots}) == 32
     assert all(len(s.polygon) == 3 for s in obj.slots)
-    layouts = [resolve_kaleidocycle_state(state, width_mm=240) for state in "ABCD"]
+    layouts = [
+        resolve_kaleidocycle_state(state, width_mm=240, tetrahedron_count=8)
+        for state in "ABCD"
+    ]
     assert {p.panel_id for v in layouts for p in v.panels} == {
         s.slot_id for s in obj.slots
     }
@@ -36,7 +39,7 @@ def test_net_has_32_stable_triangles_and_four_states_cover_every_panel():
 
 
 def test_placement_guides_and_glue_tabs_fit_sheet():
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(tetrahedron_count=8)
     sheet = SheetSpec("letter", 279.4, 215.9, "landscape")
     placement = obj.resolve_placement(sheet, {"width_mm": 240, "margin_mm": 5})
     assert placement.width_mm / placement.height_mm == pytest.approx(obj.aspect_ratio)
@@ -58,12 +61,14 @@ def test_placement_guides_and_glue_tabs_fit_sheet():
 )
 def test_invalid_placement(options):
     with pytest.raises(ValueError):
-        Kaleidocycle().resolve_placement(SheetSpec("x", 200, 100, "landscape"), options)
+        Kaleidocycle(tetrahedron_count=8).resolve_placement(
+            SheetSpec("x", 200, 100, "landscape"), options
+        )
 
 
 def test_invalid_state():
     with pytest.raises(ValueError):
-        resolve_kaleidocycle_state("AB", width_mm=240)
+        resolve_kaleidocycle_state("AB", width_mm=240, tetrahedron_count=8)
 
 
 def test_triangle_export_return_and_partial_bindings(tmp_path):
@@ -72,7 +77,7 @@ def test_triangle_export_return_and_partial_bindings(tmp_path):
     from imposition.artwork_return import prepare_layout_assets
     from tests.test_artwork_layout_return import producer_fixture
 
-    layout = resolve_kaleidocycle_state("A", width_mm=240)
+    layout = resolve_kaleidocycle_state("A", width_mm=240, tetrahedron_count=8)
     _, export, producer = producer_fixture(tmp_path, layout=layout)
     output = prepare_layout_assets(
         producer_bundle=producer,
@@ -115,7 +120,7 @@ def test_four_state_assets_impose_once_preserving_layers_and_provenance(
     for state in "ABCD":
         folder = tmp_path / state
         folder.mkdir()
-        layout = resolve_kaleidocycle_state(state, width_mm=240)
+        layout = resolve_kaleidocycle_state(state, width_mm=240, tetrahedron_count=8)
         _, export, producer = producer_fixture(
             folder, layout=layout, blank=blank, stroke="M 0 30 L 300 30"
         )
@@ -128,6 +133,7 @@ def test_four_state_assets_impose_once_preserving_layers_and_provenance(
     config = tmp_path / "kaleidocycle.json"
     payload = {
         "schema_version": 1,
+        "tetrahedron_count": 8,
         "width_mm": 240,
         "sheet_size": "letter",
         "states": states,
@@ -157,7 +163,11 @@ def test_four_state_assets_impose_once_preserving_layers_and_provenance(
     assert len(audit["panels"]) == 32
     assert audit["validation_status"] == "provisional"
     for record in audit["panels"]:
-        slot = next(s for s in Kaleidocycle().slots if s.slot_id == record["slot"])
+        slot = next(
+            s
+            for s in Kaleidocycle(tetrahedron_count=8).slots
+            if s.slot_id == record["slot"]
+        )
         p = audit["placement_mm"]
         expected = [(p[0] + x * p[2], p[1] + y * p[3]) for x, y in slot.polygon]
         for actual, point in zip(record["polygon_mm"], expected):
@@ -181,7 +191,7 @@ def test_four_state_assets_impose_once_preserving_layers_and_provenance(
         record = audit["panels"][0]
         tx = min(x for x, y in record["polygon_mm"]) * 96 / 25.4
         ty = min(y for x, y in record["polygon_mm"]) * 96 / 25.4
-        scale = 240 / Kaleidocycle.net_width * 2 / 128 * 96 / 25.4
+        scale = 240 / Kaleidocycle(8).net_width * 2 / 128 * 96 / 25.4
         candidate = [
             line
             for line in lines
@@ -211,7 +221,7 @@ def test_four_state_assets_impose_once_preserving_layers_and_provenance(
 def test_declared_state_profile_checks_geometry_and_seams():
     from imposition.kaleidocycle_artwork import validate_kaleidocycle_layout
 
-    layout = resolve_kaleidocycle_state("A", width_mm=240)
+    layout = resolve_kaleidocycle_state("A", width_mm=240, tetrahedron_count=8)
     payload = layout_dict(layout)
     payload["profile_id"] = "paper-test-A"
     validate_kaleidocycle_layout(parse_layout(payload))

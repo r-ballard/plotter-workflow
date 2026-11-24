@@ -9,7 +9,9 @@ def test_twelve_recipes_use_common_catalog_and_valid_triangle_handoffs():
     catalogs = []
     for style in ("curves", "light-fill", "multiscale"):
         for state in "ABCD":
-            layout = resolve_kaleidocycle_state(state, width_mm=213.531)
+            layout = resolve_kaleidocycle_state(
+                state, width_mm=213.531, tetrahedron_count=8
+            )
             recipe = build_recipe(style, state, layout)
             job = build_artwork_job(layout, recipe)
             catalogs.append(job["passes"][0]["logical_layers"])

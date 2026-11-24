@@ -22,8 +22,10 @@ from .sheet_packing.model import number
 class KaleidocycleRequest:
     width_mm: float
     states: tuple
+    tetrahedron_count: int = 6
 
     def __post_init__(self):
+        Kaleidocycle(self.tetrahedron_count)
         width = number(self.width_mm, "width_mm")
         if not 0 < width <= 10000:
             raise ValueError("width_mm outside supported range")
@@ -41,10 +43,12 @@ def prepare_native_kaleidocycle(request):
     import vpype
 
     width = request.width_mm
-    height = width / Kaleidocycle.aspect_ratio
+    height = width / Kaleidocycle(request.tetrahedron_count).aspect_ratio
     sheet = SheetSpec("custom", width, height, "landscape")
     root, catalog, records, _ = render_kaleidocycle(
-        dict(request.states), ObjectPlacement(sheet, 0, 0, width, height)
+        dict(request.states),
+        ObjectPlacement(sheet, 0, 0, width, height),
+        tetrahedron_count=request.tetrahedron_count,
     )
     fragments = []
     for layer in root:
@@ -75,6 +79,7 @@ def prepare_native_kaleidocycle(request):
         _freeze(
             {
                 "validation_status": "provisional",
+                "tetrahedron_count": request.tetrahedron_count,
                 "states": [
                     {
                         "state": state,

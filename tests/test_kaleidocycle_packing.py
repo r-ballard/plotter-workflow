@@ -21,7 +21,9 @@ def states(tmp_path, width, *, blank=False):
         folder.mkdir()
         _, export, producer = producer_fixture(
             folder,
-            layout=resolve_kaleidocycle_state(state, width_mm=width),
+            layout=resolve_kaleidocycle_state(
+                state, width_mm=width, tetrahedron_count=8
+            ),
             blank=blank,
             stroke="M 0 30 L 300 30",
         )
@@ -44,6 +46,7 @@ def payload(assets, width=269.4, quantity=2):
             {
                 "id": "ring",
                 "type": "kaleidocycle",
+                "tetrahedron_count": 8,
                 "width_mm": width,
                 "states": assets,
                 "quantity": quantity,
@@ -55,7 +58,7 @@ def payload(assets, width=269.4, quantity=2):
 
 
 def test_corner_placement_keeps_center_default():
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(tetrahedron_count=8)
     sheet = SheetSpec("letter", 279.4, 215.9, "landscape")
     p = obj.resolve_placement(sheet, {"width_mm": 240, "position": "top-left"})
     assert (p.x_mm, p.y_mm) == (5, 5)
@@ -243,6 +246,7 @@ def test_single_imposer_accepts_top_left_config(tmp_path):
         json.dumps(
             {
                 "schema_version": 1,
+                "tetrahedron_count": 8,
                 "width_mm": 240,
                 "states": states(tmp_path, 240),
                 "position": "top-left",

@@ -300,6 +300,7 @@ def _source_record(obj, face):
         return {
             "face": "front",
             "width_mm": face.request.width_mm,
+            "tetrahedron_count": face.request.tetrahedron_count,
             "states": {s: str(p) for s, p in face.request.states},
             "layer_map": face.layer_map,
         }

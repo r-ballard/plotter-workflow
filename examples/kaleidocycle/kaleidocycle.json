@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "tetrahedron_count": 8,
   "sheet_size": "letter",
   "width_mm": 240,
   "margin_mm": 5,

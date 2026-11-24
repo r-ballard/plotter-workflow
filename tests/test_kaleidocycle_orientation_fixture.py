@@ -9,7 +9,7 @@ from scripts.generate_kaleidocycle_orientation_fixture import generate_fixture
 
 
 def test_diagnostic_nets_use_real_imposition_and_plotter_safe_labels(tmp_path):
-    output = generate_fixture(tmp_path / "diagnostics")
+    output = generate_fixture(tmp_path / "diagnostics", tetrahedron_count=8)
     fixture = json.loads(
         (
             Path(__file__).parent / "fixtures/imposition/kaleidocycle/expected.json"
@@ -49,6 +49,6 @@ def test_diagnostic_nets_use_real_imposition_and_plotter_safe_labels(tmp_path):
     assert all(p["observed_state"] is None for p in observations["panels"])
     before = (output / "panel-orientation/sheet/design.svg").read_bytes()
     with pytest.raises(ValueError):
-        generate_fixture(output)
-    generate_fixture(output, overwrite=True)
+        generate_fixture(output, tetrahedron_count=8)
+    generate_fixture(output, tetrahedron_count=8, overwrite=True)
     assert (output / "panel-orientation/sheet/design.svg").read_bytes() == before

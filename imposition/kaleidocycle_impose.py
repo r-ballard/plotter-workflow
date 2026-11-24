@@ -1,6 +1,7 @@
 """Return prepared state artwork to the physical net without reapplying views."""
 
 import hashlib
+import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
@@ -56,10 +57,12 @@ def resolve_state_paths(states, base_dir):
     return result
 
 
-def render_kaleidocycle(states, placement):
+def render_kaleidocycle(states, placement, *, tetrahedron_count=6):
     """Validate and render one net in a supplied physical frame, in memory."""
     sheet = placement.sheet
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(tetrahedron_count)
+    if not math.isclose(placement.width_mm / placement.height_mm, obj.aspect_ratio):
+        raise ValueError("placement must preserve net aspect ratio")
     root = _sheet_root(sheet)
     root.set("data-viz-layer-contract", NEUTRAL_CONTRACT)
     groups, catalog, records, protected = {}, None, [], []
@@ -69,6 +72,8 @@ def render_kaleidocycle(states, placement):
         protected.append(bundle)
         _, layout = _load_handoff(bundle / "layout-handoff.json")
         validate_kaleidocycle_layout(layout)
+        if layout.settings.get("tetrahedron_count", 8) != obj.tetrahedron_count:
+            raise ValueError("tetrahedron count differs from prepared artwork")
         if (
             layout.settings["state"] != state
             or abs(layout.settings["width_mm"] - placement.width_mm) > 1e-7
@@ -97,7 +102,7 @@ def render_kaleidocycle(states, placement):
         if {s.path for s in manifest.surfaces} != {
             f"surfaces/{p.panel_id}.svg" for p in layout.panels
         }:
-            raise ValueError("state bundle requires exactly eight panel assignments")
+            raise ValueError("state bundle requires exactly one panel per cell")
         current = manifest.raw["logical_layers"]
         if catalog is None:
             catalog = current
@@ -189,6 +194,7 @@ def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
         - {
             "schema_version",
             "width_mm",
+            "tetrahedron_count",
             "sheet_size",
             "margin_mm",
             "states",
@@ -204,13 +210,15 @@ def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
     if name not in booklet.SHEET_SIZES_MM:
         raise ValueError("unsupported sheet size")
     sheet = SheetSpec(name, *booklet.SHEET_SIZES_MM[name], "landscape")
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(config.get("tetrahedron_count", 6))
     placement = obj.resolve_placement(
         sheet,
         {k: config[k] for k in ("width_mm", "margin_mm", "position") if k in config},
     )
     root, catalog, records, protected = render_kaleidocycle(
-        resolve_state_paths(config["states"], config_path.parent), placement
+        resolve_state_paths(config["states"], config_path.parent),
+        placement,
+        tetrahedron_count=obj.tetrahedron_count,
     )
     protected.append(config_path)
     guides = _sheet_root(sheet)
@@ -234,6 +242,7 @@ def write_kaleidocycle(config_path, output_dir, *, overwrite=False):
     audit = {
         "schema_version": 1,
         "object_id": obj.object_id,
+        "tetrahedron_count": obj.tetrahedron_count,
         "validation_status": "provisional",
         "placement_mm": [
             placement.x_mm,

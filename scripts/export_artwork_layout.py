@@ -23,6 +23,7 @@ def main(argv=None):
     p.add_argument("--sheet-size")
     p.add_argument("--state", choices=list("ABCD"))
     p.add_argument("--width-mm", type=float)
+    p.add_argument("--tetrahedron-count", type=int)
     p.add_argument("--spread", nargs=2, type=int)
     p.add_argument("--margin-mm", type=float)
     p.add_argument("--gutter-mm", type=float)
@@ -35,6 +36,8 @@ def main(argv=None):
     try:
         if a.layout == "kaleidocycle-state":
             from imposition.kaleidocycle_artwork import resolve_kaleidocycle_state
+
+            count = a.tetrahedron_count if a.tetrahedron_count is not None else 6
 
             if any(
                 v is not None
@@ -56,12 +59,17 @@ def main(argv=None):
                 if (
                     a.state != layout.settings["state"]
                     or a.width_mm != layout.settings["width_mm"]
+                    or count != layout.settings.get("tetrahedron_count", 8)
                 ):
-                    raise ValueError("profile state/width differs from CLI request")
+                    raise ValueError(
+                        "profile state/width/count differs from CLI request"
+                    )
             else:
-                layout = resolve_kaleidocycle_state(a.state, width_mm=a.width_mm)
-        elif a.state is not None or a.width_mm is not None:
-            raise ValueError("state/width require kaleidocycle layout")
+                layout = resolve_kaleidocycle_state(
+                    a.state, width_mm=a.width_mm, tetrahedron_count=count
+                )
+        elif any(v is not None for v in (a.state, a.width_mm, a.tetrahedron_count)):
+            raise ValueError("state/width/count require kaleidocycle layout")
         elif a.layout == "booklet-spread":
             if a.profile is not None or a.square_size_mm is not None:
                 raise ValueError("profile/square size require folded layout")

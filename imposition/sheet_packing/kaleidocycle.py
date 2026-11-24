@@ -14,7 +14,7 @@ def prepare_object(spec, native=None):
         else prepare_native_kaleidocycle(spec.faces[0].request)
     )
     w, h = native.width_mm, native.height_mm
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(spec.faces[0].request.tetrahedron_count)
     placement = ObjectPlacement(SheetSpec("custom", w, h, "landscape"), 0, 0, w, h)
     polygons = [s.polygon for s in obj.slots] + list(obj.glue_polygons)
     regions = tuple(

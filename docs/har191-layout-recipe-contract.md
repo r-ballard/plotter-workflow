@@ -1,6 +1,8 @@
 # HAR-191 — Layout, recipe and surface handoff contract
 
-Status: proposed contract for review. Evidence revision: `79fa5ef` in
+Status: agreed architectural direction, including state-specific adjacency.
+Wire-schema and runtime implementation are tracked by HAR-192 through HAR-195.
+Evidence revision: `79fa5ef` in
 plotter-workflow. Producer reference: `a552442` in viz_virtualserver.
 
 ## How the coupling developed
@@ -130,6 +132,40 @@ composition. A recipe change must preserve each selected layout's adjacency.
 Tests check mismatched edge pairs, reversed crop order, point-only contact,
 near-coincident edges, and partial contacts according to declared capabilities.
 
+### Multiple states and transition snapshots
+
+An object may supply multiple named view profiles while retaining stable panel
+and crop-edge identities. Each profile identifies its object type, applicable
+parameters such as tetrahedron count, state or transition snapshot, composition
+frame, visible panel set, per-panel transforms, adjacency declarations and
+validation status. All edge references resolve against that profile's applicable
+object geometry. Validation prevents references to absent panels or undefined
+edges and applies the constraints appropriate to each declared relationship.
+
+For example, an eight-cell object's profile could declare that panel `1B` meets
+`2B` and `8B` on two specified edges. A different snapshot could describe its
+visible relationship with `1A` or `1C`. These are illustrative panel relationships
+requiring explicit edge identities and physical validation. A six-cell profile
+cannot reference `8B`.
+
+Physical hinge/glue connections remain object topology. Each profile explicitly
+identifies whether it describes physical connections or visible edge contact in
+projection. Folding can change visible contact and visibility while physical
+connections persist. Recipe processing receives the selected profile's geometry
+and declared relationships through the shared contract.
+
+Object implementations supply their own state profiles and parameter
+applicability. The framework owns common profile representation, reference and
+geometry validation. The contract permits multiple independently named snapshots
+without requiring a kinematic solver. Continuous transitions may later add a
+motion parameter and visibility/contact rules through an explicit capability.
+
+Acceptance includes two profiles for the same panel set with differing declared
+adjacency, a transition snapshot with a differing visible set, preservation of
+stable identities across states, rejection of count-incompatible references,
+and separate checks for projected contact and physical connectivity. Provisional
+profiles retain their status through generation, preparation and imposition.
+
 ## Three paired request/return examples
 
 ### Shared composition split into facets
@@ -207,6 +243,6 @@ algorithms. New capabilities may require an explicit shared-contract revision.
 Exercise blank canvases, reordered surfaces, unknown IDs, changed recipes,
 unsupported transforms, multi-pass requests, mixed catalogs and physical scale.
 
-The proposed decisions for review are explicit generation mode, explicit
+The agreed architectural decisions are explicit generation mode, explicit
 composition-frame identity, producer-owned recipe resolution, and version-scoped
 legacy replay. Physical validation status stays attached to the selected layout.

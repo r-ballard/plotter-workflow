@@ -60,7 +60,7 @@ Inspect paper placement and the actual loaded pen before an attended send.
 
 ## Use generated viz artwork
 
-Export each A-D viewing state at the chosen `width_mm`, generate its artwork,
+Export each A-D viewing state at the chosen `width_mm` and `tetrahedron_count`, generate its artwork,
 and restore it using the existing [kaleidocycle workflow](kaleidocycle.md).
 Then point a packing config's `states` at those four prepared directories.
 Use a common logical-layer catalog or provide an explicit output catalog and
@@ -72,6 +72,7 @@ Minimal kaleidocycle object entry:
 {
   "id": "ring",
   "type": "kaleidocycle",
+  "tetrahedron_count": 8,
   "quantity": 2,
   "width_mm": 269.4,
   "rotations": [0],
@@ -91,7 +92,12 @@ default sample preparation, run:
   --output-dir output/packed-kaleidocycle
 ```
 
-All source handoffs must match `width_mm`; re-export and prepare when changing
+Count defaults to six when omitted. The committed 1/2/3-up examples explicitly
+use eight to preserve their dimensions and sheet counts. Changing count changes
+the net aspect ratio; packing uses the resulting full footprint, including tabs,
+without scaling it to fit.
+
+All source handoffs must match `width_mm` and `tetrahedron_count`; re-export and prepare when changing
 size. Output must not overlap source state bundles. Catalogs, source hashes,
 panel provenance and unique instance/path IDs are preserved. The new object
 supports front-only jobs and cut/fold guides; J-card duplex controls and

@@ -69,7 +69,10 @@ def build_layout_bindings(layout, asset_paths):
 
         validate_kaleidocycle_layout(layout)
         kind = "kaleidocycle"
-        all_ids = {s.slot_id for s in Kaleidocycle().slots}
+        all_ids = {
+            s.slot_id
+            for s in Kaleidocycle(layout.settings.get("tetrahedron_count", 8)).slots
+        }
         entries = [
             {"slot": p.panel_id, "source": paths[p.panel_id]} for p in layout.panels
         ]

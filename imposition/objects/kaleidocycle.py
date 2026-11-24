@@ -1,4 +1,4 @@
-"""Thirty-two-panel net transcribed from the supplied four-segment reference.
+"""Count-parameterized net using the supplied reference's face proportions.
 
 Coordinates use horizontal half-segment = 2, vertical half-edge = 1.
 The net and folded reading frames remain provisional pending a paper fold.
@@ -6,6 +6,7 @@ The net and folded reading frames remain provisional pending a paper fold.
 
 import math
 from dataclasses import dataclass
+from functools import cached_property
 
 from ..geometry import map_normalized_polygon
 from ..model import Guide, ObjectPlacement, OrientationTarget, Slot
@@ -21,20 +22,31 @@ def _positive(value, name, *, zero=False):
 
 @dataclass(frozen=True)
 class Kaleidocycle:
+    tetrahedron_count: int = 6
     object_id = "kaleidocycle"
     schema_version = 1
-    net_width = 16.35
     net_height = 5.0
-    aspect_ratio = net_width / net_height
 
-    @staticmethod
-    def normalize(polygon):
-        return tuple(((x + 0.35) / 16.35, y / 5) for x, y in polygon)
+    def __post_init__(self):
+        n = self.tetrahedron_count
+        if type(n) is not int or n < 6 or n % 2:
+            raise ValueError("tetrahedron_count must be an even integer >= 6")
 
     @property
+    def net_width(self):
+        return 2 * self.tetrahedron_count + 0.35
+
+    @property
+    def aspect_ratio(self):
+        return self.net_width / self.net_height
+
+    def normalize(self, polygon):
+        return tuple(((x + 0.35) / self.net_width, y / 5) for x, y in polygon)
+
+    @cached_property
     def slots(self):
         result = []
-        for column in range(8):
+        for column in range(self.tetrahedron_count):
             x = column * 2
             if column % 2 == 0:
                 triangles = [
@@ -93,7 +105,10 @@ class Kaleidocycle:
 
     @property
     def glue_polygons(self):
-        top = [((4 * i, 0), (4 * i + 4, 0), (4 * i + 2, 1)) for i in range(4)]
+        top = [
+            ((4 * i, 0), (4 * i + 4, 0), (4 * i + 2, 1))
+            for i in range(self.tetrahedron_count // 2)
+        ]
         ends = [
             ((0, y), (-0.35, y + 0.2), (-0.35, y + 1.8), (0, y + 2)) for y in (0, 2)
         ]

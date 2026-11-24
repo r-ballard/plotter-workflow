@@ -4,7 +4,8 @@
   "margins_mm": [5, 5, 5, 5],
   "gutter_mm": 5,
   "objects": [{
-    "id": "ring", "type": "kaleidocycle", "quantity": 2,
+    "id": "ring", "type": "kaleidocycle",
+    "tetrahedron_count": 8, "quantity": 2,
     "width_mm": 269.4, "rotations": [0],
     "guides": {"cut": true, "fold": true},
     "states": {

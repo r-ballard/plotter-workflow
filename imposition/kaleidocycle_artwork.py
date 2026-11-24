@@ -1,5 +1,7 @@
 """Explicit provisional A-D composition profiles, separate from flat placement."""
 
+import math
+
 from .artwork_layout import (
     ArtworkLayout,
     PanelLayout,
@@ -24,16 +26,17 @@ def triangle_matrix(source, target):
     return (a, b, c, d, X - a * x - c * y, Y - b * x - d * y)
 
 
-def resolve_kaleidocycle_state(state, *, width_mm):
+def resolve_kaleidocycle_state(state, *, width_mm, tetrahedron_count=6):
     if state not in ("A", "B", "C", "D"):
         raise ValueError("state must be A, B, C, or D; transitions are deferred")
     width = finite(width_mm, "width_mm")
     if not 0 < width <= 10000:
         raise ValueError("width_mm outside supported range")
-    obj = Kaleidocycle()
+    obj = Kaleidocycle(tetrahedron_count)
+    count = obj.tetrahedron_count
     # Integer canonical canvases avoid ambiguous near-gaps in the producer's
     # exact seam checks. Physical scaling is applied once by the imposer.
-    radius = 256
+    radius = max(256, count * 2)
     center = (radius, radius)
     vertices = [
         (512, 256),
@@ -45,8 +48,18 @@ def resolve_kaleidocycle_state(state, *, width_mm):
         (256, 0),
         (512, 0),
     ]
+    if count != 8:
+        # Shared integer endpoints preserve exact producer seam comparisons.
+        # This fan is illustrative, not a physically derived folded view.
+        vertices = [
+            (
+                round(radius + radius * math.cos(2 * math.pi * i / count)),
+                round(radius + radius * math.sin(2 * math.pi * i / count)),
+            )
+            for i in range(count)
+        ]
     panels = []
-    for i in range(8):
+    for i in range(count):
         slot_id = f"column-{i + 1}-{state.lower()}"
         local = obj.local_polygon(slot_id, width)
         side = max(x for x, y in local)
@@ -55,7 +68,7 @@ def resolve_kaleidocycle_state(state, *, width_mm):
         )
         # A viewing projection can foreshorten faces; these affine maps are an
         # illustrative declaration, not a kinematic solution or validation.
-        target = (center, vertices[i], vertices[(i + 1) % 8])
+        target = (center, vertices[i], vertices[(i + 1) % count])
         panels.append(
             PanelLayout(
                 slot_id,
@@ -66,7 +79,8 @@ def resolve_kaleidocycle_state(state, *, width_mm):
             )
         )
     adjacency = [
-        ((panels[i].panel_id, 2), (panels[(i + 1) % 8].panel_id, 0)) for i in range(8)
+        ((panels[i].panel_id, 2), (panels[(i + 1) % count].panel_id, 0))
+        for i in range(count)
     ]
     return ArtworkLayout(
         f"kaleidocycle-{state}",
@@ -78,6 +92,7 @@ def resolve_kaleidocycle_state(state, *, width_mm):
             "layout": "kaleidocycle-state",
             "state": state,
             "width_mm": width,
+            "tetrahedron_count": count,
             "source_edge_units": 128,
             "source_unit_mm": width / obj.net_width * 2 / 128,
             "adjacency": adjacency,
@@ -88,7 +103,9 @@ def resolve_kaleidocycle_state(state, *, width_mm):
 
 def validate_kaleidocycle_layout(layout):
     expected = resolve_kaleidocycle_state(
-        layout.settings.get("state"), width_mm=layout.settings.get("width_mm")
+        layout.settings.get("state"),
+        width_mm=layout.settings.get("width_mm"),
+        tetrahedron_count=layout.settings.get("tetrahedron_count", 8),
     )
     canonical = {p.panel_id: p for p in expected.panels}
     if (
@@ -107,8 +124,8 @@ def validate_kaleidocycle_layout(layout):
         ):
             raise ValueError("state panel differs from canonical intrinsic geometry")
     adjacency = layout.settings.get("adjacency")
-    if not isinstance(adjacency, (tuple, list)) or len(adjacency) != 8:
-        raise ValueError("state requires eight explicitly paired radial seams")
+    if not isinstance(adjacency, (tuple, list)) or len(adjacency) != len(canonical):
+        raise ValueError("state requires one explicitly paired radial seam per cell")
     used = set()
     for seam in adjacency:
         if not isinstance(seam, (tuple, list)) or len(seam) != 2:

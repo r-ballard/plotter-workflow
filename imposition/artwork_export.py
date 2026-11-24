@@ -199,10 +199,14 @@ def write_layout_export(
 ):
     job = build_artwork_job(layout, template)
     data = json_bytes(job)
+    resolved_layout = layout_dict(layout)
+    if layout.settings.get("layout") == "kaleidocycle-state":
+        # Old profiles remain readable, but every new handoff is explicit.
+        resolved_layout["settings"].setdefault("tetrahedron_count", 8)
     report = {
         "schema_version": 1,
         "artifact_type": "assembled-artwork-layout",
-        "layout": layout_dict(layout),
+        "layout": resolved_layout,
         "job_sha256": hashlib.sha256(data).hexdigest(),
         "template_sha256": hashlib.sha256(json_bytes(template)).hexdigest(),
         "producer_request": job,

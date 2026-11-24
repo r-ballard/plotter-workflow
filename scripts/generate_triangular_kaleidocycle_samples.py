@@ -113,7 +113,9 @@ def generate_samples(output_dir, *, viz_repo, viz_python, overwrite=False):
         folder = output / style
         folder.mkdir(exist_ok=True)
         for state in "ABCD":
-            layout = resolve_kaleidocycle_state(state, width_mm=WIDTH_MM)
+            layout = resolve_kaleidocycle_state(
+                state, width_mm=WIDTH_MM, tetrahedron_count=8
+            )
             recipe = build_recipe(style, state, layout)
             recipes = folder / "recipes"
             recipes.mkdir(exist_ok=True)
@@ -148,6 +150,7 @@ def generate_samples(output_dir, *, viz_repo, viz_python, overwrite=False):
         single = {
             "schema_version": 1,
             "sheet_size": "letter",
+            "tetrahedron_count": 8,
             "width_mm": WIDTH_MM,
             "margin_mm": 5,
             "position": "top-left",
@@ -173,6 +176,7 @@ def generate_samples(output_dir, *, viz_repo, viz_python, overwrite=False):
                 {
                     "id": style,
                     "type": "kaleidocycle",
+                    "tetrahedron_count": 8,
                     "quantity": 1,
                     "width_mm": WIDTH_MM,
                     "rotations": [0],

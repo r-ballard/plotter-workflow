@@ -39,7 +39,7 @@ def recipe(algorithm):
 def test_triangle_recipe_exports_replays_and_preserves_binding_hashes(
     tmp_path, algorithm
 ):
-    layout = resolve_kaleidocycle_state("A", width_mm=213.531)
+    layout = resolve_kaleidocycle_state("A", width_mm=213.531, tetrahedron_count=8)
     template = recipe(algorithm)
     before = copy.deepcopy(template)
     job = build_artwork_job(layout, template)
@@ -60,11 +60,15 @@ def test_triangle_curve_layer_must_be_declared_scalar(value):
     p = recipe("truchet-triangular")
     p["passes"][0]["parameters"]["curve_layer_id"] = value
     with pytest.raises(ValueError, match="curve_layer_id"):
-        build_artwork_job(resolve_kaleidocycle_state("A", width_mm=213.531), p)
+        build_artwork_job(
+            resolve_kaleidocycle_state("A", width_mm=213.531, tetrahedron_count=8), p
+        )
 
 
 def test_triangle_rejects_classic_plural_palette():
     p = recipe("truchet-triangular")
     p["passes"][0]["parameters"]["curve_layer_ids"] = ["curve"]
     with pytest.raises(ValueError, match="curve_layer"):
-        build_artwork_job(resolve_kaleidocycle_state("A", width_mm=213.531), p)
+        build_artwork_job(
+            resolve_kaleidocycle_state("A", width_mm=213.531, tetrahedron_count=8), p
+        )

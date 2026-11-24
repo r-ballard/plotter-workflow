@@ -41,7 +41,9 @@ def generate_samples(output_dir, *, overwrite=False):
     )
     # Each physical width has its own matching handoffs and prepared assets.
     for folder, width in (("full-size", 269.4), ("three-up", 213.531)):
-        generate_fixture(output / folder, width_mm=width, overwrite=overwrite)
+        generate_fixture(
+            output / folder, width_mm=width, tetrahedron_count=8, overwrite=overwrite
+        )
     records = []
     for n, path in enumerate(templates, 1):
         raw = read_json(path)

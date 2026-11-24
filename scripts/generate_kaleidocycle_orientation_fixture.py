@@ -186,8 +186,13 @@ def _reference(layout, artwork):
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def generate_fixture(output_dir, *, width_mm=240, overwrite=False):
-    layouts = [resolve_kaleidocycle_state(s, width_mm=width_mm) for s in "ABCD"]
+def generate_fixture(output_dir, *, width_mm=240, tetrahedron_count=6, overwrite=False):
+    layouts = [
+        resolve_kaleidocycle_state(
+            s, width_mm=width_mm, tetrahedron_count=tetrahedron_count
+        )
+        for s in "ABCD"
+    ]
     # The shared exporter uses this recipe only as a validated transport envelope.
     # No Truchet algorithm runs: fixture provenance explicitly records hand-drawn diagnostics.
     template = {
@@ -212,6 +217,7 @@ def generate_fixture(output_dir, *, width_mm=240, overwrite=False):
             config = {
                 "schema_version": 1,
                 "width_mm": width_mm,
+                "tetrahedron_count": tetrahedron_count,
                 "sheet_size": "letter",
                 "states": {},
             }
@@ -319,6 +325,7 @@ def generate_fixture(output_dir, *, width_mm=240, overwrite=False):
             )
         observations = {
             "schema_version": 1,
+            "tetrahedron_count": tetrahedron_count,
             "validation_status": "not-tested",
             "note": "Record observations, not corrections inferred from the provisional profiles.",
             "panels": [
@@ -344,6 +351,7 @@ def generate_fixture(output_dir, *, width_mm=240, overwrite=False):
                     "schema_version": 1,
                     "fixture": "kaleidocycle-orientation/v1",
                     "width_mm": width_mm,
+                    "tetrahedron_count": tetrahedron_count,
                     "status": "provisional",
                     "states": [
                         {
@@ -368,11 +376,15 @@ def main(argv=None):
         default=Path("output/hardware-acceptance/kaleidocycle"),
     )
     parser.add_argument("--width-mm", type=float, default=240)
+    parser.add_argument("--tetrahedron-count", type=int, default=6)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
     try:
         result = generate_fixture(
-            args.output_dir, width_mm=args.width_mm, overwrite=args.overwrite
+            args.output_dir,
+            width_mm=args.width_mm,
+            tetrahedron_count=args.tetrahedron_count,
+            overwrite=args.overwrite,
         )
     except (ValueError, OSError, TypeError) as exc:
         parser.error(str(exc))

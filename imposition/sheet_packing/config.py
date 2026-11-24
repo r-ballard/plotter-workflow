@@ -125,6 +125,7 @@ def load_packing_config(payload, *, base_dir):
                 "front",
                 "back",
                 "width_mm",
+                "tetrahedron_count",
                 "states",
                 "layer_map",
             ),
@@ -137,7 +138,10 @@ def load_packing_config(payload, *, base_dir):
         kind = obj.get("type")
         if kind not in ("jcard", "kaleidocycle"):
             raise ValueError("object type must be jcard or kaleidocycle")
-        if kind == "jcard" and {"width_mm", "states", "layer_map"} & obj.keys():
+        if (
+            kind == "jcard"
+            and {"width_mm", "states", "layer_map", "tetrahedron_count"} & obj.keys()
+        ):
             raise ValueError("inactive kaleidocycle controls on J-card")
         quantity = obj.get("quantity", 1)
         if type(quantity) is not int or not 1 <= quantity <= 1000:
@@ -176,6 +180,7 @@ def load_packing_config(payload, *, base_dir):
             request = KaleidocycleRequest(
                 obj.get("width_mm"),
                 tuple((s, _path(value, base_dir)) for s, value in state_paths.items()),
+                tetrahedron_count=obj.get("tetrahedron_count", 6),
             )
             mapping = _layer_map(obj["layer_map"]) if "layer_map" in obj else None
             objects.append(

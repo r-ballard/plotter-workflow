@@ -1,13 +1,29 @@
 # Kaleidocycle composition and imposition
 
 The kaleidocycle uses the existing assembled-artwork export, producer,
-return adapter, and neutral logical-layer contracts. Its flat net has 32
-triangles in eight alternating columns. The supplied reference calls these
-four segments; a segment is a pair of columns. Slots are `column-1-a` through
-`column-8-d`. Glue tabs are construction geometry, never artwork slots.
+return adapter, and neutral logical-layer contracts. `tetrahedron_count` defaults
+to six and accepts even integers of at least six. Each cell has four triangular
+faces, giving 24 faces by default. Slots run from `column-1-a` through
+`column-N-d`. Glue tabs are construction geometry, never artwork slots.
+
+The object owns normalized shape, slots and guides; placement supplies physical
+size and sheet position. `width_mm` is the total net width including end tabs.
+Height is `width_mm * 5 / (2 * tetrahedron_count + 0.35)`. Scaling preserves face
+proportions. At a fixed total width, fewer cells produce larger faces. Omitting
+width in standalone imposition fits the net to the sheet margins; packing
+requires a physical width and preserves that scale.
+
+Historical eight-cell examples and regeneration scripts explicitly select eight.
+The commands below reproduce those examples. Use `--tetrahedron-count 6` and
+`"tetrahedron_count": 6` in the imposition config for a six-cell design.
+New handoffs record their count; historical handoffs without a count still mean
+eight. Configs without a count now mean six, so add an explicit eight when using
+historical assets. Changing count requires regenerating matching state artwork.
+The shared artwork layout limit of 1000 panels applies to each state.
 
 **Physical validation is pending.** The built-in A-D viewing profiles are
-illustrative square fan projections with explicit radial seam pairings. They
+illustrative fan projections with explicit radial seam pairings (the eight-cell
+projection retains its original square arrangement). They
 demonstrate continuous composition and orientation mapping; they are not a
 derived 3D folding solution. Their panel ordering, assembled adjacency, reading
 orientation, and closure must be checked with a labeled paper fold before
@@ -26,7 +42,7 @@ $vizPython = "$vizRepo/.venv/Scripts/python.exe"
 $demo = "$PWD/output/kaleidocycle-demo"
 foreach ($state in @('A', 'B', 'C', 'D')) {
   & $python scripts/export_artwork_layout.py --layout kaleidocycle-state `
-    --state $state --width-mm 240 `
+    --state $state --width-mm 240 --tetrahedron-count 8 `
     --job-template examples/assembled-artwork/truchet-recipe.json `
     --output-dir "$demo/$state/export"
   Push-Location $vizRepo
@@ -49,8 +65,8 @@ its own recipe and seed; all four returned bundles must retain exactly the same
 logical-layer catalog. No catalog renaming or implicit merge occurs.
 
 The example config requires all four state asset directories relative to the
-config. Each must contain exactly eight prepared surfaces with a matching
-handoff and producer provenance. Physical width must match the export width.
+config. Each must contain one prepared surface per tetrahedron with matching
+handoff and producer provenance. Count and physical width must match the export.
 Letter, A4, A3, and tabloid use the existing booklet sheet dimensions.
 
 ## Coordinates and explicit profiles
@@ -60,7 +76,8 @@ Integer source vertices and integer built-in transforms make shared seams exact
 for the producer's precision checks. These are design coordinates, not physical
 96-dpi dimensions. `settings.source_unit_mm` records the physical scale; recipe
 spacing in design units scales with it. For width 240 mm, one design unit is
-approximately 0.22936 mm. `width_mm` includes the left glue tabs.
+approximately 0.22936 mm for eight cells, or 0.30364 mm for six.
+`width_mm` includes the left glue tabs.
 
 The producer generates one composition in a named assembled frame and clips it
 into the triangles. Preparation restores local canvases. Imposition applies the
@@ -73,16 +90,28 @@ export's `layout-handoff.json` into a separate JSON file. Change its `profile_id
 `window`, per-panel `assembled_matrix`, and explicit `settings.adjacency` as needed.
 Keep canonical panel identities, local crop/canvas geometry, and bindings.
 Each adjacency entry is `[[panel_id, edge_index], [other_panel_id, edge_index]]`;
-edge indices follow the crop's ordered vertices. Eight unique edge pairs must
-cover all eight panels and meet in reverse endpoint order. Keep the status
+edge indices follow the crop's ordered vertices. One unique edge pair per cell must
+cover all panels and meet in reverse endpoint order. Keep the status
 `provisional` until a future physical acceptance workflow establishes validation.
 
-Pass this file as `--profile corrected-A.json` alongside `--state A --width-mm 240`.
+Pass this file as `--profile corrected-A.json` alongside `--state A --width-mm 240`
+and the matching `--tetrahedron-count` (eight for historical profiles).
 The exporter validates declared seams, bounds, and invertible transforms. It does
 not infer a fold state from flat sheet contact. Arbitrary profiles should use
 exactly representable shared endpoints; the producer rejects ambiguous gaps.
 
 ## Outputs and acceptance
+
+Generate a six-cell labeled diagnostic without accepting any folded view:
+
+```powershell
+& $python scripts/generate_kaleidocycle_orientation_fixture.py `
+  --tetrahedron-count 6 --width-mm 240 `
+  --output-dir output/hardware-acceptance/kaleidocycle-six
+```
+
+`panel-orientation/sheet/net-preview.svg` labels all 24 faces. Observation
+templates start as `not-tested`; views and audits remain `provisional`.
 
 - `sheet/design.svg`: artwork only, neutral layers, preserved physical placement.
 - `sheet/design.json`: hashed artwork inventory and shared layer catalog.

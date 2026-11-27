@@ -1,10 +1,9 @@
-"""Native face layouts and scoped Truchet recipes; no sheet transforms."""
+"""Native face layouts and geometry for artwork export."""
 
-import copy
 import hashlib
 import xml.etree.ElementTree as ET
 
-from .artwork_export import _build_standard_artwork_job, write_layout_export
+from .artwork_export import build_artwork_job, write_layout_export
 from .artwork_io import atomic_directory, json_bytes, read_json
 from .artwork_layout import MM_TO_PX, ArtworkLayout, PanelLayout, layout_dict, rect
 from .jcard_placement import resolve_jcard_placement, transform
@@ -77,41 +76,11 @@ def validate_jcard_layout(layout):
 
 
 def build_jcard_artwork_job(layout, template, *, mode):
-    validate_jcard_layout(layout)
-    if mode != layout.settings["mode"]:
+    if layout.settings.get("layout") != "cassette-jcard":
+        raise ValueError("Expected a native J-card layout")
+    if mode != layout.settings.get("mode"):
         raise ValueError("Artwork mode differs from layout")
-    adapted = copy.deepcopy(template)
-    # Standard validation still owns supported algorithms/catalogs. Normalize only
-    # the scoped frame controls before applying the selected native face mode.
-    if (
-        isinstance(adapted, dict)
-        and isinstance(adapted.get("passes"), list)
-        and len(adapted["passes"]) == 1
-    ):
-        if not isinstance(adapted["passes"][0], dict):
-            raise ValueError("Artwork pass must be an object")
-        params = adapted["passes"][0].get("parameters")
-        if isinstance(params, dict):
-            if "coordinate_frame" in params and params["coordinate_frame"] not in (
-                "domain",
-                "composition",
-            ):
-                raise ValueError("Unsupported coordinate_frame")
-            if "composition_mode" in params and params["composition_mode"] not in (
-                "continuous",
-                "independent-panels",
-            ):
-                raise ValueError("Unsupported composition_mode")
-            params["coordinate_frame"] = "composition"
-            params["composition_mode"] = "continuous"
-    job = _build_standard_artwork_job(layout, adapted)
-    if mode == "independent":
-        params = job["passes"][0]["parameters"]
-        params["coordinate_frame"] = "domain"
-        for key in ("composition_mode", "composition_window", "seam_margin"):
-            params.pop(key, None)
-        job.pop("composition_transforms")
-    return job
+    return build_artwork_job(layout, template)
 
 
 def sheet_preview(config, face, placement):

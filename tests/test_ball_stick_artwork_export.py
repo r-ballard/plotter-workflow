@@ -27,18 +27,12 @@ def test_ball_stick_export_replays_without_truchet_controls(tmp_path, algorithm)
     job = build_artwork_job(layout, recipe)
     assert recipe == before
     assert len(job["domains"]) == 6
-    assert job["passes"][0]["parameters"] == {
-        "rows": 5,
-        "columns": 5,
-        "coordinate_frame": "composition",
-    }
+    assert job["passes"][0]["parameters"] == before["passes"][0]["parameters"]
+    assert job["passes"][0]["composition"]["mode"] == "shared"
     assert build_artwork_job(layout, job) == job
     out = write_layout_export(layout, recipe, tmp_path / "export")
     report, _ = _load_handoff(out / "layout-handoff.json")
     assert report["producer_request"] == job
-    recipe["passes"][0]["parameters"]["coordinate_frame"] = "domain"
-    with pytest.raises(ValueError, match="composition"):
-        build_artwork_job(layout, recipe)
 
 
 def test_sample_recipes_are_distinct_and_use_six_cell_transport():

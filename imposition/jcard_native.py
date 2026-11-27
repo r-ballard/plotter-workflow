@@ -1,5 +1,6 @@
 """Validated immutable native J-card fragments, independent of sheet placement."""
 
+import hashlib
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,8 +10,9 @@ from scripts import booklet_impose as booklet
 
 from .artwork_io import json_bytes, read_json
 from .artwork_layout import MM_TO_PX, _freeze, bounds, layout_dict
-from .artwork_return import _load_handoff, _subset
-from .jcard_artwork import build_jcard_artwork_job, resolve_jcard_layout
+from .artwork_replay_v1 import replay_v1_job
+from .artwork_return import _load_handoff, matches_producer_request
+from .jcard_artwork import resolve_jcard_layout
 from .jcard_profiles import get_jcard_profile
 from .native_artwork import (
     NativeFragment,
@@ -68,10 +70,15 @@ def prepare_native_face(request):
     if json_bytes(layout_dict(layout)) != json_bytes(layout_dict(expected)):
         raise ValueError("Prepared face/profile differs from selected native layout")
     recipe = getattr(config, f"{face}_artwork")
-    if (
-        build_jcard_artwork_job(expected, read_json(recipe.template), mode=recipe.mode)
-        != report["producer_request"]
-    ):
+    template = read_json(recipe.template)
+    if report["schema_version"] == 1:
+        matches = replay_v1_job(expected, template) == report["producer_request"]
+    else:
+        matches = (
+            hashlib.sha256(json_bytes(template)).hexdigest()
+            == report["template_sha256"]
+        )
+    if not matches:
         raise ValueError("Prepared artwork is stale relative to selected recipe")
     entries = [
         SimpleNamespace(source=bundle / f"surfaces/{p.panel_id}.svg")
@@ -90,7 +97,7 @@ def prepare_native_face(request):
         raise ValueError("Prepared bundle provenance/hash mismatch")
     producer = read_json(bundle / "producer-design.json")
     if (
-        not _subset(report["producer_request"], producer)
+        not matches_producer_request(report["producer_request"], producer)
         or producer.get("logical_layers") != manifest.raw["logical_layers"]
     ):
         raise ValueError("Producer recipe/catalog differs from prepared bundle")

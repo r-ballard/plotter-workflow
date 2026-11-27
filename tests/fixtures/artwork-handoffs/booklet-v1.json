@@ -1,0 +1,271 @@
+{
+  "artifact_type": "assembled-artwork-layout",
+  "job_sha256": "5d811d7214a795fefffd49fb69e165ef037f9f258abce2420701cffde7a95ff3",
+  "layout": {
+    "panels": [
+      {
+        "assembled_matrix": [
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ],
+        "binding": {
+          "kind": "booklet-page",
+          "page": 8
+        },
+        "canvas_polygon": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            264.0,
+            0.0
+          ],
+          [
+            264.0,
+            408.00000000000006
+          ],
+          [
+            0.0,
+            408.00000000000006
+          ]
+        ],
+        "crop_polygon": [
+          [
+            11.338582677165356,
+            11.338582677165356
+          ],
+          [
+            260.2204724409449,
+            11.338582677165356
+          ],
+          [
+            260.2204724409449,
+            396.6614173228347
+          ],
+          [
+            11.338582677165356,
+            396.6614173228347
+          ]
+        ],
+        "panel_id": "page-8"
+      },
+      {
+        "assembled_matrix": [
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          264.0,
+          0.0
+        ],
+        "binding": {
+          "kind": "booklet-page",
+          "page": 1
+        },
+        "canvas_polygon": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            264.0,
+            0.0
+          ],
+          [
+            264.0,
+            408.00000000000006
+          ],
+          [
+            0.0,
+            408.00000000000006
+          ]
+        ],
+        "crop_polygon": [
+          [
+            3.7795275590551185,
+            11.338582677165356
+          ],
+          [
+            252.66141732283464,
+            11.338582677165356
+          ],
+          [
+            252.66141732283464,
+            396.6614173228347
+          ],
+          [
+            3.7795275590551185,
+            396.6614173228347
+          ]
+        ],
+        "panel_id": "page-1"
+      }
+    ],
+    "profile_id": "pocketmod8-8-1",
+    "settings": {
+      "gutter_mm": 2.0,
+      "layout": "booklet-spread",
+      "margin_mm": 3.0,
+      "mm_to_px": 3.7795275590551185,
+      "pages": [
+        8,
+        1
+      ],
+      "sheet_size": "letter"
+    },
+    "units": "svg-px",
+    "validation_status": "validated",
+    "window": [
+      0.0,
+      0.0,
+      528.0,
+      408.00000000000006
+    ]
+  },
+  "panels": [
+    {
+      "binding": {
+        "kind": "booklet-page",
+        "page": 8
+      },
+      "panel_id": "page-8",
+      "rebase_offset": [
+        11.338582677165356,
+        11.338582677165356
+      ],
+      "source_path": "surfaces/page-8.svg"
+    },
+    {
+      "binding": {
+        "kind": "booklet-page",
+        "page": 1
+      },
+      "panel_id": "page-1",
+      "rebase_offset": [
+        3.7795275590551185,
+        11.338582677165356
+      ],
+      "source_path": "surfaces/page-1.svg"
+    }
+  ],
+  "producer_request": {
+    "composition_transforms": [
+      {
+        "domain_id": "page-8",
+        "matrix": [
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "domain_id": "page-1",
+        "matrix": [
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          264.0,
+          0.0
+        ]
+      }
+    ],
+    "domains": [
+      {
+        "id": "page-8",
+        "vertices": [
+          [
+            11.338582677165356,
+            11.338582677165356
+          ],
+          [
+            260.2204724409449,
+            11.338582677165356
+          ],
+          [
+            260.2204724409449,
+            396.6614173228347
+          ],
+          [
+            11.338582677165356,
+            396.6614173228347
+          ]
+        ]
+      },
+      {
+        "id": "page-1",
+        "vertices": [
+          [
+            3.7795275590551185,
+            11.338582677165356
+          ],
+          [
+            252.66141732283464,
+            11.338582677165356
+          ],
+          [
+            252.66141732283464,
+            396.6614173228347
+          ],
+          [
+            3.7795275590551185,
+            396.6614173228347
+          ]
+        ]
+      }
+    ],
+    "passes": [
+      {
+        "algorithm": "truchet",
+        "id": "tiles",
+        "logical_layers": [
+          {
+            "id": "curve"
+          },
+          {
+            "id": "fill"
+          }
+        ],
+        "parameters": {
+          "composition_mode": "continuous",
+          "composition_window": {
+            "height": 408.00000000000006,
+            "width": 528.0,
+            "x": 0.0,
+            "y": 0.0
+          },
+          "coordinate_frame": "composition",
+          "curve_layer_ids": [
+            "curve"
+          ],
+          "region_fills": {
+            "painted": {
+              "effect": "parallel-hatch",
+              "layer_id": "fill",
+              "parameters": {
+                "spacing": 12.0
+              }
+            }
+          },
+          "tile_size": 80.0
+        },
+        "target_domain_ids": [
+          "page-8",
+          "page-1"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "seed": 31
+  },
+  "schema_version": 1,
+  "template_sha256": "889927bfbba59a55fe9c3fd1feb78a83a92f624d45fbfed4bd0ad1c60155b36b"
+}

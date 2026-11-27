@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -11,15 +12,25 @@ from logical_layer_contract import (
 )
 
 from .artwork_bindings import build_layout_bindings
-from .artwork_export import SVG_NS, build_artwork_job
+from .artwork_export import (
+    SVG_NS,
+    layout_generation_mode,
+    layout_job_geometry,
+    layout_pass_composition,
+    validate_artwork_layers,
+    validate_layout,
+    validate_surface_bindings,
+)
 from .artwork_io import (
     MAX_BYTES,
     atomic_directory,
     check_destination,
     json_bytes,
-    read_json,
+    parse_json_bytes,
+    read_json_bytes,
 )
 from .artwork_layout import bounds, parse_layout
+from .artwork_replay_v1 import replay_v1_job
 from .source import inspect_svg_source
 
 
@@ -39,8 +50,67 @@ def _subset(expected, actual):
     return expected == actual
 
 
+def matches_producer_request(request, audit):
+    expected = dict(request)
+    if "surfaces" in expected:
+        expected["declared_surfaces"] = expected.pop("surfaces")
+    return _subset(expected, audit)
+
+
+def _validate_v2_bindings(layout, request):
+    """Compare recorded layout-owned fields without interpreting algorithm parameters."""
+    if type(request.get("schema_version")) is not int or request["schema_version"] != 1:
+        raise ValueError("unsupported handoff producer request schema")
+    if type(request.get("seed")) is not int:
+        raise ValueError("handoff requires an integer producer seed")
+    mode = layout_generation_mode(layout)
+    geometry = layout_job_geometry(layout, mode=mode)
+    if "surfaces" in request:
+        validate_surface_bindings(layout, request["surfaces"])
+    for key in ("domains", "composition_transforms"):
+        if (key in geometry) != (key in request) or json_bytes(
+            geometry.get(key)
+        ) != json_bytes(request.get(key)):
+            raise ValueError(f"handoff {key} differs from resolved layout")
+    panel_ids = {panel.panel_id for panel in layout.panels}
+    passes = request.get("passes")
+    if not isinstance(passes, list) or not passes:
+        raise ValueError("handoff requires artwork passes")
+    for design_pass in passes:
+        targets = (
+            design_pass.get("target_domain_ids")
+            if isinstance(design_pass, dict)
+            else None
+        )
+        if (
+            not isinstance(targets, list)
+            or not targets
+            or not all(isinstance(t, str) for t in targets)
+        ):
+            raise ValueError("handoff requires bound pass targets")
+        validate_artwork_layers(design_pass.get("logical_layers", []))
+        source_targets = panel_ids.intersection(targets)
+        if set(targets) - panel_ids and not design_pass.get("depends_on"):
+            raise ValueError("handoff target outside layout has no dependency")
+        if (
+            source_targets
+            and mode == "shared"
+            and len(source_targets) != len(set(targets))
+        ):
+            raise ValueError("shared handoff requires placed source targets")
+        intent = layout_pass_composition(
+            layout, mode=mode if source_targets else "independent"
+        )
+        if json_bytes(design_pass.get("composition")) != json_bytes(intent):
+            raise ValueError("handoff pass composition differs from resolved layout")
+
+
 def _load_handoff(path):
-    report = read_json(path)
+    return _parse_handoff(read_json_bytes(path))
+
+
+def _parse_handoff(data):
+    report = parse_json_bytes(data)
     required = {
         "schema_version",
         "artifact_type",
@@ -54,17 +124,25 @@ def _load_handoff(path):
         not isinstance(report, dict)
         or set(report) != required
         or type(report["schema_version"]) is not int
-        or report["schema_version"] != 1
+        or report["schema_version"] not in (1, 2)
         or report["artifact_type"] != "assembled-artwork-layout"
     ):
         raise ValueError("unsupported layout handoff schema")
     layout = parse_layout(report["layout"])
+    validate_layout(layout)
     request = report["producer_request"]
     if (
-        build_artwork_job(layout, request) != request
+        not isinstance(request, dict)
+        or not isinstance(report["template_sha256"], str)
+        or not re.fullmatch(r"[0-9a-f]{64}", report["template_sha256"])
         or hashlib.sha256(json_bytes(request)).hexdigest() != report["job_sha256"]
     ):
         raise ValueError("handoff request/hash differs from resolved layout")
+    if report["schema_version"] == 1:
+        if replay_v1_job(layout, request) != request:
+            raise ValueError("historical handoff request differs from resolved layout")
+    else:
+        _validate_v2_bindings(layout, request)
     expected = [
         {
             "panel_id": p.panel_id,
@@ -176,11 +254,12 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
     bundle = Path(producer_bundle).resolve()
     handoff = Path(handoff).resolve()
     check_destination(output_dir, (bundle, handoff))
-    report, layout = _load_handoff(handoff)
+    handoff_data = read_json_bytes(handoff)
+    report, layout = _parse_handoff(handoff_data)
     audit_path = bundle / "design.json"
-    audit = read_json(audit_path)
-    audit_data = audit_path.read_bytes()
-    if not _subset(report["producer_request"], audit):
+    audit_data = read_json_bytes(audit_path)
+    audit = parse_json_bytes(audit_data)
+    if not matches_producer_request(report["producer_request"], audit):
         raise ValueError("producer geometry/recipe differs from exported request")
     manifest = load_logical_layer_manifest(audit_path)
     records = manifest.raw.get("surfaces")
@@ -193,7 +272,7 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         raise ValueError("producer surfaces do not map one-to-one to layout panels")
     surfaces = {r["domain_id"]: r for r in records}
     prepared = []
-    total = len(audit_data) + len(json_bytes(report))
+    total = len(audit_data) + len(handoff_data)
     for panel in layout.panels:
         record = surfaces[panel.panel_id]
         relative = f"surfaces/{panel.panel_id}.svg"
@@ -224,7 +303,7 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         "surfaces": [r for _, _, r in prepared],
         "adapter_provenance": {
             "producer_design_sha256": hashlib.sha256(audit_data).hexdigest(),
-            "handoff_sha256": hashlib.sha256(handoff.read_bytes()).hexdigest(),
+            "handoff_sha256": hashlib.sha256(handoff_data).hexdigest(),
             "layout_profile": layout.profile_id,
             "validation_status": layout.validation_status,
         },
@@ -235,7 +314,7 @@ def prepare_layout_assets(*, producer_bundle, handoff, output_dir, overwrite=Fal
         for name, data, _ in prepared:
             (stage / name).write_bytes(data)
         (stage / "producer-design.json").write_bytes(audit_data)
-        (stage / "layout-handoff.json").write_bytes(json_bytes(report))
+        (stage / "layout-handoff.json").write_bytes(handoff_data)
         (stage / "design.json").write_bytes(json_bytes(derivative))
         bindings = build_layout_bindings(
             layout, {p.panel_id: f"surfaces/{p.panel_id}.svg" for p in layout.panels}

@@ -1,4 +1,4 @@
-"""Resolved layout export with Truchet and ball-and-stick job adapters."""
+"""Bind layout geometry to a producer-owned artwork recipe."""
 
 import copy
 import hashlib
@@ -11,30 +11,72 @@ SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
 
 
-def build_artwork_job(layout, template):
-    if layout.settings.get("layout") == "kaleidocycle-state":
+def validate_layout(layout):
+    kind = layout.settings.get("layout")
+    if kind == "kaleidocycle-state":
         from .kaleidocycle_artwork import validate_kaleidocycle_layout
 
         validate_kaleidocycle_layout(layout)
-    if layout.settings.get("layout") == "cassette-jcard":
-        from .jcard_artwork import build_jcard_artwork_job
+    elif kind == "cassette-jcard":
+        from .jcard_artwork import validate_jcard_layout
 
-        return build_jcard_artwork_job(
-            layout, template, mode=layout.settings.get("mode")
-        )
-    return _build_standard_artwork_job(layout, template)
+        validate_jcard_layout(layout)
 
 
-def _build_standard_artwork_job(layout, template):
+def layout_generation_mode(layout):
+    if layout.settings.get("layout") == "cassette-jcard" and layout.settings["mode"] == "independent":
+        return "independent"
+    return "shared"
+
+
+def layout_job_geometry(layout, *, mode):
+    geometry = {
+        "domains": [
+            {"id": panel.panel_id, "vertices": [list(point) for point in panel.crop_polygon]}
+            for panel in layout.panels
+        ],
+    }
+    if mode == "shared":
+        geometry["composition_transforms"] = [
+            {"domain_id": panel.panel_id, "matrix": list(panel.assembled_matrix)}
+            for panel in layout.panels
+        ]
+    return geometry
+
+
+def layout_pass_composition(layout, *, mode):
+    intent = {"mode": mode}
+    if mode == "shared":
+        intent["window"] = dict(zip(("x", "y", "width", "height"), layout.window, strict=True))
+    return intent
+
+
+def validate_artwork_layers(layers):
+    if not isinstance(layers, list):
+        raise ValueError("logical_layers must be a list")  # noqa: TRY004
+    seen = set()
+    for layer in layers:
+        layer_id = layer.get("id") if isinstance(layer, dict) else None
+        if not isinstance(layer_id, str) or not ID_RE.fullmatch(layer_id) or layer_id in seen:
+            raise ValueError("template requires unique safe logical layer IDs")
+        seen.add(layer_id)
+
+
+def validate_surface_bindings(layout, surfaces):
+    if not isinstance(surfaces, list) or len(surfaces) != len(layout.panels):
+        raise ValueError("surfaces differ from layout panels")
+    for surface, panel in zip(surfaces, layout.panels, strict=True):
+        if not isinstance(surface, dict) or (
+            surface.get("id"), surface.get("domain_id")
+        ) != (panel.panel_id, panel.panel_id):
+            raise ValueError("surface binding differs from layout panel")
+
+
+def build_artwork_job(layout, template):
+    validate_layout(layout)
     if not isinstance(template, dict) or set(template) - {
-        "schema_version",
-        "seed",
-        "domains",
-        "surfaces",
-        "groups",
-        "relations",
-        "composition_transforms",
-        "passes",
+        "schema_version", "seed", "domains", "surfaces", "groups", "relations",
+        "composition_transforms", "passes",
     }:
         raise ValueError("unknown artwork template fields")
     if (
@@ -42,101 +84,48 @@ def _build_standard_artwork_job(layout, template):
         or template["schema_version"] != 1
         or type(template.get("seed")) is not int
     ):
-        raise ValueError("artwork template requires schema_version1 and integer seed")
-    if template.get("groups") or template.get("relations"):
-        raise ValueError("template cannot retain stale groups/relations")
-    passes = template.get("passes")
-    if not isinstance(passes, list) or len(passes) != 1:
-        raise ValueError("template requires exactly one pass")
-    p = copy.deepcopy(passes[0])
-    if not isinstance(p, dict) or set(p) - {
-        "id",
-        "algorithm",
-        "target_domain_ids",
-        "parameters",
-        "logical_layers",
-        "depends_on",
-        "group_context_ids",
-        "relation_context_ids",
-    }:
-        raise ValueError("invalid template pass fields")
-    if p.get("algorithm") not in (
-        "truchet",
-        "truchet-multiscale",
-        "truchet-triangular",
-        "truchet-triangular-multiscale",
-        "ball-stick",
-        "ball-stick-3d",
-    ) or not ID_RE.fullmatch(p.get("id", "")):
-        raise ValueError("template requires a supported artwork pass with safe ID")
-    if any(
-        p.get(k) for k in ("depends_on", "group_context_ids", "relation_context_ids")
+        raise ValueError("artwork template requires schema_version 1 and integer seed")
+    job = copy.deepcopy(template)
+    mode = layout_generation_mode(layout)
+    geometry = layout_job_geometry(layout, mode=mode)
+    panel_ids = [panel.panel_id for panel in layout.panels]
+    # Producer defaults bind each source domain to its identically named surface.
+    if job.get("surfaces") == []:
+        del job["surfaces"]
+    if "surfaces" in job:
+        validate_surface_bindings(layout, job["surfaces"])
+    for field, expected in (
+        ("domains", geometry["domains"]),
+        ("composition_transforms", geometry.get("composition_transforms", [])),
     ):
-        raise ValueError("template cannot retain pass dependencies")
-    triangular = p["algorithm"] in (
-        "truchet-triangular",
-        "truchet-triangular-multiscale",
-    )
-    curve_key = "curve_layer_id" if triangular else "curve_layer_ids"
-    parameters = p.get("parameters")
-    truchet = p["algorithm"].startswith("truchet")
-    if not isinstance(parameters, dict):
-        raise ValueError("template requires structured parameters")  # noqa: TRY004 -- export validation API
-    if truchet and (
-        not isinstance(parameters.get("region_fills"), dict)
-        or not parameters.get(curve_key)
-    ):
-        raise ValueError(f"template requires structured region_fills and {curve_key}")
-    if (
-        parameters.get("coordinate_frame", "composition") != "composition"
-        or parameters.get("composition_mode", "continuous") != "continuous"
-    ):
-        raise ValueError("template requires continuous composition")
-    layers = p.get("logical_layers")
-    if (
-        not isinstance(layers, list)
-        or not layers
-        or any(
-            not isinstance(v, dict) or not ID_RE.fullmatch(v.get("id", ""))
-            for v in layers
-        )
-        or len({v["id"] for v in layers}) != len(layers)
-    ):
-        raise ValueError("template requires unique safe logical layer IDs")
-    parameters["coordinate_frame"] = "composition"
-    if truchet:
-        if triangular and "curve_layer_ids" in parameters:
-            raise ValueError(
-                "triangular recipes use curve_layer_id, not curve_layer_ids"
-            )
-        palette = [parameters[curve_key]] if triangular else parameters[curve_key]
-        declared = {v["id"] for v in layers}
-        if (
-            not isinstance(palette, list)
-            or not palette
-            or any(not isinstance(v, str) or v not in declared for v in palette)
-            or len(set(palette)) != len(palette)
-        ):
-            raise ValueError(f"{curve_key} requires unique declared logical layer IDs")
-        x, y, w, h = layout.window
-        parameters.update(
-            composition_mode="continuous",
-            composition_window={"x": x, "y": y, "width": w, "height": h},
-        )
-    p["target_domain_ids"] = [v.panel_id for v in layout.panels]
-    job = {
-        "schema_version": 1,
-        "seed": template["seed"],
-        "domains": [
-            {"id": v.panel_id, "vertices": [list(q) for q in v.crop_polygon]}
-            for v in layout.panels
-        ],
-        "composition_transforms": [
-            {"domain_id": v.panel_id, "matrix": list(v.assembled_matrix)}
-            for v in layout.panels
-        ],
-        "passes": [p],
-    }
+        supplied = job.pop(field, [])
+        if supplied != [] and json_bytes(supplied) != json_bytes(expected):
+            raise ValueError(f"template {field} differs from layout geometry")
+    job.update(geometry)
+    passes = job.get("passes")
+    if not isinstance(passes, list) or not passes:
+        raise ValueError("template requires artwork passes")
+    for design_pass in passes:
+        if not isinstance(design_pass, dict):
+            raise ValueError("artwork pass must be an object")  # noqa: TRY004
+        validate_artwork_layers(design_pass.get("logical_layers", []))
+        targets = design_pass.get("target_domain_ids", [])
+        if not isinstance(targets, list) or any(not isinstance(t, str) or not t for t in targets):
+            raise ValueError("invalid target_domain_ids")
+        if not targets:
+            targets = panel_ids.copy()
+            design_pass["target_domain_ids"] = targets
+        derived = set(targets).difference(panel_ids)
+        if derived and not design_pass.get("depends_on"):
+            raise ValueError("targets outside the layout require a dependency on derived domains")
+        if derived and mode == "shared" and derived != set(targets):
+            raise ValueError("shared generation cannot mix placed panels and derived domains")
+        intent = layout_pass_composition(layout, mode="independent" if derived else mode)
+        if "composition" in design_pass:
+            declared = design_pass["composition"]
+            if declared != {"mode": intent["mode"]} and json_bytes(declared) != json_bytes(intent):
+                raise ValueError("pass composition differs from layout generation intent")
+        design_pass["composition"] = intent
     if len(json_bytes(job)) > MAX_BYTES:
         raise ValueError("artwork job exceeds size limit")
     return job
@@ -211,7 +200,7 @@ def write_layout_export(
         # Old profiles remain readable, but every new handoff is explicit.
         resolved_layout["settings"].setdefault("tetrahedron_count", 8)
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "artifact_type": "assembled-artwork-layout",
         "layout": resolved_layout,
         "job_sha256": hashlib.sha256(data).hexdigest(),

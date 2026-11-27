@@ -53,22 +53,3 @@ def test_triangle_recipe_exports_replays_and_preserves_binding_hashes(
     report, restored = _load_handoff(export / "layout-handoff.json")
     assert report["producer_request"] == job
     assert restored.settings["width_mm"] == 213.531
-
-
-@pytest.mark.parametrize("value", [None, "", True, [], "missing"])
-def test_triangle_curve_layer_must_be_declared_scalar(value):
-    p = recipe("truchet-triangular")
-    p["passes"][0]["parameters"]["curve_layer_id"] = value
-    with pytest.raises(ValueError, match="curve_layer_id"):
-        build_artwork_job(
-            resolve_kaleidocycle_state("A", width_mm=213.531, tetrahedron_count=8), p
-        )
-
-
-def test_triangle_rejects_classic_plural_palette():
-    p = recipe("truchet-triangular")
-    p["passes"][0]["parameters"]["curve_layer_ids"] = ["curve"]
-    with pytest.raises(ValueError, match="curve_layer"):
-        build_artwork_job(
-            resolve_kaleidocycle_state("A", width_mm=213.531, tetrahedron_count=8), p
-        )

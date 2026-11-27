@@ -1,6 +1,7 @@
 import hashlib
 import json
 import xml.etree.ElementTree as E
+from pathlib import Path
 
 import pytest
 
@@ -232,3 +233,51 @@ def test_return_rejects_mismatched_provenance(tmp_path, tamper):
         prepare_layout_assets(
             producer_bundle=bundle, handoff=handoff, output_dir=tmp_path / "out"
         )
+
+
+def test_archived_v1_handoff_restores_original_geometry_and_provenance(tmp_path):
+    from imposition.artwork_return import prepare_layout_assets
+
+    archive = Path(__file__).parent / "fixtures/artwork-handoffs/booklet-v1.json"
+    historical = json.loads(archive.read_bytes())
+    layout, _, bundle = producer_fixture(tmp_path)
+    audit_path = bundle / "design.json"
+    audit = json.loads(audit_path.read_bytes())
+    audit.update(historical["producer_request"])
+    audit_path.write_bytes(json_bytes(audit))
+    handoff = tmp_path / "saved-handoff.json"
+    handoff.write_bytes(archive.read_bytes() + b"\n")
+    out = tmp_path / "returned"
+    prepare_layout_assets(producer_bundle=bundle, handoff=handoff, output_dir=out)
+
+    manifest = load_logical_layer_manifest(out / "design.json")
+    assert [layer.id for layer in manifest.layers] == ["curve", "fill"]
+    assert (out / "layout-handoff.json").read_bytes() == handoff.read_bytes()
+    assert (
+        manifest.raw["adapter_provenance"]["handoff_sha256"]
+        == hashlib.sha256(handoff.read_bytes()).hexdigest()
+    )
+    for panel in layout.panels:
+        assert (
+            inspect_svg_source(out / f"surfaces/{panel.panel_id}.svg").polygon
+            == panel.canvas_polygon
+        )
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_rehashed_placement_tampering_is_rejected(tmp_path, version):
+    from imposition.artwork_return import _load_handoff
+
+    if version == 1:
+        source = Path(__file__).parent / "fixtures/artwork-handoffs/booklet-v1.json"
+    else:
+        _, export, _ = producer_fixture(tmp_path)
+        source = export / "layout-handoff.json"
+    report = json.loads(source.read_bytes())
+    request = report["producer_request"]
+    request["composition_transforms"][0]["matrix"][4] += 1
+    report["job_sha256"] = hashlib.sha256(json_bytes(request)).hexdigest()
+    handoff = tmp_path / "tampered.json"
+    handoff.write_bytes(json_bytes(report))
+    with pytest.raises(ValueError, match="layout"):
+        _load_handoff(handoff)

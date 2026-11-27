@@ -1,6 +1,7 @@
 import json
 
 import pytest
+
 from imposition.artwork_return import prepare_layout_assets
 from imposition.jcard_artwork import (
     build_jcard_artwork_job,
@@ -27,13 +28,21 @@ def test_native_export_and_restore(tmp_path, face, mode):
     layout = resolve_jcard_layout(config, face)
     assert len(layout.panels) == 8
     job = build_jcard_artwork_job(layout, template(), mode=mode)
-    assert job["passes"][0]["parameters"]["coordinate_frame"] == (
-        "domain" if mode == "independent" else "composition"
-    )
+    assert job["passes"][0]["parameters"] == template()["passes"][0]["parameters"]
+    composition = job["passes"][0]["composition"]
+    if mode == "independent":
+        assert composition == {"mode": "independent"}
+    else:
+        assert composition["mode"] == "shared"
+        assert composition["window"] == dict(
+            zip(("x", "y", "width", "height"), layout.window, strict=True)
+        )
     _, export, producer = producer_fixture(tmp_path, layout=layout)
     prepared = tmp_path / "prepared"
     prepare_layout_assets(
-        producer_bundle=producer, handoff=export / "layout-handoff.json", output_dir=prepared
+        producer_bundle=producer,
+        handoff=export / "layout-handoff.json",
+        output_dir=prepared,
     )
     bindings = json.loads((prepared / "bindings.json").read_text())
     assert bindings["kind"] == "jcard" and bindings["complete"]
@@ -52,16 +61,10 @@ def test_face_bytes_are_selection_independent(tmp_path, face):
         assert (single / face / name).read_bytes() == (both / face / name).read_bytes()
 
 
-@pytest.mark.parametrize(
-    "bad", [{"passes": [None]}, {"coordinate_frame": False}, {"composition_mode": {}}]
-)
-def test_malformed_recipe_controls_are_rejected(tmp_path, bad):
+def test_malformed_pass_rejected(tmp_path):
     layout = resolve_jcard_layout(configuration(tmp_path), "front")
     recipe = template()
-    if "passes" in bad:
-        recipe.update(bad)
-    else:
-        recipe["passes"][0]["parameters"].update(bad)
+    recipe["passes"] = [None]
     with pytest.raises(ValueError):
         build_jcard_artwork_job(layout, recipe, mode="independent")
 

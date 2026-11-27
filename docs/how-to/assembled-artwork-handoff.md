@@ -23,6 +23,13 @@ existing producer job schema. `layout-preview.svg` shows the assembled canvases,
 crop boxes and labeled corners. It is a diagnostic image, not a plotter input.
 The sample recipe is a template; do not run its empty domain list directly.
 
+To use another producer algorithm, supply its recipe through the same
+`--job-template` option. The layout supplies the panel polygons, placements,
+and the shared composition window. An empty pass target list binds to all
+layout panels. Keep explicit targets for passes that draw on a subset or use
+domains created by an earlier pass. The producer resolves algorithm names,
+artwork parameters, and dependencies when it runs the job.
+
 Geometry uses SVG pixels: **96 / 25.4 units per millimeter**. A physical pen width
 of 0.3 mm corresponds to approximately 1.133858 design units at this resolved scale.
 Recipe spacing, pen width, and clearance numbers are not automatically converted
@@ -30,7 +37,7 @@ from millimeters. Adjust the recipe intentionally for the exported physical size
 
 ## Generate and restore full canvases
 
-Use a producer checkout containing merged PR45 (or newer), and its environment:
+Use a producer checkout containing merged PR137 (or newer), and its environment:
 
 ```powershell
 $vizRepo = 'C:/path/to/viz_virtualserver'
